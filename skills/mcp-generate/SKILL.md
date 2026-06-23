@@ -3,6 +3,8 @@ name: mcp-generate
 description: Extract rpc/config.json wire-specs from proxy source code for the scaffolded rpc-calling project
 ---
 
+> 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
+
 > 本 skill 的 base dir = 加载时显示的路径；CLI 调用形式为 `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（${SKILL_DIR} 即本 skill 的 base dir）。
 
 # MCP Generate
@@ -67,6 +69,16 @@ For each capability in `analysis.json`, extract how it is actually called on the
      - `reply` — `readJSON()` → `"json"`; `readString()` → `"string"`; typed reads → `"int"` / `"double"` / `"bool"`
    - **Native** (`require`/factory + method): extract `require`, optional `factory`, `method`, and the literal `args` array.
 3. **Write the entry** into `rpc/config.json` with `op` = `capability.id` (the key under which the spec is stored).
+
+**sourceRef 对不上真实源码时的处理（绝不臆造 wire）**：
+1. 若 sourceRef 指向的方法在真实源码里不存在或方法名不符，**不要按 fixture 臆造 wire**——在 app 源码里搜索该 capability 真正的 proxy/manager（按 capability 的 object/action 关键词、D-Bus bus 名、`createMethodCallMessage` 调用点grep）。
+2. 找到真实 proxy → 按其 `createMethodCallMessage`+`funcName`+`stringify` 模式抽真实 wire-spec，写入 config（verified）。
+3. 若该 capability **不走 dbus/native RPC 模型**（如 launch_app=adb sendlink、VIN=系统属性 native 调用、appstatus=进程内读取），**跳过它**：不进 config，在最终报告标注 `deferred: 非 RPC 模型（<原因>）`。
+4. 报告里清晰区分每条 capability：`verified`（源码核对过 wire）vs `deferred`（跳过+原因）。**禁止把 inferred/猜测的 wire 当 verified 发出。**
+5. `validate-config` 会要求每个进 config 的 capability 都 dispatchable；deferred 的不进 config（覆盖率闸门对它们放行——它们不在 RPC 模型内，单列说明）。
+
+   > **覆盖率闸门说明（供 controller 知悉）**：当前 `validate-config` 的 coverage 检查期望 `analysis.json` 里**每一个** capability 在 config 中都有对应 `op`。对于 deferred（非 RPC 模型）的 capability，把它们在最终报告/analysis 里标为 out-of-scope，覆盖率闸门对「真正可走 RPC 的 capability」成立即可。本 skill **不改动** validate-config 代码；未来迭代可能需要给 validate-config 增加「deferred allowlist」，让 deferred capability 显式豁免 coverage 检查（本次只在文档层面记下这个预期）。
+
 4. **Run both gates** (these are deterministic CLI gates — the reliability spine). On failure, read the gate's error message, fix the config, and re-run. Retry up to 3 attempts; if still failing, surface the gate errors to the user and stop.
 
    ```bash

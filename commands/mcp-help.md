@@ -2,6 +2,8 @@
 description: Reference for the im-mcp-codeagent plugin — skills, CLI subcommands, and install/装车 prerequisites
 ---
 
+> 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
+
 # /mcp-help
 
 Reference card for the **im-mcp-codeagent** plugin. Print this verbatim to the user.

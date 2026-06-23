@@ -3,6 +3,8 @@ description: Run the full MCP Server generation pipeline (analyze→scaffold→g
 argument-hint: <app源码目录>
 ---
 
+> 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
+
 # /mcp-pipeline
 
 Load and follow the **mcp-pipeline** skill to run the end-to-end pipeline that turns the YunOS HDT app at `$ARGUMENTS` into a production MCP Server.

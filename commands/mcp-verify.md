@@ -3,6 +3,8 @@ description: Verify a generated MCP Server project (install + tsc + tools/call d
 argument-hint: <project-dir>
 ---
 
+> 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
+
 # /mcp-verify
 
 Run the deterministic `verify` command against the generated MCP Server project at `$ARGUMENTS` and report the results.
