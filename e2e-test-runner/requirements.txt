@@ -1,0 +1,22 @@
+# E2E Test Runner Requirements
+
+# YAML config support
+pyyaml>=6.0
+
+# OpenAI API client (for LLM calls)
+openai>=1.0.0
+
+# Anthropic API client (optional, for Claude support)
+anthropic>=0.18.0
+
+# HTTP client with HTTP/2 support (required by openai_client.py http2=True)
+httpx[http2]>=0.27.0
+
+# Async utilities
+tenacity>=8.2.0
+
+# Token counting
+tiktoken>=0.5.0
+
+# Repair incomplete JSON from LLM outputs
+json_repair>=0.30.0

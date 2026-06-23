@@ -1,0 +1,23 @@
+{
+  "name": "im-mcp-codeagent",
+  "version": "0.1.0",
+  "description": "Auto-generate controllable MCP Servers from YunOS HDT apps (Claude Code + Codex).",
+  "author": { "name": "IM Cockpit Team" },
+  "homepage": "https://github.com/im-cockpit/im-mcp-codeagent",
+  "repository": "https://github.com/im-cockpit/im-mcp-codeagent",
+  "license": "MIT",
+  "keywords": ["yunos", "automotive", "mcp", "codex", "rpc-bridge"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "IM MCP CodeAgent",
+    "shortDescription": "Auto-generate controllable MCP Servers from YunOS HDT apps.",
+    "longDescription": "Scaffolds an MCP Server from a YunOS HDT app manifest, generates an adb-driven rpc-bridge, and wires a car-side RpcEngine so Claude Code and Codex can drive the device.",
+    "developerName": "IM Cockpit Team",
+    "category": "Developer",
+    "capabilities": ["Write"],
+    "defaultPrompt": [
+      "Scaffold an MCP server from a YunOS HDT app manifest.",
+      "Generate the rpc-bridge and car-side RpcEngine wiring."
+    ]
+  }
+}

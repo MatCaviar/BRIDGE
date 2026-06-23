@@ -1,0 +1,25 @@
+{
+  "servers": [
+    {
+      "name": "imaudio",
+      "path": "../mcp-imaudio",
+      "command": "node",
+      "args": ["dist/index.js"],
+      "analysis_json": "../schema/__tests__/fixtures/imaudio-analysis.json"
+    },
+    {
+      "name": "aipet",
+      "path": "../mcp-aipet",
+      "command": "node",
+      "args": ["dist/index.js"],
+      "analysis_json": "../schema/__tests__/fixtures/aipet-full-analysis.json"
+    },
+    {
+      "name": "hvac",
+      "path": "../mcp-hvac",
+      "command": "node",
+      "args": ["dist/index.js"],
+      "analysis_json": "../schema/__tests__/fixtures/hvac-analysis.json"
+    }
+  ]
+}

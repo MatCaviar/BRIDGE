@@ -1,0 +1,234 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://im.alibaba-inc.com/schemas/analysis.schema.json",
+  "title": "MCP CodeAgent Analysis",
+  "description": "Interface-level analysis of a YunOS HDT application, produced by /mcp-analyze. Captures capabilities, params, returns, safety levels, and error codes — NOT internal implementation details.",
+  "type": "object",
+  "required": ["app", "capabilities"],
+  "additionalProperties": false,
+  "properties": {
+    "app": {
+      "type": "object",
+      "description": "Application metadata extracted from manifest and source.",
+      "required": ["name", "domain", "framework", "entryFile"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Application identifier (e.g. 'aipet', 'music')."
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1,
+          "description": "YunOS domain grouping (e.g. 'cockpit', 'navigation')."
+        },
+        "framework": {
+          "type": "string",
+          "enum": ["YunOS HDT"],
+          "description": "Application framework. V1 only supports YunOS HDT."
+        },
+        "entryFile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path to the main TypeScript entry file."
+        },
+        "pages": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Page names from the app manifest."
+        },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Declared permissions from the app manifest."
+        },
+        "voiceEnabled": {
+          "type": "boolean",
+          "description": "Whether the app has voice interaction enabled.",
+          "default": false
+        },
+        "dualScreen": {
+          "type": "boolean",
+          "description": "Whether the app supports dual-screen display.",
+          "default": false
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Discrete capabilities exposed by the app. Each maps to one MCP tool.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "domain", "object", "action", "safetyLevel", "sdkCalls", "sourceRef"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Unique capability identifier in snake_case. Used as MCP tool name."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Grouping domain (e.g. 'navigation', 'pet', 'vehicle')."
+          },
+          "object": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target object (e.g. 'page', 'pet', 'gear')."
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Verb phrase (e.g. 'navigate_to', 'capture', 'read_status')."
+          },
+          "params": {
+            "type": "array",
+            "description": "Input parameters accepted by this capability.",
+            "items": {
+              "type": "object",
+              "required": ["name", "type"],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z][a-zA-Z0-9]*$",
+                  "description": "Parameter name in camelCase."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "TypeScript type name (e.g. 'string', 'number', 'FpsRange')."
+                },
+                "enum": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "minItems": 1,
+                  "description": "Enum values if the type is an enum. References the enums section."
+                },
+                "optional": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Whether this parameter can be omitted."
+                }
+              }
+            }
+          },
+          "returns": {
+            "type": "object",
+            "description": "Return type information.",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Return type name (e.g. 'GearStatus', 'NavigationResult')."
+              },
+              "fields": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Field names in the return type."
+              }
+            }
+          },
+          "safetyLevel": {
+            "type": "string",
+            "enum": [
+              "readonly",
+              "normal",
+              "p_gear_required",
+              "p_gear_and_confirm",
+              "p_gear_and_network"
+            ],
+            "description": "Safety level determines precondition checks enforced by the middleware."
+          },
+          "sdkCalls": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "YunOS SDK module paths called by this capability (e.g. '@system.router')."
+          },
+          "sourceRef": {
+            "type": "string",
+            "minLength": 1,
+            "description": "file:method reference in the original app source."
+          }
+        }
+      }
+    },
+    "enums": {
+      "type": "object",
+      "description": "Enum types referenced by capability params or returns.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["values", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1,
+            "description": "Enum member names."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["string", "number"],
+            "description": "Underlying type of the enum."
+          },
+          "sourceFile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source file where this enum is defined."
+          }
+        }
+      }
+    },
+    "errorCodes": {
+      "type": "object",
+      "description": "Domain-prefixed error codes. Key is the domain prefix identifier.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["prefix", "domainName", "codes"],
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "Domain prefix number (e.g. 2 for navigation → 2xxx error codes)."
+          },
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable domain name (e.g. 'navigation', 'pet')."
+          },
+          "codes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["value", "message"],
+              "additionalProperties": false,
+              "properties": {
+                "value": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 99,
+                  "description": "Suffix value. Full code = prefix * 1000 + value (e.g. 2001 = 2*1000 + 1)."
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Error message in zh-CN."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

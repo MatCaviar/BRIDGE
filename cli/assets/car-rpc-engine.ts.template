@@ -1,0 +1,153 @@
+"use strict";
+/**
+ * 通用 RPC 引擎页（所有 app 相同）。镜像 MCP server 框架的 dispatch 算法。
+ * 以 system uid 运行：读 /sdcard/imrpc/{config,cmd}.json → 按 config dispatch(dbus|native) → 写 result.json → 自销毁。
+ * 不 import 任何 app 业务代码；靠 config 驱动。
+ *
+ * 实现期已对照源码核对：
+ *  - ubus 用法：ts/proxy/BaseProxy.ts:27,33-37（new UBus("dbus")；createInterface(busName, busPath, interface)；interface = busName + ".interface"）
+ *  - 文件 API（同步）：ts/utils/EqualizerConfigStore.ts:95-97,318-326（new File(path)；FileReader.readFileSync；FileWriter.writeFileSync；closeSync；destroy）
+ */
+import { BMPage } from "extend/hdt/page/BMPage";
+import UBus = require("ubus");
+import File = require("yunos/cloudfs/File");
+import FileReader = require("yunos/cloudfs/FileReader");
+import FileWriter = require("yunos/cloudfs/FileWriter");
+import Log = require("./utils/Log");
+
+const TAG = "RpcEngine::";
+const CONFIG_PATH = "/sdcard/imrpc/config.json";
+const CMD_PATH = "/sdcard/imrpc/cmd.json";
+const RESULT_PATH = "/sdcard/imrpc/result.json";
+
+// ---- dispatch 算法（镜像 MCP server 框架）----
+function interpolate(template: any, vars: Record<string, any>): any {
+  if (typeof template === "string") {
+    // 单独一个 ${var} 占位 → 保留原类型（number 仍是 number），匹配真实 wire/方法签名
+    const single = template.match(/^\$\{(\w+)\}$/);
+    if (single) return vars[single[1]];
+    return template.replace(/\$\{(\w+)\}/g, (_m, k) => (vars[k] === undefined ? "" : String(vars[k])));
+  }
+  if (Array.isArray(template)) return template.map((v: any) => interpolate(v, vars));
+  if (template && typeof template === "object") {
+    const o: any = {};
+    for (const k of Object.keys(template)) o[k] = interpolate(template[k], vars);
+    return o;
+  }
+  return template;
+}
+function applyStringify(arg: any, paths: string[] = []): void {
+  for (const p of paths) {
+    const segs = p.split(".");
+    let node: any = arg;
+    for (let i = 0; i < segs.length - 1; i++) node = node[segs[i]];
+    node[segs[segs.length - 1]] = JSON.stringify(node[segs[segs.length - 1]]);
+  }
+}
+function evalExpr(expr: string, vars: Record<string, any>): any {
+  const s = expr.replace(/\$\{(\w+)\}/g, (_m, k) => String(vars[k] ?? 0));
+  if (!/^[-+*/().\s\d]+$/.test(s)) throw new Error("bad expr: " + expr);
+  return Function('"use strict"; return (' + s + ");")();
+}
+
+// ---- 同步文件 API（参考 utils/EqualizerConfigStore.ts）----
+function readFile(path: string): string {
+  const f = new File(path);
+  const reader = new FileReader(f);
+  const result = reader.readFileSync("utf8");
+  reader.closeSync();
+  return result || "";
+}
+function writeResult(obj: any): void {
+  const f = new File(RESULT_PATH);
+  const w = new FileWriter(f);
+  w.writeFileSync(JSON.stringify(obj), "utf-8");
+  w.closeSync();
+  try { f.destroy(); } catch (_) { /* ignore */ }
+}
+
+class RpcEngine extends BMPage {
+  onStart() {
+    this.run()
+      .catch((e: any) => Log.E(TAG, "run error", e))
+      .then(() => {
+        // 自销毁：每次 sendlink = 全新 onStart。finish() 若不存在则安全降级（Task 8 实测确认）。
+        try { (this as any).finish(); } catch (e) { Log.W(TAG, "finish unavailable", e); }
+      });
+  }
+
+  private async run(): Promise<void> {
+    let cmd: any;
+    try {
+      cmd = JSON.parse(readFile(CMD_PATH));
+    } catch (e) {
+      writeResult({ reqId: "", ok: false, error: { code: "BAD_ARGS", message: "cmd unreadable" } });
+      return;
+    }
+    const reqId = cmd.reqId;
+    let cfg: any;
+    try {
+      cfg = JSON.parse(readFile(CONFIG_PATH));
+    } catch (e) {
+      writeResult({ reqId, ok: false, error: { code: "BAD_ARGS", message: "config unreadable" } });
+      return;
+    }
+    const spec = cfg[cmd.op];
+    if (!spec) {
+      writeResult({ reqId, ok: false, error: { code: "UNKNOWN_OP", message: cmd.op } });
+      return;
+    }
+    try {
+      const data = spec.type === "dbus" ? await this.callDbus(spec, cmd.args || {})
+                : spec.type === "native" ? await this.callNative(spec, cmd.args || {})
+                : Promise.reject(new Error("bad type"));
+      writeResult({ reqId, ok: true, data });
+    } catch (e) {
+      writeResult({ reqId, ok: false, error: { code: "RPC_ERROR", message: String(e) } });
+    }
+  }
+
+  private callDbus(spec: any, args: Record<string, any>): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const arg = interpolate(JSON.parse(JSON.stringify(spec.arg)), args);
+      applyStringify(arg, spec.stringify || []);
+      const ubus = new UBus("dbus");
+      const iface = ubus.createInterface(spec.bus, spec.path, spec.bus + ".interface");
+      const msg = iface.createMethodCallMessage(spec.method);
+      msg.writeString(JSON.stringify(arg));
+      iface.sendMethodCallMessage(msg, (err: any, result: any) => {
+        if (err) { reject(err); return; }
+        try {
+          let data: any;
+          switch (spec.reply) {
+            case "json": data = result.readJSON(); break;
+            case "string": data = result.readString(); break;
+            case "int": data = result.readInt32(); break;
+            case "double": data = result.readDouble(); break;
+            case "bool": data = result.readBool(); break;
+            default: data = result.readJSON();
+          }
+          resolve(data);
+        } catch (e) {
+          reject(e);
+        } finally {
+          try { result.destroy(); } catch (_) { /* ignore */ }
+          try { iface.destroy(); } catch (_) { /* ignore */ }
+        }
+      });
+    });
+  }
+
+  private async callNative(spec: any, args: Record<string, any>): Promise<any> {
+    const M: any = require(spec.require);
+    const inst = spec.factory ? M[spec.factory]() : new M();
+    const resolved = (spec.args || []).map((a: any) => {
+      if (typeof a === "string") return interpolate(a, args);
+      if (a && typeof a === "object" && typeof a.expr === "string") return evalExpr(a.expr, args);
+      return a;
+    });
+    return await inst[spec.method](...resolved);
+  }
+}
+
+export = RpcEngine;

@@ -1,0 +1,360 @@
+{
+  "app": {
+    "name": "imaudio",
+    "domain": "imaudio",
+    "framework": "YunOS HDT",
+    "entryFile": "ts/App.ts",
+    "pages": ["home", "soundSpace"],
+    "permissions": [
+      "MANAGE_VOICE_KEYPHRASES.permission.yunos.com",
+      "APR_HIDDEN_TRIGGER.permission.yunos.com",
+      "NETWORK.permission.yunos.com",
+      "GLOBAL_GESTURE.permission.yunos.com",
+      "IMAUDIO_SERVICE.permission.yunos.com",
+      "CREATE_OVERLAY_WINDOW.permission.yunos.com",
+      "MEDIA_SERVICE.permission.yunos.com",
+      "MODIFY_AUDIO_SETTINGS.permission.yunos.com",
+      "CAR_INFO.permission.yunos.com",
+      "CAR_PROPERTY_SYS.permission.yunos.com",
+      "SPEECH_RECOGNITION.permission.yunos.com",
+      "PLAY_TTS.permission.yunos.com",
+      "CAR_CONTROL_AMBIENT_LIGHT.permission.yunos.com",
+      "CAR_CONTROL_WINDOW.permission.yunos.com",
+      "NETMGR_URL_GET.permission.yunos.com"
+    ],
+    "voiceEnabled": true,
+    "dualScreen": true
+  },
+  "capabilities": [
+    {
+      "id": "soundstage_read",
+      "domain": "soundstage",
+      "object": "sound_stage",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "SoundStageResult",
+        "fields": ["mode", "fade", "balance", "vncEnabled", "isAtmosPlaying"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["SoundStageManager.getSoundStage"],
+      "sourceRef": "ts/model/SoundStageModel.ts:getSoundStage"
+    },
+    {
+      "id": "soundstage_set",
+      "domain": "soundstage",
+      "object": "sound_stage",
+      "action": "set",
+      "params": [
+        { "name": "mode", "type": "number" },
+        { "name": "fade", "type": "number", "optional": true },
+        { "name": "balance", "type": "number", "optional": true }
+      ],
+      "returns": {
+        "type": "SoundStageResult",
+        "fields": ["success", "mode", "fade", "balance"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["SoundStageManager.setSoundStage"],
+      "sourceRef": "ts/model/SoundStageModel.ts:setSoundStage"
+    },
+    {
+      "id": "vnc_status_read",
+      "domain": "soundstage",
+      "object": "vnc_status",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "VncStatusResult",
+        "fields": ["enabled", "status"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["SoundStageManager.getSpeedVolumeStatus"],
+      "sourceRef": "ts/model/SoundStageModel.ts:getVNCStatus"
+    },
+    {
+      "id": "vnc_status_set",
+      "domain": "soundstage",
+      "object": "vnc_status",
+      "action": "set",
+      "params": [
+        { "name": "enabled", "type": "boolean" }
+      ],
+      "returns": {
+        "type": "VncStatusResult",
+        "fields": ["success", "enabled"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["SoundStageManager.setSpeedVolumeStatus"],
+      "sourceRef": "ts/model/SoundStageModel.ts:setVNCStatus"
+    },
+    {
+      "id": "equalizer_read",
+      "domain": "equalizer",
+      "object": "equalizer",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "EqualizerResult",
+        "fields": ["type", "officialType", "customEffectId", "customValues"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["EqualizerModel.getEffectValues"],
+      "sourceRef": "ts/model/EqualizerModel.ts:getEffectValues"
+    },
+    {
+      "id": "equalizer_preset_set",
+      "domain": "equalizer",
+      "object": "equalizer_preset",
+      "action": "set",
+      "params": [
+        { "name": "preset", "type": "string", "enum": ["0", "1", "2", "3"] }
+      ],
+      "returns": {
+        "type": "EqualizerResult",
+        "fields": ["success", "officialType"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["EqualizerModel.sendEffectValues"],
+      "sourceRef": "ts/model/EqualizerModel.ts:setEffectValues"
+    },
+    {
+      "id": "equalizer_custom_set",
+      "domain": "equalizer",
+      "object": "custom_equalizer",
+      "action": "set",
+      "params": [
+        { "name": "effectId", "type": "string" },
+        { "name": "values", "type": "string" }
+      ],
+      "returns": {
+        "type": "EqualizerResult",
+        "fields": ["success", "effectId"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["EqualizerModel.sendEffectValues"],
+      "sourceRef": "ts/model/EqualizerModel.ts:sendCustomEffectValues"
+    },
+    {
+      "id": "equalizer_custom_save",
+      "domain": "equalizer",
+      "object": "custom_equalizer",
+      "action": "save",
+      "params": [
+        { "name": "name", "type": "string" },
+        { "name": "values", "type": "string" }
+      ],
+      "returns": {
+        "type": "EqualizerSaveResult",
+        "fields": ["success", "effectId", "name"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["EqualizerModel.createAndSaveEffect"],
+      "sourceRef": "ts/model/EqualizerModel.ts:createAndSaveEffect"
+    },
+    {
+      "id": "beosonic_read",
+      "domain": "beosonic",
+      "object": "beosonic",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "BeosonicResult",
+        "fields": ["enabled", "preset", "x", "y"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["BeosonicModel.getCurrentValues"],
+      "sourceRef": "ts/model/BeosonicModel.ts:getCurrentValues"
+    },
+    {
+      "id": "beosonic_preset_set",
+      "domain": "beosonic",
+      "object": "beosonic_preset",
+      "action": "set",
+      "params": [
+        { "name": "x", "type": "number" },
+        { "name": "y", "type": "number" },
+        { "name": "z", "type": "number", "optional": true }
+      ],
+      "returns": {
+        "type": "BeosonicResult",
+        "fields": ["success", "x", "y", "z"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["BeosonicModel.sendEffectValues"],
+      "sourceRef": "ts/model/BeosonicModel.ts:sendEffectValues"
+    },
+    {
+      "id": "locksound_read",
+      "domain": "locksound",
+      "object": "lock_sound",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "LockSoundResult",
+        "fields": ["enabled", "resourceCode", "resourceName", "soundType"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["LockSoundModel.getEffectValues"],
+      "sourceRef": "ts/model/LockSoundModel.ts:getEffectValues"
+    },
+    {
+      "id": "locksound_enable",
+      "domain": "locksound",
+      "object": "lock_sound",
+      "action": "enable",
+      "params": [
+        { "name": "resourceCode", "type": "string" }
+      ],
+      "returns": {
+        "type": "LockSoundResult",
+        "fields": ["success", "enabled", "resourceCode"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["LockSoundModel.sendEffectValues"],
+      "sourceRef": "ts/model/LockSoundModel.ts:setEffectValues"
+    },
+    {
+      "id": "locksound_disable",
+      "domain": "locksound",
+      "object": "lock_sound",
+      "action": "disable",
+      "params": [],
+      "returns": {
+        "type": "LockSoundResult",
+        "fields": ["success", "enabled"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["LockSoundModel.disableLockSound"],
+      "sourceRef": "ts/model/LockSoundModel.ts:disableLockSound"
+    },
+    {
+      "id": "karaoke_read",
+      "domain": "karaoke",
+      "object": "karaoke",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "KaraokeResult",
+        "fields": ["enabled", "mode", "micVolume", "mediaVolume"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["KaraokeModel.getFastAudioMode"],
+      "sourceRef": "ts/model/KaraokeModel.ts:getFastAudioMode"
+    },
+    {
+      "id": "karaoke_mode_set",
+      "domain": "karaoke",
+      "object": "karaoke_mode",
+      "action": "set",
+      "params": [
+        { "name": "mode", "type": "number", "enum": ["0", "1", "2"] }
+      ],
+      "returns": {
+        "type": "KaraokeResult",
+        "fields": ["success", "mode"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": ["KaraokeManager.setFastAudioMode"],
+      "sourceRef": "ts/manager/KaraokeManager.ts:setFastAudioMode"
+    },
+    {
+      "id": "carinfo_read",
+      "domain": "vehicle",
+      "object": "car_info",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "CarInfoResult",
+        "fields": ["vin", "model"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["CarInfoModel.getVin"],
+      "sourceRef": "ts/model/CarInfoModel.ts:getVin"
+    },
+    {
+      "id": "appstatus_read",
+      "domain": "system",
+      "object": "app_status",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "AppStatusResult",
+        "fields": ["isPageActive", "currentDisplayName", "theme"]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": ["WindowManager.isPageActive"],
+      "sourceRef": "ts/manager/WindowManager.ts"
+    },
+    {
+      "id": "launch_app",
+      "domain": "system",
+      "object": "app",
+      "action": "launch",
+      "params": [
+        { "name": "appName", "type": "string", "enum": ["imaudio", "lightpoint", "smartcar"] }
+      ],
+      "returns": {
+        "type": "LaunchAppResult",
+        "fields": ["success", "targetPageId", "appName"]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [],
+      "sourceRef": "adb:sendlink"
+    }
+  ],
+  "enums": {
+    "SoundStage": {
+      "values": ["AllCar", "Driver", "RearSeatVip", "HignOrderSurround", "MiniConcert", "ConcertHall", "ProfessionalListeningRoom", "Custom", "PanoramicCinema", "AIRhineVoice", "AIAuroraWarm", "AIEnglandStyle", "AIAmericanMetal"],
+      "type": "number",
+      "sourceFile": "ts/interface/SoundStage.ts"
+    },
+    "SpeedVolumeStatus": {
+      "values": ["OFF", "LOW", "MID", "HIGH"],
+      "type": "string",
+      "sourceFile": "ts/interface/SoundStage.ts"
+    },
+    "EqualizerOfficialType": {
+      "values": ["0", "1", "2", "3"],
+      "type": "string",
+      "sourceFile": "ts/interface/Equalizer.ts"
+    },
+    "LockSoundType": {
+      "values": ["OFFICAL", "CUSTOMIZE", "OPERATION"],
+      "type": "number",
+      "sourceFile": "ts/interface/LockSound.ts"
+    },
+    "FastAudioModeEnum": {
+      "values": ["Normal", "RecordingStudio", "KSongRoom"],
+      "type": "number",
+      "sourceFile": "ts/proxy/MAFProxy.ts"
+    }
+  },
+  "errorCodes": {
+    "audio": {
+      "prefix": 2,
+      "domainName": "audio",
+      "codes": {
+        "SDK_UNAVAILABLE": { "value": 1, "message": "Audio SDK not available" },
+        "INVALID_PARAM": { "value": 2, "message": "Invalid audio parameter" },
+        "EFFECT_NOT_FOUND": { "value": 3, "message": "Audio effect not found" },
+        "SET_FAILED": { "value": 4, "message": "Failed to set audio effect" },
+        "RESOURCE_NOT_INSTALLED": { "value": 5, "message": "Lock sound resource not installed" }
+      }
+    },
+    "vehicle": {
+      "prefix": 3,
+      "domainName": "vehicle",
+      "codes": {
+        "VIN_UNAVAILABLE": { "value": 1, "message": "Vehicle VIN not available" }
+      }
+    },
+    "system": {
+      "prefix": 5,
+      "domainName": "system",
+      "codes": {
+        "APP_NOT_READY": { "value": 1, "message": "Audio app not ready" }
+      }
+    }
+  }
+}
