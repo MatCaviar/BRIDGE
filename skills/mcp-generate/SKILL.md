@@ -73,11 +73,11 @@ For each capability in `analysis.json`, extract how it is actually called on the
 **sourceRef 对不上真实源码时的处理（绝不臆造 wire）**：
 1. 若 sourceRef 指向的方法在真实源码里不存在或方法名不符，**不要按 fixture 臆造 wire**——在 app 源码里搜索该 capability 真正的 proxy/manager（按 capability 的 object/action 关键词、D-Bus bus 名、`createMethodCallMessage` 调用点grep）。
 2. 找到真实 proxy → 按其 `createMethodCallMessage`+`funcName`+`stringify` 模式抽真实 wire-spec，写入 config（verified）。
-3. 若该 capability **不走 dbus/native RPC 模型**（如 launch_app=adb sendlink、VIN=系统属性 native 调用、appstatus=进程内读取），**跳过它**：不进 config，在最终报告标注 `deferred: 非 RPC 模型（<原因>）`。
-4. 报告里清晰区分每条 capability：`verified`（源码核对过 wire）vs `deferred`（跳过+原因）。**禁止把 inferred/猜测的 wire 当 verified 发出。**
-5. `validate-config` 会要求每个进 config 的 capability 都 dispatchable；deferred 的不进 config（覆盖率闸门对它们放行——它们不在 RPC 模型内，单列说明）。
+3. 若该 capability **不走 dbus/native RPC 模型**（如 launch_app=adb sendlink、VIN=系统属性 native 调用、appstatus=进程内读取），**defer 它**：在 `rpc/config.json` 顶层写入 `_deferred` 允许清单——`"_deferred": { "<cap.id>": "<原因>" }`（例 `"_deferred": { "launch_app": "adb sendlink — 非 RPC", "carinfo_read": "sysprop native" }`）。**不要给它写 wire-spec**；`_deferred` 里登记即代表有意不提供 wire。`validate-config` 的 coverage 闸门会豁免 `_deferred` 登记的 capability，并把它们作为 `deferred` 信息型字段返回。
+4. 报告里清晰区分每条 capability：`verified`（源码核对过 wire）vs `deferred`（写入 `_deferred`+原因）。**禁止把 inferred/猜测的 wire 当 verified 发出。**
+5. `validate-config` 会要求每个进 config 的 capability 都 dispatchable；deferred 的只进 `_deferred`（不进 wire-spec）——覆盖率闸门对它们放行（它们不在 RPC 模型内，机器可读地登记在 `_deferred` 里）。
 
-   > **覆盖率闸门说明（供 controller 知悉）**：当前 `validate-config` 的 coverage 检查期望 `analysis.json` 里**每一个** capability 在 config 中都有对应 `op`。对于 deferred（非 RPC 模型）的 capability，把它们在最终报告/analysis 里标为 out-of-scope，覆盖率闸门对「真正可走 RPC 的 capability」成立即可。本 skill **不改动** validate-config 代码；未来迭代可能需要给 validate-config 增加「deferred allowlist」，让 deferred capability 显式豁免 coverage 检查（本次只在文档层面记下这个预期）。
+   > **覆盖率闸门说明（供 controller 知悉）**：`validate-config` 的 coverage 检查期望 `analysis.json` 里**每一个** capability 在 config 中都有对应 `op` **或** 登记在顶层 `_deferred` 允许清单里（`{ "_deferred": { "<cap.id>": "<原因>" } }`）。`_deferred` 里的 key = 有意不提供 wire-spec 的 capability id；value = 原因字符串。gate 会跳过（不报错）这些 capability，并在结果里把它们的 id 作为 `deferred` 字段返回（信息型，非错误）。`_deferred` 本身不是 capability，因此不会进入 dispatchable/wire 检查（它无 `.type`/`.arg.funcName`，是惰性的）。非对象型的 `_deferred`（如字符串）会被当作空、静默忽略。
 
 4. **Run both gates** (these are deterministic CLI gates — the reliability spine). On failure, read the gate's error message, fix the config, and re-run. Retry up to 3 attempts; if still failing, surface the gate errors to the user and stop.
 

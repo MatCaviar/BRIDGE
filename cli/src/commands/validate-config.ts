@@ -4,7 +4,7 @@ import { constructDbusCall, constructNativeCall } from "@im/mcp-server-framework
 import type { AnalysisData, ParamDef } from "../types.js";
 import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
 
-export interface ValidateConfigResult { readonly valid: boolean; readonly errors: readonly string[] }
+export interface ValidateConfigResult { readonly valid: boolean; readonly errors: readonly string[]; readonly deferred: readonly string[] }
 
 export function sampleArgs(params: readonly ParamDef[] | undefined): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -20,9 +20,14 @@ export function sampleArgs(params: readonly ParamDef[] | undefined): Record<stri
 
 export function validateConfig(config: unknown, analysis: AnalysisData): ValidateConfigResult {
   const errors: string[] = [];
-  if (!config || typeof config !== "object") return { valid: false, errors: ["config is not an object"] };
+  if (!config || typeof config !== "object") return { valid: false, errors: ["config is not an object"], deferred: [] };
   const cfg = config as Record<string, unknown>;
+  const deferredRaw = cfg._deferred;
+  const deferred: readonly string[] = deferredRaw && typeof deferredRaw === "object" && !Array.isArray(deferredRaw)
+    ? Object.keys(deferredRaw as Record<string, unknown>)
+    : [];
   for (const cap of analysis.capabilities) {
+    if (deferred.includes(cap.id)) continue;
     if (!cfg[cap.id]) errors.push(`missing op for capability: ${cap.id}`);
   }
   for (const cap of analysis.capabilities) {
@@ -37,7 +42,7 @@ export function validateConfig(config: unknown, analysis: AnalysisData): Validat
       errors.push(`${cap.id}: not dispatchable: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, deferred };
 }
 
 export async function validateConfigCommand(args: string[]): Promise<void> {
@@ -50,6 +55,6 @@ export async function validateConfigCommand(args: string[]): Promise<void> {
   let state = readState(appName) ?? createInitialState(appName, resolve(configPath));
   const result = validateConfig(config, analysis);
   try { state = updateStep(state, "validate_config", { status: result.valid ? "completed" : "failed", error: result.valid ? undefined : result.errors.join("\n") }); writeState(state); } catch {}
-  if (result.valid) { process.stdout.write(`Config valid\n`); return; }
+  if (result.valid) { process.stdout.write(`Config valid${result.deferred.length ? ` (${result.deferred.length} deferred: ${result.deferred.join(", ")})` : ""}\n`); return; }
   throw new Error(`Config invalid:\n${result.errors.join("\n")}`);
 }
