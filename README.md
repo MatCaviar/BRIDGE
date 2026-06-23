@@ -17,7 +17,7 @@ Given a YunOS HDT app (source + manifest), it produces a ready-to-run MCP Server
 ## Install (Claude Code)
 
 ```bash
-/plugin marketplace add https://github.com/<your-org>/im-mcp-codeagent.git
+/plugin marketplace add https://github.com/MatCaviar/im-mcp-codeagent.git
 /plugin install im-mcp-codeagent
 ```
 
