@@ -10,10 +10,15 @@ describe("SP-D hooks", () => {
     expect(h).not.toMatch(/npm install/);
     expect(h).not.toMatch(/tsc --noEmit/);
   });
+  it("session-init.sh builds framework BEFORE cli (cli depends on @im/mcp-server-framework → framework/dist)", () => {
+    const s = readFileSync(resolve(__dirname, "../../hooks/session-init.sh"), "utf-8");
+    expect(s).toContain("framework/dist/index.js");
+    expect(s.indexOf("framework/dist/index.js")).toBeLessThan(s.indexOf("cli/dist/cli.js"));
+  });
   it("session-init.sh builds dist (emit, not --noEmit) and fails loud", () => {
     const s = readFileSync(resolve(__dirname, "../../hooks/session-init.sh"), "utf-8");
     expect(s).toContain("CLAUDE_PLUGIN_ROOT");
-    expect(s).toMatch(/npx tsc( |")/);
+    expect(s).toMatch(/npx tsc[) "]/);
     expect(s).not.toContain("--noEmit");
     expect(s).toMatch(/dist\/cli\.js/);
     expect(s).not.toMatch(/2>\/dev\/null/);

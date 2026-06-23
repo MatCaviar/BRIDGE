@@ -17,8 +17,15 @@ install_if_needed() {
 install_if_needed "$ROOT/framework"
 install_if_needed "$ROOT/cli"
 
+# build framework FIRST — cli imports @im/mcp-server-framework (→ framework/dist), so
+# framework/dist must exist before cli's tsc can resolve it (else TS2307 on fresh install).
+if [ ! -f "$ROOT/framework/dist/index.js" ]; then
+  echo "[im-mcp] building framework/dist"
+  (cd "$ROOT/framework" && npx tsc) || { echo "[im-mcp] framework build failed" >&2; exit 1; }
+fi
+
 if [ ! -f "$ROOT/cli/dist/cli.js" ]; then
   echo "[im-mcp] building cli/dist"
-  (cd "$ROOT/cli" && npx tsc ) || { echo "[im-mcp] tsc build failed" >&2; exit 1; }
+  (cd "$ROOT/cli" && npx tsc) || { echo "[im-mcp] cli build failed" >&2; exit 1; }
 fi
 echo "[im-mcp] ready"
