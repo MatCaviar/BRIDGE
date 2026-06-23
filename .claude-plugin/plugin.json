@@ -3,7 +3,7 @@
   "displayName": "IM MCP CodeAgent",
   "version": "0.1.0",
   "description": "Auto-generate controllable MCP Servers from YunOS HDT apps: analyze → scaffold → generate → gates → build. Car-side RPC bridge, deterministic config gates, dual-end (Claude Code + Codex).",
-  "author": { "name": "IM Cockpit Team" },
+  "author": { "name": "Tongji University & IM" },
   "license": "MIT",
   "homepage": "https://github.com/MatCaviar/im-mcp-codeagent",
   "repository": "https://github.com/MatCaviar/im-mcp-codeagent",

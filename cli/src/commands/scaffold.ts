@@ -137,7 +137,9 @@ adapter:
   mock_mode: true
 
 adb:
-  path: "../../tools/adb/adb.exe"
+  # "adb" resolves via PATH on any OS (Windows/macOS/Linux). Override to a
+  # concrete path (e.g. ../../tools/adb/adb.exe) only if bundling your own adb.
+  path: "adb"
   use_host: true
   timeout_ms: 10000
 
@@ -193,7 +195,7 @@ export interface ServerConfig {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const DEFAULT_ADB_PATH = resolve(__dirname, "..", "..", "tools", "adb", "adb.exe");
+const DEFAULT_ADB_PATH = "adb"; // resolves via PATH on any OS
 const DEFAULT_CONFIG: ServerConfig = {
   adapter: { mock_mode: true },
   adb: { path: DEFAULT_ADB_PATH, use_host: true, timeout_ms: 10000 },
@@ -213,8 +215,10 @@ function parseAdb(yaml: string): AdbConfig {
   const hostMatch = yaml.match(/adb:[\\s\\S]*?use_host:\\s*(\\w+)/);
   const timeoutMatch = yaml.match(/adb:[\\s\\S]*?timeout_ms:\\s*(\\d+)/);
   const rawPath = pathMatch && pathMatch[1] ? pathMatch[1].trim() : DEFAULT_ADB_PATH;
-  // Resolve relative path against conf/ dir to an absolute path (no cwd dependency)
-  const absPath = resolve(__dirname, "..", "conf", rawPath);
+  // A bare command name (e.g. "adb") resolves via PATH when spawned; keep it as-is.
+  // A path with a separator (/ or \\) is resolved against conf/ dir to an absolute path.
+  const looksLikeBareCommand = rawPath.indexOf("/") === -1 && rawPath.indexOf("\\\\") === -1;
+  const absPath = looksLikeBareCommand ? rawPath : resolve(__dirname, "..", "conf", rawPath);
   return {
     path: absPath,
     use_host: hostMatch && hostMatch[1] ? hostMatch[1] !== "false" : true,

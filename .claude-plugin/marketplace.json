@@ -1,7 +1,7 @@
 {
   "name": "im-mcp-marketplace",
   "description": "IM Cockpit MCP CodeAgent 插件市场（本地/团队）",
-  "owner": { "name": "IM Cockpit Team" },
+  "owner": { "name": "Tongji University & IM" },
   "plugins": [
     {
       "name": "im-mcp-codeagent",

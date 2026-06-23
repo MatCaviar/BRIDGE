@@ -1,0 +1,4 @@
+# Normalize text files; .sh must be LF (bash on macOS/Linux breaks on CRLF)
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
