@@ -392,9 +392,11 @@ export async function scaffoldCommand(args: string[]): Promise<void> {
   const outputPath = outputFlag !== -1 ? args[outputFlag + 1] : null;
   const frameworkFlag = args.indexOf("--framework-path");
   const frameworkPath = frameworkFlag !== -1 ? args[frameworkFlag + 1] : undefined;
+  const selectionFlag = args.indexOf("--selection");
+  const selectionPath = selectionFlag !== -1 ? args[selectionFlag + 1] : undefined;
 
   if (!inputPath) {
-    throw new Error("Usage: mcp-pipeline scaffold <analysis.json> --output <dir> [--framework-path <path>]");
+    throw new Error("Usage: mcp-pipeline scaffold <analysis.json> --output <dir> [--framework-path <path>] [--selection <selection.json>]");
   }
 
   let analysis: AnalysisData;
@@ -420,7 +422,7 @@ ${validation.errors.map((e) => `  ${e.path}: ${e.message}`).join("\n")}`);
   } catch {}
 
   try {
-    scaffoldProject(analysis, resolve(outDir), frameworkPath);
+    scaffoldProject(analysis, resolve(outDir), frameworkPath, selectionPath ? { selectionPath: resolve(selectionPath) } : undefined);
     try {
       state = updateStep(state, "scaffold", { status: "completed" });
       writeState(state);

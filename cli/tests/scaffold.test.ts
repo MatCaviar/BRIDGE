@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
-import { scaffoldProject } from "../src/commands/scaffold.js";
+import { scaffoldProject, scaffoldCommand } from "../src/commands/scaffold.js";
 
 const OUTPUT_DIR = resolve(import.meta.dirname, "__scaffold_output__");
 const FIXTURE_PATH = resolve(import.meta.dirname, "../../schema/__tests__/fixtures/valid-analysis.json");
@@ -126,5 +126,24 @@ describe("scaffoldProject", () => {
     const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
     scaffoldProject(analysis, OUTPUT_DIR);
     expect(existsSync(resolve(OUTPUT_DIR, "AGENT_GUIDE.md"))).toBe(false);
+  });
+
+  it("scaffoldCommand --selection filters capabilities end-to-end", async () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    mkdirSync(OUTPUT_DIR, { recursive: true });
+    const ids = analysis.capabilities.map((c:any)=>c.id);
+    const selPath = resolve(OUTPUT_DIR, "selection.json");
+    writeFileSync(selPath, JSON.stringify({ selected: [ids[0]] }));
+    const out = resolve(OUTPUT_DIR, "proj");
+    const cwd = process.cwd();
+    try {
+      process.chdir(OUTPUT_DIR);
+      await scaffoldCommand([FIXTURE_PATH, "--output", out, "--selection", selPath]);
+    } finally {
+      process.chdir(cwd);
+    }
+    const registry = readFileSync(resolve(out, "src/tools/registry.ts"), "utf-8");
+    expect(registry).toContain(ids[0]);
+    for (const id of ids.slice(1)) expect(registry).not.toContain(id);
   });
 });
