@@ -57,12 +57,12 @@ If validation fails, report the errors and ask the user to review the analysis.j
 
 In `--step` mode: Pause after this step and ask "Analysis complete. Review analysis.json before continuing? [y/n]"
 
-**Optional:** run `/mcp-curate` to pick which capabilities become tools (writes `selection.json`); scaffold then generates only the chosen subset.
+**Optional:** run `/mcp-curate` to pick which capabilities become tools (writes `.mcp-pipeline/<app>/selection.json`); then scaffold with `--selection .mcp-pipeline/<app>/selection.json` generates only the chosen subset.
 
 ### Step 3: Scaffold (Deterministic — CLI)
 
 ```bash
-node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" scaffold .mcp-pipeline/<app>/analysis.json --output ./mcp-<app>
+node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" scaffold .mcp-pipeline/<app>/analysis.json --output ./mcp-<app> [--selection .mcp-pipeline/<app>/selection.json]
 ```
 
 Generates the project skeleton with templates and auto-generated files (enums, errors, registry, contract tests, mock adapter tests). **SP-B:** scaffold also deterministically produces the RPC bridge (`src/rpc/*`), the rpc-calling `src/adapters/yunos-adapter.ts` (each method → `rpcCall(op, args)` + map-by-name DTO, **no `throw`**), `src/executors/adb-executor.ts`, the car-side deliverables (`car-side/RpcEngine.ts`, `car-side/manifest-page.json`), and the `adb:` block in `conf/config.yaml`. The host agent creates `rpc/config.json` from scratch in the `generate` step (it is **not** scaffolded).

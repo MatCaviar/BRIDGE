@@ -15,7 +15,7 @@ After analyze, decide WHICH capabilities become MCP tools.
 1. **Enumerate** (deterministic): `mcp-pipeline curate <analysis.json> [--prd <prd.md>]` → candidate table.
 2. **Propose a subset** (your judgment, informed by the table + PRD): which capabilities are worth MCP-ifying now.
 3. **Present the subset to the user and let them pick** (第一要义：用户选择). Do not write until the user chooses.
-4. On the user's choice, **write `selection.json`** = `{ "selected": ["<cap.id>", ...] }` into the project.
+4. On the user's choice, **write `selection.json`** = `{ "selected": ["<cap.id>", ...] }` 到 `.mcp-pipeline/<app>/selection.json`（与 `analysis.json` 同目录）。随后 scaffold 须带 `--selection .mcp-pipeline/<app>/selection.json`，才会只生成被选中的能力。
 
 ## Rules
 - Re-pick = edit `selection.json` + re-run the pipeline (generated files regenerate; `rpc/config.json` + `conf/config.yaml` preserved).
