@@ -6,6 +6,7 @@ import { registerCommand } from "./commands/register.js";
 import { verifyCommand } from "./commands/verify.js";
 import { validateConfigCommand } from "./commands/validate-config.js";
 import { wireCheckCommand } from "./commands/wire-check.js";
+import { curateCommand } from "./commands/curate.js";
 
 type CommandHandler = (args: string[]) => Promise<void>;
 
@@ -18,6 +19,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   build: buildCommand,
   register: registerCommand,
   verify: verifyCommand,
+  curate: curateCommand,
 };
 
 export async function dispatch(argv: string[]): Promise<number> {
@@ -34,6 +36,7 @@ export async function dispatch(argv: string[]): Promise<number> {
     process.stderr.write("  build      Build the MCP Server\n");
     process.stderr.write("  register   Register to gateway config\n");
     process.stderr.write("  verify     Verify connectivity and tool discovery\n");
+  process.stderr.write("  curate     Enumerate MCP-ifiable capabilities\n");
     return 1;
   }
 
