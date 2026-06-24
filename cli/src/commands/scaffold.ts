@@ -21,7 +21,17 @@ import { generateCarRpcEngine } from "../generators/car-rpc-engine.js";
 import type { AnalysisData } from "../types.js";
 import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
 
-function writeFileIfNotExists(filePath: string, content: string): void {
+interface Selection { readonly selected: readonly string[]; }
+
+function readSelection(path: string): Selection | null {
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function writeProtected(filePath: string, content: string): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   try {
@@ -31,9 +41,10 @@ function writeFileIfNotExists(filePath: string, content: string): void {
   }
 }
 
-function writeFile(filePath: string, content: string): void {
+function writeGenerated(filePath: string, content: string): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  if (existsSync(filePath)) process.stderr.write(`[scaffold] overwriting generated file: ${filePath}\n`);
   writeFileSync(filePath, content, { encoding: "utf-8" });
 }
 
@@ -322,7 +333,11 @@ ${domains.map((d) => `  register${d.charAt(0).toUpperCase() + d.slice(1)}Tools(s
 `;
 }
 
-export function scaffoldProject(analysis: AnalysisData, outputDir: string, frameworkPath?: string): void {
+export function scaffoldProject(analysis: AnalysisData, outputDir: string, frameworkPath?: string, opts?: { selectionPath?: string }): void {
+  if (opts?.selectionPath) {
+    const sel = readSelection(resolve(opts.selectionPath));
+    if (sel?.selected) analysis = { ...analysis, capabilities: analysis.capabilities.filter((c) => sel.selected.includes(c.id)) };
+  }
   const resolvedFramework = resolve(frameworkPath ?? DEFAULT_FRAMEWORK_PATH);
   const frameworkRelPath = relative(outputDir, resolvedFramework).replace(/\\/g, "/");
 
@@ -348,25 +363,26 @@ export function scaffoldProject(analysis: AnalysisData, outputDir: string, frame
 
   for (const file of files) {
     const fullPath = resolve(outputDir, file.path);
-    writeFileIfNotExists(fullPath, file.content);
+    const fn = file.path === "conf/config.yaml" ? writeProtected : writeGenerated;
+    fn(fullPath, file.content);
   }
 
   const domainFiles = generateToolHandlers(analysis);
   for (const [filePath, content] of domainFiles) {
     const fullPath = resolve(outputDir, filePath);
-    writeFileIfNotExists(fullPath, content);
+    writeGenerated(fullPath, content);
   }
 
   const rpcFiles = generateRpcBridge(analysis);
   for (const [filePath, content] of rpcFiles) {
     const fullPath = resolve(outputDir, filePath);
-    writeFileIfNotExists(fullPath, content);
+    writeGenerated(fullPath, content);
   }
 
   const carFiles = generateCarRpcEngine(analysis);
   for (const [filePath, content] of carFiles) {
     const fullPath = resolve(outputDir, filePath);
-    writeFileIfNotExists(fullPath, content);
+    writeGenerated(fullPath, content);
   }
 }
 

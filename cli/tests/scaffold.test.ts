@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, readFileSync, rmSync } from "fs";
+import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
 import { scaffoldProject } from "../src/commands/scaffold.js";
 
@@ -72,17 +72,26 @@ describe("scaffoldProject", () => {
     expect(registry).toContain("capture_pet");
   });
 
-  it("does not overwrite existing files by default", () => {
+  it("with selection.json, scaffold generates only selected capabilities", () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    const selPath = resolve(OUTPUT_DIR, "selection.json");
+    mkdirSync(OUTPUT_DIR, { recursive: true });
+    const ids = analysis.capabilities.map((c:any)=>c.id);
+    writeFileSync(selPath, JSON.stringify({ selected: [ids[0]] }));
+    scaffoldProject(analysis, OUTPUT_DIR, undefined, { selectionPath: selPath });
+    const registry = readFileSync(resolve(OUTPUT_DIR, "src/tools/registry.ts"), "utf-8");
+    expect(registry).toContain(ids[0]);
+    for (const id of ids.slice(1)) expect(registry).not.toContain(id);
+  });
+  it("generate-layer overwritten on re-scaffold; conf/config.yaml (mock_mode) preserved", () => {
     const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
     scaffoldProject(analysis, OUTPUT_DIR);
-
-    const pkgPath = resolve(OUTPUT_DIR, "package.json");
-    const original = readFileSync(pkgPath, "utf-8");
-
-    // Second scaffold should not overwrite
+    const yamlPath = resolve(OUTPUT_DIR, "conf/config.yaml");
+    writeFileSync(yamlPath, readFileSync(yamlPath,"utf-8").replace("mock_mode: true","mock_mode: false"));
+    writeFileSync(resolve(OUTPUT_DIR,"src/tools/registry.ts"), "// USER EDIT\n");
     scaffoldProject(analysis, OUTPUT_DIR);
-    const afterSecond = readFileSync(pkgPath, "utf-8");
-    expect(afterSecond).toBe(original);
+    expect(readFileSync(yamlPath,"utf-8")).toContain("mock_mode: false");
+    expect(readFileSync(resolve(OUTPUT_DIR,"src/tools/registry.ts"),"utf-8")).not.toContain("USER EDIT");
   });
 
   it("config.ts contains AdbConfig and config.yaml contains adb block", () => {
