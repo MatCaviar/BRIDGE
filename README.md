@@ -132,8 +132,7 @@ im-mcp-codeagent/
 │   └── bin/mcp-pipeline.js
 ├── framework/            @im/mcp-server-framework (shared dispatch core: constructDbusCall / …)
 ├── tools/adb/            bundled adb (self-contained; see LICENSE note)
-├── schema/               analysis.schema.json + fixtures
-└── docs/                 specs · plans · smoke docs
+└── schema/               analysis.schema.json + test fixture
 ```
 
 The CLI runs via a **skill-base-relative path** (`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`) — self-contained, no PATH / global-link dependency.

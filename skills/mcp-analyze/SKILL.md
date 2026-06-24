@@ -65,6 +65,8 @@ node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" validate .mcp-pipeline/<app-na
 
 If validation fails, fix the analysis.json and re-validate until it passes.
 
+> **Ground rule — derive from source only.** Analyze the app's OWN source. Never read or rely on `schema/__tests__/fixtures/*` — those are stale CLI test fixtures, not authoritative for this app; using them makes the analysis stale and non-generalizable. Every capability must come from the live source via `sourceRef`.
+
 ## Output
 
 Write the result to `.mcp-pipeline/<app-name>/analysis.json` relative to the app directory.

@@ -5,12 +5,12 @@ import { resolve } from "path";
 const readJson = (p: string) => JSON.parse(readFileSync(resolve(__dirname, p), "utf-8"));
 
 describe("SP-D claude manifest", () => {
-  it("declares skills + commands + hooks explicitly (ecc style) + metadata", () => {
+  it("declares skills + commands explicitly + metadata (hooks auto-loaded, not declared)", () => {
     const p = readJson("../../.claude-plugin/plugin.json");
     expect(p.name).toBe("im-mcp-codeagent");
     expect(p.skills).toEqual(["./skills/"]);
     expect(p.commands).toEqual(["./commands/"]);
-    expect(p.hooks).toBe("./hooks/hooks.json");
+    expect(p.hooks).toBeUndefined(); // hooks/hooks.json is auto-loaded by Claude Code; declaring it triggered a duplicate-hooks error
     expect(p.defaultEnabled).toBe(true);
     expect(typeof p.version).toBe("string");
     expect(p.homepage).toBeTruthy();
