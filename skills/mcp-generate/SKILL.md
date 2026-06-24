@@ -66,7 +66,11 @@ For each capability in `analysis.json`, extract how it is actually called on the
      - `method` — the string passed to `createMethodCallMessage` (e.g. `"request"`)
      - `arg` — the object written: `{ funcName, data: { ... } }`. Parameterize call inputs with `${var}` placeholders matching the capability `params` names (single placeholder, type-preserving — Phase-1 TDD bug fix)
      - `stringify` — the dotted paths inside `arg` that must be `JSON.stringify`-ed before send (e.g. `["data"]`)
-     - `reply` — `readJSON()` → `"json"`; `readString()` → `"string"`; typed reads → `"int"` / `"double"` / `"bool"`
+     - `reply` — `readJSON()` → `"json"`; `readString()` → `"string"`; typed reads → `"int"` / `"double"` / `"bool"`. **DESIGN A (read/write extraction — C2):** `reply` can ALSO be an object to tell the host adapter how to reach the payload in the device's varied response shapes. The object form allows ONLY these 4 fields (minimal — no others):
+       - `read` — which UBus reply reader the car-side uses (`"json"` | `"string"` | `"int"` | `"double"` | `"bool"`). **Required.** Legacy string `reply: "<kind>"` ≡ `{ read: "<kind>" }`.
+       - `unwrap` — dotted path into the read value to the payload object. The device's `readJSON()` often returns a `PolicyResponse`-style envelope `{ result: { data: { ... } } }`; set `unwrap: "result.data"` so the adapter reaches the real fields.
+       - `parseJson` — `true` when the read value (after `unwrap`) is a JSON-encoded **string** that must be `JSON.parse`-d into an object before field mapping (common when the proxy uses `readString()` but the string body is JSON).
+       - `valueField` — when the unwrapped value is a **scalar** (a set-op success code from `readDouble()`, or a single-value read), map it onto this DTO field name. For set ops the device convention is `0 = success`, so use `valueField: "success"` and the adapter maps `0 → success:true`.
    - **Native** (`require`/factory + method): extract `require`, optional `factory`, `method`, and the literal `args` array.
 3. **Write the entry** into `rpc/config.json` with `op` = `capability.id` (the key under which the spec is stored).
 
@@ -117,6 +121,42 @@ For each capability in `analysis.json`, extract how it is actually called on the
 ```
 
 Note how this mirrors the proxy exactly: `method` `"request"` matches `createMethodCallMessage("request")`; `arg.funcName` matches the proxy's `funcName` constant; the `set` op's `data` uses `${mode}`/`${fade}`/`${balance}` placeholders for the call inputs and is listed under `stringify` because the proxy does `JSON.stringify({ ..., data })`. `reply` is `"json"` because the proxy reads via `readJSON()`.
+
+**Worked example — object `reply` for read/write extraction (DESIGN A):**
+
+```json
+{
+  "soundstage_read": {
+    "type": "dbus",
+    "bus": "com.yunos.audiopolicyservice",
+    "path": "/com/yunos/audiopolicyservice",
+    "method": "request",
+    "arg": { "funcName": ".../requstGetSoundEffectsMode" },
+    "reply": { "read": "json", "unwrap": "result.data" }
+  },
+  "volume_set": {
+    "type": "dbus",
+    "bus": "com.yunos.audiopolicyservice",
+    "path": "/com/yunos/audiopolicyservice",
+    "method": "request",
+    "arg": { "funcName": ".../requstSetAllCarAndHeadrestVolumeLevel", "data": { "volume": "${volume}", "streamType": "${streamType}", "zoneId": "${zoneId}" } },
+    "stringify": ["data"],
+    "reply": { "read": "double", "valueField": "success" }
+  },
+  "mic_vocal_read": {
+    "type": "dbus",
+    "bus": "com.yunos.audiopolicyservice",
+    "path": "/com/yunos/audiopolicyservice",
+    "method": "request",
+    "arg": { "funcName": ".../requstGetMicVocal" },
+    "reply": { "read": "string", "parseJson": true }
+  }
+}
+```
+
+- `soundstage_read`: device returns `{ result: { data: { mode, fade, balance } } }` via `readJSON()` → `unwrap: "result.data"` reaches the fields.
+- `volume_set`: device returns a scalar `double` (0 = success) → `valueField: "success"` maps it; no `unwrap` (it's already the scalar).
+- `mic_vocal_read`: device returns a JSON-encoded string via `readString()` → `parseJson: true` parses it into an object before field mapping.
 
 ### Step 3: Verify via the gates
 
