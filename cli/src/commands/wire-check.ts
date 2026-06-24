@@ -19,7 +19,9 @@ export interface WireCheckResult { readonly valid: boolean; readonly errors: rea
 export function wireCheck(config: unknown, proxySource: string): WireCheckResult {
   const errors: string[] = [];
   const cfg = config as Record<string, any>;
-  for (const w of extractExpectedWire(proxySource)) {
+  const wires = extractExpectedWire(proxySource);
+  if (wires.length === 0) errors.push("no createMethodCallMessage(...) ... funcName patterns found in proxy source — cannot verify any wire");
+  for (const w of wires) {
     const opEntry = Object.values(cfg).find((s: any) => s?.arg?.funcName === w.arg.funcName);
     if (!opEntry) { errors.push(`proxy funcName "${w.arg.funcName}" not found in config`); continue; }
     try {

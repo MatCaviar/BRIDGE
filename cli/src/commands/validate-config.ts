@@ -26,6 +26,7 @@ export function validateConfig(config: unknown, analysis: AnalysisData): Validat
   const deferred: readonly string[] = deferredRaw && typeof deferredRaw === "object" && !Array.isArray(deferredRaw)
     ? Object.keys(deferredRaw as Record<string, unknown>)
     : [];
+  if (analysis.capabilities.length === 0) errors.push("analysis has no capabilities — nothing to wire");
   for (const cap of analysis.capabilities) {
     if (deferred.includes(cap.id)) continue;
     if (!cfg[cap.id]) errors.push(`missing op for capability: ${cap.id}`);

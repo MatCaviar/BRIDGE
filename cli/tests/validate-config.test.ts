@@ -43,6 +43,11 @@ describe("validateConfig", () => {
     expect(r.valid).toBe(false);
     expect(r.errors.join("\n")).toContain("read_status");
   });
+  it("fails closed: empty capabilities (degenerate analysis) is NOT vacuously valid", () => {
+    const r = validateConfig({}, { ...ANALYSIS, capabilities: [] });
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("no capabilities");
+  });
 });
 
 describe("validateConfig — _deferred allowlist", () => {

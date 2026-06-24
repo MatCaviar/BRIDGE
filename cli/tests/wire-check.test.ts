@@ -31,4 +31,7 @@ describe("wireCheck", () => {
     const bad = { soundstage_read: { ...CONFIG.soundstage_read, method: "WRONG" } };
     expect(wireCheck(bad, PROXY_SRC).valid).toBe(false);
   });
+  it("fails closed when proxy source has no recognizable wire pattern (no vacuous pass)", () => {
+    expect(wireCheck(CONFIG, "const x = 1; // no proxy patterns here").valid).toBe(false);
+  });
 });
