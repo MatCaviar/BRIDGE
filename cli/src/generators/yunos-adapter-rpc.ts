@@ -1,12 +1,15 @@
 import type { AnalysisData } from "../types.js";
-import { buildMethodMap, tsType, safeFieldName, toDtoName } from "./adapter-types.js";
+import { buildMethodMap, tsType, safeFieldName, toDtoName, inferFieldType } from "./adapter-types.js";
 
 /** 生成按名映射 DTO 的对象字面量（returns.fields → data[f] ?? default）。
  *  每个生成的 DTO 接口都无条件要求 success: boolean（见 adapter-types.ts），
  *  因此这里始终注入 success: true，确保对象字面量满足接口契约（spec §4.1/§9.2）。 */
 function mapDtoSnippet(fields: readonly string[]): string {
+  const dft = (f: string): string => {
+    switch (inferFieldType(f)) { case "boolean": return "false"; case "number": return "0"; default: return '""'; }
+  };
   const extra = fields.filter((f) => f !== "success").map((f) =>
-    `${f}: (data as any)[${JSON.stringify(f)}] ?? defaultFor(${JSON.stringify(f)})`,
+    `${f}: (rpcResult as any)[${JSON.stringify(f)}] ?? ${dft(f)}`,
   ).join(", ");
   return extra ? `{ success: true, ${extra} }` : "{ success: true }";
 }
@@ -17,11 +20,6 @@ export function generateYunosAdapterRpc(analysis: AnalysisData): string {
   lines.push('import { rpcCall as defaultRpcCall } from "../rpc/rpc-client.js";');
   lines.push("import type { AdbConfig } from \"../config.js\";");
   lines.push('import type { IAdapter' + (dtoNames.length ? ", " + dtoNames.join(", ") : "") + ' } from "./types.js";');
-  lines.push("");
-  lines.push("function defaultFor(field: string): unknown {");
-  lines.push("  if (/enabled|active|playing/i.test(field)) return false;");
-  lines.push("  return \"\";");
-  lines.push("}");
   lines.push("");
   lines.push("export function createYunosAdapter(adbConfig: AdbConfig, rpcFn: (op: string, args: unknown, config: AdbConfig) => Promise<unknown> = defaultRpcCall): IAdapter {");
   lines.push("  return {");
@@ -35,7 +33,7 @@ export function generateYunosAdapterRpc(analysis: AnalysisData): string {
     const argsObj = (cap.params ?? []).length ? `{ ${(cap.params ?? []).map((p) => safeFieldName(p.name)).join(", ")} }` : "{}";
     lines.push("");
     lines.push(`    async ${methodName}(${params}): Promise<${retType}> {`);
-    lines.push(`      const data = await rpcFn(${JSON.stringify(cap.id)}, ${argsObj}, adbConfig);`);
+    lines.push(`      const rpcResult = await rpcFn(${JSON.stringify(cap.id)}, ${argsObj}, adbConfig);`);
     lines.push(`      return ${mapDtoSnippet(fields)} as unknown as ${retType};`);
     lines.push("    },");
   }

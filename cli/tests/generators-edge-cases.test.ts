@@ -228,6 +228,26 @@ describe("generateMockAdapter — edge cases", () => {
     expect(code).toContain("frozen<");
     expect(code).toContain("structuredClone");
   });
+
+  it("show_toast resolves the text param by name (no hardcoded 'message' identifier)", () => {
+    const analysis = makeAnalysis({
+      capabilities: [{
+        id: "show_toast",
+        domain: "ui",
+        object: "toast",
+        action: "show",
+        params: [{ name: "text", type: "string" }],
+        returns: { type: "ShowToastResult", fields: ["success"] },
+        safetyLevel: "normal",
+        sdkCalls: [],
+        sourceRef: "src/ui.ts:showToast",
+      }],
+    });
+    const code = generateMockAdapter(analysis);
+    // the capability-driven method resolves the param by name ('text'), not a hardcoded 'message'
+    expect(code).toMatch(/async showToast\(text: string\)/);
+    expect(code).toContain("activeToast: text");
+  });
 });
 
 describe("generateMockAdapterTests — control separation", () => {

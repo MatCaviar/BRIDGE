@@ -19,7 +19,8 @@ export {
 }
 
 function rpcClient(appName: string): string {
-  return `import { execute } from "../executors/adb-executor.js";
+  return `import { randomUUID } from "node:crypto";
+import { execute } from "../executors/adb-executor.js";
 import type { AdbConfig } from "../config.js";
 import { RpcError, type Executor, type RpcResult } from "./rpc-types.js";
 
@@ -31,12 +32,15 @@ let counter = 0;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function safeParse(s: string): RpcResult | undefined { try { return JSON.parse(s.trim()) as RpcResult; } catch { return undefined; } }
 
-export async function rpcCall(op: string, args: unknown, config: AdbConfig, executor: Executor = execute, opts: { timeoutMs?: number; intervalMs?: number } = {}): Promise<unknown> {
+async function rpcCallInner(op: string, args: unknown, config: AdbConfig, executor: Executor = execute, opts: { timeoutMs?: number; intervalMs?: number } = {}): Promise<unknown> {
   const timeoutMs = opts.timeoutMs ?? 5000;
   const intervalMs = opts.intervalMs ?? 150;
-  const reqId = "r-" + Date.now() + "-" + (counter++);
+  const reqId = "r-" + process.pid + "-" + (counter++) + "-" + randomUUID();
   const cmdJson = JSON.stringify({ reqId, op, args });
-  await executor("shell", { cmd: "printf '%s' '" + cmdJson + "' > " + CMD_PATH }, config);
+  // POSIX single-quote escape: a string arg containing ' (e.g. O'Brien) must not break the
+  // device-shell printf. JSON.stringify does not escape ', so we close/reopen the quote: ' -> '\''.
+  const cmdEscaped = cmdJson.replace(/'/g, "'\\\\''");
+  await executor("shell", { cmd: "printf '%s' '" + cmdEscaped + "' > " + CMD_PATH }, config);
   const sl = await executor("sendlink", { url: RPC_URL }, config);
   if (!sl.success) await executor("sendlink", { url: RPC_URL }, config);
   const deadline = Date.now() + timeoutMs;
@@ -47,6 +51,16 @@ export async function rpcCall(op: string, args: unknown, config: AdbConfig, exec
     await sleep(intervalMs);
   }
   throw new RpcError("RPC_TIMEOUT", "no response for " + op);
+}
+
+// Serialize: the device uses ONE shared cmd.json/result.json mailbox, so concurrent rpcCall
+// would cross-wire results (B's write clobbers A's before A's spawned page reads it). Run one at a time.
+let rpcChain: Promise<unknown> = Promise.resolve();
+export function rpcCall(op: string, args: unknown, config: AdbConfig, executor: Executor = execute, opts: { timeoutMs?: number; intervalMs?: number } = {}): Promise<unknown> {
+  const run = () => rpcCallInner(op, args, config, executor, opts);
+  const next = rpcChain.then(run, run);
+  rpcChain = next.then(() => undefined, () => undefined);
+  return next;
 }
 export { RpcError };
 `;
@@ -74,9 +88,8 @@ export async function execute(commandName: string, args: Record<string, unknown>
     child.on("error", (err) => { resolveResult({ success: false, rawOutput: "spawn error: " + err.message }); });
     child.on("close", (code) => {
       const trimmed = stdout.trim();
-      if (code === 0 && trimmed.startsWith("SUCCESS:")) {
-        const jsonPart = trimmed.slice("SUCCESS:".length).trim();
-        let parsed: unknown; try { parsed = JSON.parse(jsonPart); } catch { parsed = undefined; }
+      if (code === 0) {
+        let parsed: unknown; try { parsed = JSON.parse(trimmed); } catch { parsed = undefined; }
         resolveResult({ success: true, rawOutput: trimmed, parsed });
       } else { resolveResult({ success: false, rawOutput: trimmed || "exit code " + code }); }
     });

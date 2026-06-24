@@ -9,6 +9,8 @@ argument-hint: <project-dir>
 
 Run the deterministic `verify` command against the generated MCP Server project at `$ARGUMENTS` and report the results.
 
+> ⚠️ 前提：`verify` 需要先生成构建产物（`dist/index.js`）。若项目尚未 `build`，`verify` 只会报告"缺构建产物"这一项错误，其余四项检查（install / tsc / tools-call / rpc-bridge）不会执行。请先完整跑一遍 `/mcp-pipeline`，或单独 `mcp-pipeline build <dir>` 后再 verify。
+
 Run exactly:
 
 ```bash

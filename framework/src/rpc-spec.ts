@@ -46,8 +46,9 @@ function interpolate(template: unknown, vars: Record<string, unknown>): unknown 
 function applyStringify(arg: Record<string, unknown>, paths: string[] = []): void {
   for (const p of paths) {
     const segs = p.split(".");
-    let node: Record<string, unknown> = arg;
-    for (let i = 0; i < segs.length - 1; i++) node = node[segs[i]] as Record<string, unknown>;
+    let node: Record<string, unknown> | undefined = arg;
+    for (let i = 0; i < segs.length - 1; i++) node = node?.[segs[i]] as Record<string, unknown> | undefined;
+    if (node == null) throw new Error(`stringify path not found in arg: ${p}`);
     const last = segs[segs.length - 1];
     node[last] = JSON.stringify(node[last]);
   }

@@ -94,12 +94,18 @@ export function updateStep(
     timestamp: new Date().toISOString(),
   };
 
-  const nextStepIndex = ALL_STEPS.indexOf(step) + 1;
-  const isDone = update.status === "completed" && nextStepIndex >= ALL_STEPS.length;
+  const stepIndex = ALL_STEPS.indexOf(step);
+  const isLinear = stepIndex !== -1;  // validate_config/wire_check are inline sub-steps, not linear phases
+  const nextStepIndex = stepIndex + 1;
+  const isDone = isLinear && update.status === "completed" && nextStepIndex >= ALL_STEPS.length;
+  const currentStep = !isLinear ? state.currentStep
+    : isDone ? "done"
+    : update.status === "completed" ? ALL_STEPS[nextStepIndex]
+    : state.currentStep;
 
   return {
     ...state,
-    currentStep: isDone ? "done" : (update.status === "completed" ? ALL_STEPS[nextStepIndex] : state.currentStep),
+    currentStep,
     steps: { ...state.steps, [step]: updatedStep },
   };
 }

@@ -5,7 +5,7 @@ description: Extract rpc/config.json wire-specs from proxy source code for the s
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
 
-> 本 skill 的 base dir = 加载时显示的路径；CLI 调用形式为 `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（${SKILL_DIR} 即本 skill 的 base dir）。
+> 本 skill 的 base dir = 加载时显示的路径；CLI 调用形式为 `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（${SKILL_DIR} 即本 skill 的 base dir）。若 `${SKILL_DIR}` 未展开，改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`（CLAUDE_PLUGIN_ROOT 即插件根目录，CLI 在 `<根>/cli/bin`，勿加 `../../`）。
 
 # MCP Generate
 
@@ -87,7 +87,7 @@ For each capability in `analysis.json`, extract how it is actually called on the
    ```
 
    - `validate_config` checks: schema conformance (RpcConfig), **coverage** (every capability has a matching `op`), and **dispatchable** (`constructDbusCall`/`constructNativeCall` runs against sample args synthesized from `cap.params` without crashing, `${var}` interpolation and `stringify` correct).
-   - `wire_check` statically parses the proxy source for the shared `createMethodCallMessage("m") ... funcName: "f"` pattern, reconstructs the expected wire, and compares it against `constructDbusCall(config[op])`. A mismatch means your extracted `bus`/`path`/`method`/`arg`/`stringify` does not match the real proxy — fix the entry and re-run.
+   - `wire_check` statically parses the proxy source for the shared `createMethodCallMessage("m") ... funcName: "f"` pattern, reconstructs the expected wire, and compares it against `constructDbusCall(config[op])`. A mismatch means your extracted `bus`/`path`/`method`/`arg`/`stringify` does not match the real proxy — fix the entry and re-run. 注意方向：`wire_check` 只校验 **proxy→config**（对 proxy 里每个 `funcName` 找 config 对应项）——你凭空多写/猜的一个 config op（`funcName` 不在 proxy 源码里）**不会被拦**。因此每个非 `_deferred` 的 op 都必须对应 proxy 里真实存在的 `funcName`；非 RPC 能力请用 `config._deferred` 声明。
 
 **Worked example — `soundstage.read` / `soundstage.set`** (copied verbatim from the Phase-1 reference `imaudio_app_code/rpc/config.json`; the proxy is `imaudio_app_code/ts/proxy/AudioPolicyProxy.ts`, whose `getSoundStage` / `setSoundStage` use `createMethodCallMessage("request")` + `writeString(JSON.stringify({ funcName, data }))` + `readJSON()`):
 

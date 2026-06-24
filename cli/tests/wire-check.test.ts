@@ -27,4 +27,8 @@ describe("wireCheck", () => {
     const bad = { soundstage_read: { ...CONFIG.soundstage_read, arg: { funcName: "WRONG" } } };
     expect(wireCheck(bad, PROXY_SRC).valid).toBe(false);
   });
+  it("invalid when config method diverges (funcName matches — exercises the real comparison)", () => {
+    const bad = { soundstage_read: { ...CONFIG.soundstage_read, method: "WRONG" } };
+    expect(wireCheck(bad, PROXY_SRC).valid).toBe(false);
+  });
 });

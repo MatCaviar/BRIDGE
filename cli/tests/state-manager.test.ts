@@ -55,6 +55,19 @@ describe("updateStep", () => {
     expect(updated.steps.validate.status).toBe("completed");
     expect(original).not.toBe(updated);
   });
+
+  it("validate_config / wire_check are inline sub-steps — recorded but do NOT change currentStep", () => {
+    let state = createInitialState("test", "/path");
+    for (const step of ["validate", "analyze", "scaffold"] as const) state = updateStep(state, step, { status: "completed" });
+    expect(state.currentStep).toBe("generate");
+    // regression: completing an inline sub-step used to reset currentStep to "validate"
+    state = updateStep(state, "validate_config", { status: "completed" });
+    expect(state.currentStep).toBe("generate");
+    state = updateStep(state, "wire_check", { status: "completed" });
+    expect(state.currentStep).toBe("generate");
+    expect(state.steps.validate_config.status).toBe("completed");
+    expect(state.steps.wire_check.status).toBe("completed");
+  });
 });
 
 describe("readState / writeState", () => {

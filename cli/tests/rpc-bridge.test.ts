@@ -28,4 +28,25 @@ describe("generateRpcBridge", () => {
     const engine = files.get("src/rpc/rpc-engine.ts")!;
     expect(engine).toContain("@im/mcp-server-framework");
   });
+  it("rpc-client escapes single quotes in the cmd payload (printf-safe on the device shell)", () => {
+    const client = generateRpcBridge(SAMPLE).get("src/rpc/rpc-client.ts")!;
+    expect(client).toContain("cmdJson.replace(/'/g");
+    expect(client).toContain("cmdEscaped");
+  });
+  it("rpc-client reqId is globally unique across restarts (process.pid + randomUUID)", () => {
+    const client = generateRpcBridge(SAMPLE).get("src/rpc/rpc-client.ts")!;
+    expect(client).toContain("randomUUID");
+    expect(client).toContain("process.pid");
+  });
+  it("rpc-client serializes concurrent calls (shared cmd.json mailbox — no TOCTOU cross-wire)", () => {
+    const client = generateRpcBridge(SAMPLE).get("src/rpc/rpc-client.ts")!;
+    expect(client).toContain("rpcCallInner");          // body renamed out of the export
+    expect(client).toContain("rpcChain");               // module-level serialization chain
+    expect(client).toContain("export function rpcCall"); // serialized public entry
+  });
+  it("adb-executor marks success on exit code 0 (no dead SUCCESS: prefix)", () => {
+    const exec = generateRpcBridge(SAMPLE).get("src/executors/adb-executor.ts")!;
+    expect(exec).toContain("code === 0");
+    expect(exec).not.toContain("SUCCESS:");
+  });
 });

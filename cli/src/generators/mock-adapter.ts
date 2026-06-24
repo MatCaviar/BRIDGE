@@ -145,7 +145,8 @@ export function generateMockAdapter(analysis: AnalysisData): string {
     } else if (hasNavigation && (cap.action === "go_back" || cap.action === "navigate_back")) {
       bodyLines.push("popPage();");
     } else if (cap.action === "show" && cap.object === "toast") {
-      bodyLines.push(`state = { ...state, activeToast: message };`);
+      const msgParam = cap.params?.find((p) => /message|text|content|msg|body|info/i.test(p.name));
+      bodyLines.push(`state = { ...state, activeToast: ${msgParam ? safeFieldName(msgParam.name) : '"toast"'} };`);
     } else if (cap.action === "show" && cap.object === "loading") {
       bodyLines.push(`state = { ...state, isLoading: true };`);
     } else if (cap.action === "hide" && cap.object === "loading") {

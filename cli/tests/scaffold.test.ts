@@ -103,4 +103,19 @@ describe("scaffoldProject", () => {
       expect(existsSync(resolve(OUTPUT_DIR, f)), `Missing: ${f}`).toBe(true);
     }
   });
+  it("adapter factory wires the RPC yunos-adapter in production mode (no throw-stub)", () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    scaffoldProject(analysis, OUTPUT_DIR);
+    const indexTs = readFileSync(resolve(OUTPUT_DIR, "src/adapters/index.ts"), "utf-8");
+    // SP-B: mock_mode:false must return createYunosAdapter (rpcCall-based), not throw.
+    expect(indexTs).toContain('import { createYunosAdapter } from "./yunos-adapter.js"');
+    expect(indexTs).toContain("createYunosAdapter(config.adb)");
+    expect(indexTs).not.toContain("throw new Error");
+    expect(indexTs).not.toContain("not yet generated");
+  });
+  it("no longer emits the stale pre-SP-B AGENT_GUIDE.md", () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    scaffoldProject(analysis, OUTPUT_DIR);
+    expect(existsSync(resolve(OUTPUT_DIR, "AGENT_GUIDE.md"))).toBe(false);
+  });
 });

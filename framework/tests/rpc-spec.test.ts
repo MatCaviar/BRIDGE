@@ -26,4 +26,12 @@ describe("constructNativeCall", () => {
     const call = constructNativeCall(spec, { band: 3, level: 2 });
     expect(call.args).toEqual([3, 9]);
   });
+  it("throws 'bad expr' on non-arithmetic input (blocks Function() injection)", () => {
+    const spec: NativeSpec = { type: "native", require: "x", method: "m", args: [{ expr: "process.exit(1)" }] };
+    expect(() => constructNativeCall(spec, {})).toThrow(/bad expr/);
+  });
+  it("falls back missing expr vars to 0", () => {
+    const spec: NativeSpec = { type: "native", require: "x", method: "m", args: [{ expr: "${missing} + 1" }] };
+    expect(constructNativeCall(spec, {}).args).toEqual([1]);
+  });
 });

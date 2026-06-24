@@ -5,7 +5,7 @@ description: Orchestrate the full MCP Server generation pipeline — analyze, sc
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
 
-> 本 skill 的 base dir = 加载时显示的路径；CLI 调用形式为 `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（${SKILL_DIR} 即本 skill 的 base dir）。
+> 本 skill 的 base dir = 加载时显示的路径；CLI 调用形式为 `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（${SKILL_DIR} 即本 skill 的 base dir）。若 `${SKILL_DIR}` 未展开，改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`（CLAUDE_PLUGIN_ROOT 即插件根目录，CLI 在 `<根>/cli/bin`，勿加 `../../`）。
 
 # MCP Pipeline
 
@@ -79,7 +79,7 @@ node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" wire_check rpc/config.json --p
 ```
 
 - `validate_config` — schema conformance + coverage (every capability has a matching `op`) + dispatchable (`constructDbusCall`/`constructNativeCall` runs against sample args without crashing, `${var}` and `stringify` correct).
-- `wire_check` — statically parses the proxy source for the shared `createMethodCallMessage("m") ... funcName: "f"` pattern and compares `constructDbusCall(config[op])` against it.
+- `wire_check` — statically parses the proxy source for the shared `createMethodCallMessage("m") ... funcName: "f"` pattern and compares `constructDbusCall(config[op])` against it. 注意方向：只校验 **proxy→config**（对 proxy 里每个 `funcName` 找 config 对应项）——凭空多写/猜的 config op（`funcName` 不在 proxy 源码里）不会被拦；每个非 `_deferred` 的 op 都必须对应 proxy 里真实存在的 `funcName`，非 RPC 能力用 `config._deferred` 声明。
 
 **If either gate fails:** return to the `/mcp-generate` methodology — read the gate's error, fix the offending `rpc/config.json` entry, and re-run the gate. Retry up to 3 attempts; if still failing after 3, surface the gate errors to the user and stop (do NOT proceed to build). These two gates are inline sub-steps of the `generate` phase, retried until pass (see the note above the steps).
 
