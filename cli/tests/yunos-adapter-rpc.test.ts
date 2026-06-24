@@ -48,3 +48,52 @@ describe("generateYunosAdapterRpc", () => {
     expect(code).toContain("const rpcResult = await rpcFn");
   });
 });
+
+// The generator emits an extraction function derived from the op's reply descriptor.
+// These tests assert the EMITTED CODE contains the right extraction for each shape.
+// (Behavioral end-to-end extraction is covered by the generated-fixture test in Task 4.)
+
+describe("generateYunosAdapterRpc — descriptor-aware extraction (C2)", () => {
+  it("emits unwrap for { read: 'json', unwrap: 'result.data' }", () => {
+    // soundstage_read returns { result: { data: { mode, fade, balance } } }
+    const code = generateYunosAdapterRpc(SAMPLE);
+    // The emitted adapter must support descriptor-driven unwrap (dotted path into the read value).
+    // unwrap is runtime-config-driven (read from rpc/config.json), so the generator emits the
+    // dotted-path walker getByPath + the `unwrap` field plumbing — NOT the literal "result.data".
+    expect(code).toContain("getByPath");
+    expect(code).toContain("unwrap");
+    expect(code).toContain("function applyReply");
+  });
+  it("emits scalar success mapping for set ops with read 'double' + valueField", () => {
+    // A set op whose reply is { read: 'double', valueField: 'success' } → map 0→success:true, non-0→false.
+    const setSample = {
+      app: { name: "t", domain: "d", framework: "YunOS HDT", entryFile: "i" },
+      capabilities: [{
+        id: "volume_set", domain: "volume", object: "vol", action: "set",
+        params: [{ name: "volume", type: "number" }],
+        returns: { type: "VolumeSetResult", fields: ["success"] },
+        safetyLevel: "normal", sdkCalls: [], sourceRef: "s",
+      }],
+    };
+    const code = generateYunosAdapterRpc(setSample);
+    // The generator cannot read config here, but it MUST emit a helper that the runtime
+    // adapter can drive with the descriptor. We assert the emitted extraction helper exists
+    // and handles scalar→valueField (0 = success for set ops).
+    expect(code).toContain("function applyReply");
+    expect(code).toContain("valueField");
+  });
+  it("emits parseJson for read 'string' + parseJson:true", () => {
+    const readSample = {
+      app: { name: "t", domain: "d", framework: "YunOS HDT", entryFile: "i" },
+      capabilities: [{
+        id: "mic_vocal_read", domain: "mic", object: "mic", action: "read",
+        params: [],
+        returns: { type: "MicResult", fields: ["volume"] },
+        safetyLevel: "readonly", sdkCalls: [], sourceRef: "s",
+      }],
+    };
+    const code = generateYunosAdapterRpc(readSample);
+    expect(code).toContain("parseJson");
+    expect(code).toContain("JSON.parse");
+  });
+});
