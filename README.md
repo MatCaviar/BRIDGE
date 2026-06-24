@@ -2,9 +2,9 @@
 
 # 🎛️ CodeAgent @ MCP
 
-**BRIDGE** · *Building Real-device Interfaces via Deterministic Gated Execution*
+<img src="assets/bridge.svg" alt="BRIDGE" height="76">
 
-Turn a YunOS HDT in-car app into a controllable MCP Server — reliably.
+*Building Real-device Interfaces via Deterministic Gated Execution*
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
