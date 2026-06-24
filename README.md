@@ -4,7 +4,7 @@
 
 <img src="assets/bridge.svg" alt="BRIDGE" height="76">
 
-*Building Real-device Interfaces via Deterministic Gated Execution*
+**B**uilding **R**eal-device **I**nterfaces via **D**eterministic **G**ated **E**xecution
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
