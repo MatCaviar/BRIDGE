@@ -1,74 +1,125 @@
-# IM MCP CodeAgent
+<div align="center">
 
-Auto-generate **controllable MCP Servers** from YunOS HDT automotive applications — `analyze → scaffold → generate → gates → build`, with a car-side RPC bridge, deterministic config gates, and dual-end packaging (Claude Code + Codex).
+# 🎛️ IM MCP CodeAgent
 
-A Claude Code / Codex plugin: skills provide the methodology, a deterministic Node CLI does the heavy lifting, and the host agent (Claude Code or Codex) executes. **No LLM calls inside the plugin.**
+**Turn a YunOS HDT in-car app into a controllable MCP Server — reliably.**
+
+`analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
+
+![version](https://img.shields.io/badge/version-0.1.4-0066cc)
+![license](https://img.shields.io/badge/license-MIT-22c55e)
+![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
+![no-llm](https://img.shields.io/badge/plugin-no%20LLM%20inside-6b7280)
+![platform](https://img.shields.io/badge/platform-Win%20%7C%20macOS%20%7C%20Linux-339933)
+
+</div>
 
 ---
 
-## What it does
+A Claude Code / Codex plugin. Host-LLM **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent executes. **No LLM calls live inside the plugin** — every generated artifact is reproducible.
 
-Given a YunOS HDT app (source + manifest), it produces a ready-to-run MCP Server that an upstream agent can call to **actually control the device** (EQ, soundstage, Beosonic, karaoke, car info, …) — not just a throw-stub mock. Reliability comes from:
+Given an app's source + manifest, it emits a ready-to-run MCP Server that an upstream agent can call to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock.
 
-- **Deterministic generators** (zero app literals — any app, any machine).
-- **Two config gates** (`validate-config`: schema + coverage + dispatchable; `wire-check`: proxy wire-format match) — the host agent's only judgment product (`rpc/config.json`) is verified before build.
-- **A car-side RPC engine** (delivered to a colleague to install on the device) bridging the host → device over adb/file/sendlink (no network).
+## 🛡️ Why it's reliable
 
-## Install (Claude Code)
+| Guarantee | How it's enforced |
+|---|---|
+| **Deterministic output** | Generators carry zero app literals — any app, any machine, byte-for-byte reproducible. |
+| **Verified before build** | Two fail-closed gates — `validate-config` (schema + coverage + dispatchable) and `wire-check` (proxy wire-format match) — must pass on the host's only judgment product, `rpc/config.json`. |
+| **Fail-closed safety** | `p_gear_required` tools are blocked unless Park is verified; degenerate input (empty / unmatched) errors instead of passing vacuously. |
+| **Honest selection** | `--selection` with a missing file, unknown ids, or an empty list **errors loudly** rather than silently over- or under-generating. |
+| **Real bridge, no network** | A car-side RPC engine (delivered to a colleague) bridges host → device over adb / file / sendlink. |
+| **Self-contained** | CLI runs via a skill-base-relative path; `framework/` + `cli/` deps auto-install and build on first session. |
+
+## 🧭 Pipeline
+
+```
+validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
+  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
+```
+
+Each step is either a **deterministic CLI** subcommand or a **host-LLM skill**. Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `--only`, `--step`, `--batch`.
+
+> The two gates (`validate-config` + `wire-check`) are inline sub-steps of `generate`, retried until both pass before the pipeline advances. `[curate]` is optional.
+
+## 🧩 Capability selection
+
+Most apps expose far more capabilities than you want to MCP-ify. After `analyze`, **curate** lets you choose the subset — the user's pick is the first priority.
+
+```bash
+# 1. Enumerate candidates deterministically (writes nothing)
+mcp-pipeline curate <analysis.json> [--prd <prd.md>]
+
+# 2. /mcp-curate proposes a subset, you choose → writes selection.json
+# 3. Scaffold generates only the chosen capabilities
+mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<app>/selection.json
+```
+
+`selection.json = { "selected": ["<cap.id>", …] }`. Re-pick any time — the generate-layer regenerates, while `conf/config.yaml` and `rpc/config.json` are preserved.
+
+## 📥 Install
+
+**Claude Code**
 
 ```bash
 /plugin marketplace add https://github.com/MatCaviar/im-mcp-codeagent.git
 /plugin install im-mcp-codeagent
 ```
 
-On first session start, the plugin auto-installs its `framework/` + `cli/` deps and builds `cli/dist` (idempotent). Then:
+First session start auto-installs `framework/` + `cli/` and builds `cli/dist` (idempotent). Then:
 
 ```
 /mcp-pipeline ./path/to/your-app
 ```
 
-Other entry points: `/mcp-verify <project-dir>`, `/mcp-help`.
+Entry points — `/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`.
 
-## Prerequisites for real-device control
+**Codex** reads the mirrored `.codex-plugin/plugin.json` (dual-end).
 
-The generated server controls the car over an adb/file bridge. Before a real device works:
+## 📡 Real-device prerequisites
 
-1. **Colleague builds + installs the car-side `RpcEngine.ts`** into the app and adds the `page://<app>.yunos.com/rpcagent` manifest page (the generator emits both as `car-side/` deliverables).
+The generated server drives the car over an adb / file bridge. Before a real device responds:
+
+1. **Colleague** builds + installs the car-side `RpcEngine.ts` and registers the `page://<app>.yunos.com/rpcagent` manifest page — both emitted under `car-side/`.
 2. **`adb -host`** reachability to the YunOS device.
-3. **ZebraAlfred keep-alive** (or equivalent) — the device otherwise sleeps and sendlink intermittently returns exit -1.
+3. **ZebraAlfred** keep-alive (or equivalent) — otherwise the device sleeps and sendlink intermittently returns exit `-1`.
 
-Local (no-device) verification is always available via `mcp-pipeline verify --dir <server>` (install + tsc + tool responsiveness + rpc-bridge readiness). Real-device smoke: `scripts/smoke-real-device.sh` (run gated on step 1 above).
+No device handy? Local verification always works: `mcp-pipeline verify --dir <server>` (install + tsc + tool responsiveness + bridge readiness). Real-device smoke: `scripts/smoke-real-device.sh`.
 
-## Architecture
+## 🧱 Architecture
 
 ```
 im-mcp-codeagent/
-├── .claude-plugin/        # Claude Code manifest + marketplace
-├── .codex-plugin/         # Codex manifest (dual-end)
-├── skills/                # mcp-analyze | mcp-generate | mcp-pipeline | mcp-test (methodology, no LLM calls)
-├── commands/              # /mcp-pipeline | /mcp-verify | /mcp-help
-├── hooks/                 # SessionStart: polyglot build (run-hook.cmd → session-init.sh)
-├── cli/                   # @im/mcp-pipeline-cli — deterministic Node (scaffold/gates/verify/…)
-│   ├── src/generators/    # rpc-bridge, yunos-adapter-rpc, car-rpc-engine, …
-│   ├── assets/            # car-rpc-engine.ts.template (bundled, de-hardcoded)
+├── .claude-plugin/       Claude Code manifest + marketplace
+├── .codex-plugin/        Codex manifest (dual-end mirror)
+├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test  (methodology, no LLM calls)
+├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
+├── hooks/                SessionStart → polyglot build (run-hook.cmd → session-init.sh)
+├── cli/                  @im/mcp-pipeline-cli — deterministic Node
+│   ├── src/generators/   rpc-bridge · yunos-adapter-rpc · car-rpc-engine · …
+│   ├── assets/           car-rpc-engine.ts.template (bundled, de-hardcoded)
 │   └── bin/mcp-pipeline.js
-├── framework/             # @im/mcp-server-framework (shared dispatch core: constructDbusCall/…)
-├── tools/adb/             # bundled adb (self-contained; see LICENSE note)
-├── schema/                # analysis.schema.json + fixtures
-└── docs/                  # specs + plans + smoke docs
+├── framework/            @im/mcp-server-framework (shared dispatch core: constructDbusCall / …)
+├── tools/adb/            bundled adb (self-contained; see LICENSE note)
+├── schema/               analysis.schema.json + fixtures
+└── docs/                 specs · plans · smoke docs
 ```
 
-The CLI is invoked via a **skill-base-relative path** (`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`) — self-contained, no PATH/global-link dependency.
+The CLI runs via a **skill-base-relative path** (`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`) — self-contained, no PATH / global-link dependency.
 
-## Develop
+## 🛠️ Develop
 
 ```bash
 cd framework && npm install
-cd ../cli && npm install && npx tsc        # build cli/dist
-cd ../cli && npx vitest run                # full suite
-node scripts/check-manifests.js            # claude/codex manifest drift guard
+cd ../cli     && npm install && npx tsc     # build cli/dist (the real CLI loads dist/ — rebuild after source edits)
+cd ../cli     && npx vitest run             # full suite
+node scripts/check-manifests.js             # claude / codex manifest drift guard
 ```
 
-## License
+## 📜 License
 
-MIT (see [LICENSE](LICENSE)). `tools/adb/` bundles Google's adb under its own terms.
+MIT — see [LICENSE](LICENSE). `tools/adb/` bundles Google's adb under its own terms.
+
+<div align="center">
+<sub>Built by Tongji University &amp; IM · controllable MCP for the YunOS cockpit</sub>
+</div>
