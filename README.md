@@ -22,6 +22,8 @@ A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces vi
 
 Given an app's source + manifest, it emits a ready-to-run MCP Server that an upstream agent can call to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock.
 
+<p align="center"><img src="assets/framework.svg" alt="BRIDGE — framework overview" width="920"></p>
+
 ## 🛡️ Why it's reliable
 
 | Guarantee | How it's enforced |
@@ -77,6 +79,33 @@ First session start auto-installs `framework/` + `cli/` and builds `cli/dist` (i
 Entry points — `/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`.
 
 **Codex** reads the mirrored `.codex-plugin/plugin.json` (dual-end).
+
+## 🔄 Update (already installed)
+
+When a new version ships, refresh and reload:
+
+```text
+/plugin marketplace update im-mcp-marketplace        # 1. refresh the catalog   (arg = marketplace name)
+/plugin update im-mcp-codeagent@im-mcp-marketplace   # 2. pull the new version  (arg = plugin@marketplace)
+/reload-plugins                                      # 3. activate it + re-run the build hook
+```
+
+> `/reload-plugins` (or a full `/exit` + relaunch) is **required** — until then the previous version stays live. The first session after reload re-runs the `SessionStart` build hook, which compiles `cli/dist` for the new version.
+
+Verify the installed version:
+
+```text
+/plugin list
+```
+
+**Fallback** — if `/plugin update` reports "already latest" but the code didn't change (stale cache, or the version wasn't bumped):
+
+```text
+/plugin uninstall im-mcp-codeagent@im-mcp-marketplace
+/plugin marketplace update im-mcp-marketplace
+/plugin install im-mcp-codeagent@im-mcp-marketplace
+/reload-plugins
+```
 
 ## 📡 Real-device prerequisites
 
