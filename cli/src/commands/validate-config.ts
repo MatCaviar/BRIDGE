@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { constructDbusCall, constructNativeCall } from "@im/mcp-server-framework";
+import { constructDbusCall, constructNativeCall, normalizeReply } from "@im/mcp-server-framework";
 import type { AnalysisData, ParamDef } from "../types.js";
 import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
 
@@ -36,9 +36,14 @@ export function validateConfig(config: unknown, analysis: AnalysisData): Validat
     if (!spec) continue;
     try {
       const args = sampleArgs(cap.params);
-      if (spec.type === "dbus") constructDbusCall(spec, args);
-      else if (spec.type === "native") constructNativeCall(spec, args);
-      else errors.push(`${cap.id}: unknown spec.type ${spec.type}`);
+      if (spec.type === "dbus") {
+        normalizeReply(spec.reply);  // DESIGN A: validate the reply descriptor shape
+        constructDbusCall(spec, args);
+      } else if (spec.type === "native") {
+        constructNativeCall(spec, args);
+      } else {
+        errors.push(`${cap.id}: unknown spec.type ${spec.type}`);
+      }
     } catch (e) {
       errors.push(`${cap.id}: not dispatchable: ${e instanceof Error ? e.message : String(e)}`);
     }

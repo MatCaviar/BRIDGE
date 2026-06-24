@@ -48,6 +48,43 @@ describe("validateConfig", () => {
     expect(r.valid).toBe(false);
     expect(r.errors.join("\n")).toContain("no capabilities");
   });
+  it("accepts object reply descriptor with read + unwrap", () => {
+    const config = {
+      read_status: {
+        type: "dbus", bus: "b", path: "p", method: "request",
+        arg: { funcName: "read" },
+        reply: { read: "json", unwrap: "result.data" },
+      },
+    };
+    const r = validateConfig(config, ANALYSIS);
+    expect(r.valid).toBe(true);
+    expect(r.errors).toHaveLength(0);
+  });
+  it("rejects object reply descriptor missing read", () => {
+    const config = {
+      read_status: {
+        type: "dbus", bus: "b", path: "p", method: "request",
+        arg: { funcName: "read" },
+        reply: { unwrap: "result.data" } as any,
+      },
+    };
+    const r = validateConfig(config, ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("read_status");
+    expect(r.errors.join("\n")).toContain("read");
+  });
+  it("rejects object reply descriptor with speculative field (coerce)", () => {
+    const config = {
+      read_status: {
+        type: "dbus", bus: "b", path: "p", method: "request",
+        arg: { funcName: "read" },
+        reply: { read: "json", coerce: true } as any,
+      },
+    };
+    const r = validateConfig(config, ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toMatch(/unknown.*reply.*field/i);
+  });
 });
 
 describe("validateConfig — _deferred allowlist", () => {

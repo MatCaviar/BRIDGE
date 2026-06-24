@@ -120,7 +120,12 @@ class RpcEngine extends BMPage {
         if (err) { reject(err); return; }
         try {
           let data: any;
-          switch (spec.reply) {
+          // DESIGN A: spec.reply is a string OR { read, unwrap?, parseJson?, valueField? }.
+          // The car-side only needs `read` to pick the UBus reader; host-side extraction
+          // (unwrap/parseJson/valueField) happens in the generated yunos-adapter. The device
+          // returns the raw read value — unchanged.
+          const readKind: string = typeof spec.reply === "string" ? spec.reply : (spec.reply && spec.reply.read);
+          switch (readKind) {
             case "json": data = result.readJSON(); break;
             case "string": data = result.readString(); break;
             case "int": data = result.readInt32(); break;

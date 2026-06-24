@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { constructDbusCall, constructNativeCall } from "../src/rpc-spec.js";
 import type { DbusSpec, NativeSpec } from "../src/rpc-spec.js";
+import { type ReplyDescriptor, normalizeReply } from "../src/rpc-spec.js";
 
 describe("constructDbusCall", () => {
   it("interpolates ${vars} (type-preserving) and stringifies listed paths", () => {
@@ -33,5 +34,25 @@ describe("constructNativeCall", () => {
   it("falls back missing expr vars to 0", () => {
     const spec: NativeSpec = { type: "native", require: "x", method: "m", args: [{ expr: "${missing} + 1" }] };
     expect(constructNativeCall(spec, {}).args).toEqual([1]);
+  });
+});
+
+describe("normalizeReply (reply descriptor DESIGN A)", () => {
+  it("legacy string reply → { read: <string> }", () => {
+    expect(normalizeReply("json")).toEqual<ReplyDescriptor>({ read: "json" });
+    expect(normalizeReply("double")).toEqual<ReplyDescriptor>({ read: "double" });
+  });
+  it("object reply passes through (only the 4 allowed fields)", () => {
+    const d: ReplyDescriptor = { read: "json", unwrap: "result.data" };
+    expect(normalizeReply(d)).toBe(d);
+  });
+  it("object reply with read missing → throws", () => {
+    expect(() => normalizeReply({ unwrap: "result.data" } as unknown as ReplyDescriptor)).toThrow(/read/);
+  });
+  it("object reply with unknown field → throws (minimal — only 4 fields)", () => {
+    expect(() => normalizeReply({ read: "json", coerce: true } as unknown as ReplyDescriptor)).toThrow(/unknown.*reply.*field.*coerce/i);
+  });
+  it("object reply with bad read value → throws", () => {
+    expect(() => normalizeReply({ read: "yaml" } as unknown as ReplyDescriptor)).toThrow(/read/);
   });
 });

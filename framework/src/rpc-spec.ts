@@ -1,5 +1,43 @@
 /** Node 参考实现：车机 RpcEngine.ts（agil/TS）的 dispatch 算法镜像于此。本文件有单测；车机 TS 版是它的翻译。 */
 
+/** LEGACY: `reply: "json" | "string" | "int" | "double" | "bool"` (string).
+ *  DESIGN A: ALSO accept an object. MINIMAL — only these 4 fields:
+ *    read       — which UBus reply reader the car-side uses ("json"|"string"|"int"|"double"|"bool")
+ *    unwrap?    — dotted path into the read value to the payload (e.g. "result.data")
+ *    parseJson? — the read value (after unwrap) is a JSON-encoded string → parse it
+ *    valueField?— the unwrapped value is a SCALAR (set-op success / single read) → map it onto this DTO field (e.g. "volume")
+ *  Legacy string `reply` ≡ `{ read: <string> }`. */
+export interface ReplyDescriptor {
+  readonly read: "json" | "string" | "int" | "double" | "bool";
+  readonly unwrap?: string;
+  readonly parseJson?: boolean;
+  readonly valueField?: string;
+}
+
+const READ_KINDS = new Set(["json", "string", "int", "double", "bool"]);
+const ALLOWED_REPLY_FIELDS = new Set(["read", "unwrap", "parseJson", "valueField"]);
+
+/** Normalize a `reply` value (string OR object) into a validated ReplyDescriptor.
+ *  Throws on: missing read, bad read value, or any field outside the 4 allowed (minimal — no speculative config).
+ *  A valid object is returned by reference (pass-through); a legacy string is wrapped as `{ read: <string> }`. */
+export function normalizeReply(reply: unknown): ReplyDescriptor {
+  if (typeof reply === "string") {
+    if (!READ_KINDS.has(reply)) throw new Error(`bad reply.read: ${reply}`);
+    return { read: reply as ReplyDescriptor["read"] };
+  }
+  if (!reply || typeof reply !== "object") throw new Error("reply must be a string or object");
+  const obj = reply as Record<string, unknown>;
+  for (const k of Object.keys(obj)) {
+    if (!ALLOWED_REPLY_FIELDS.has(k)) throw new Error(`unknown reply field (only read/unwrap/parseJson/valueField allowed): ${k}`);
+  }
+  const read = obj.read;
+  if (typeof read !== "string" || !READ_KINDS.has(read)) throw new Error(`bad reply.read: ${String(read)}`);
+  if (obj.unwrap !== undefined && typeof obj.unwrap !== "string") throw new Error("reply.unwrap must be a string");
+  if (obj.parseJson !== undefined && typeof obj.parseJson !== "boolean") throw new Error("reply.parseJson must be boolean");
+  if (obj.valueField !== undefined && typeof obj.valueField !== "string") throw new Error("reply.valueField must be a string");
+  return reply as ReplyDescriptor;
+}
+
 export interface DbusSpec {
   readonly type: "dbus";
   readonly bus: string;
@@ -7,7 +45,7 @@ export interface DbusSpec {
   readonly method: string;
   readonly arg: unknown;          // 模板，可含 ${var}
   readonly stringify?: string[];  // arg 内需 JSON.stringify 的点分路径
-  readonly reply: "json" | "string" | "int" | "double" | "bool";
+  readonly reply: ReplyDescriptor | ReplyDescriptor["read"];
 }
 
 export interface NativeSpec {
