@@ -26,7 +26,7 @@ Orchestrate the end-to-end pipeline that transforms a YunOS HDT application into
 The pipeline is a state machine with 8 steps. Each step has a type (deterministic CLI or LLM Skill) and produces artifacts.
 
 ```
-[validate] → [analyze] → (review) → [scaffold] → [generate]
+[validate] → [analyze] → (review) → (curate, optional) → [scaffold] → [generate]
     → (validate_config + wire_check, inline, retried until pass)
     → [test] → (fix if failed) → [build] → [register] → [verify] → [done]
 ```
@@ -56,6 +56,8 @@ node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" validate .mcp-pipeline/<app>/a
 If validation fails, report the errors and ask the user to review the analysis.json.
 
 In `--step` mode: Pause after this step and ask "Analysis complete. Review analysis.json before continuing? [y/n]"
+
+**Optional:** run `/mcp-curate` to pick which capabilities become tools (writes `selection.json`); scaffold then generates only the chosen subset.
 
 ### Step 3: Scaffold (Deterministic — CLI)
 
