@@ -128,6 +128,11 @@ describe("scaffoldProject", () => {
     expect(existsSync(resolve(OUTPUT_DIR, "AGENT_GUIDE.md"))).toBe(false);
   });
 
+  it("throws when selectionPath is provided but the file is missing", () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    expect(() => scaffoldProject(analysis, OUTPUT_DIR, undefined, { selectionPath: resolve(OUTPUT_DIR, "does-not-exist.json") })).toThrow(/selection\.json/);
+  });
+
   it("scaffoldCommand --selection filters capabilities end-to-end", async () => {
     const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
     mkdirSync(OUTPUT_DIR, { recursive: true });

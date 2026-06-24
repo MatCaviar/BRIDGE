@@ -335,8 +335,12 @@ ${domains.map((d) => `  register${d.charAt(0).toUpperCase() + d.slice(1)}Tools(s
 
 export function scaffoldProject(analysis: AnalysisData, outputDir: string, frameworkPath?: string, opts?: { selectionPath?: string }): void {
   if (opts?.selectionPath) {
-    const sel = readSelection(resolve(opts.selectionPath));
-    if (sel?.selected) analysis = { ...analysis, capabilities: analysis.capabilities.filter((c) => sel.selected.includes(c.id)) };
+    const selPath = resolve(opts.selectionPath);
+    const sel = readSelection(selPath);
+    if (!sel || !Array.isArray(sel.selected)) {
+      throw new Error(`selection.json missing or invalid (expected { "selected": [...] }): ${selPath}`);
+    }
+    analysis = { ...analysis, capabilities: analysis.capabilities.filter((c) => sel.selected.includes(c.id)) };
   }
   const resolvedFramework = resolve(frameworkPath ?? DEFAULT_FRAMEWORK_PATH);
   const frameworkRelPath = relative(outputDir, resolvedFramework).replace(/\\/g, "/");
