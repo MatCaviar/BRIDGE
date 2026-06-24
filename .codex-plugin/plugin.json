@@ -9,7 +9,7 @@
   "keywords": ["yunos", "automotive", "mcp", "codex", "rpc-bridge"],
   "skills": "./skills/",
   "interface": {
-    "displayName": "IM MCP CodeAgent",
+    "displayName": "CodeAgent @ MCP",
     "shortDescription": "Auto-generate controllable MCP Servers from YunOS HDT apps.",
     "longDescription": "Scaffolds an MCP Server from a YunOS HDT app manifest, generates an adb-driven rpc-bridge, and wires a car-side RpcEngine so Claude Code and Codex can drive the device.",
     "developerName": "Tongji University & IM",

@@ -1,8 +1,10 @@
 <div align="center">
 
-# 🎛️ IM MCP CodeAgent
+# 🎛️ CodeAgent @ MCP
 
-**Turn a YunOS HDT in-car app into a controllable MCP Server — reliably.**
+**BRIDGE** · *Building Real-device Interfaces via Deterministic Gated Execution*
+
+Turn a YunOS HDT in-car app into a controllable MCP Server — reliably.
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
@@ -16,7 +18,7 @@
 
 ---
 
-A Claude Code / Codex plugin. Host-LLM **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent executes. **No LLM calls live inside the plugin** — every generated artifact is reproducible.
+A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces via Deterministic Gated Execution*): host-LLM **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent executes. **No LLM calls live inside the plugin** — every generated artifact is reproducible.
 
 Given an app's source + manifest, it emits a ready-to-run MCP Server that an upstream agent can call to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock.
 
@@ -121,5 +123,5 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 MIT — see [LICENSE](LICENSE). `tools/adb/` bundles Google's adb under its own terms.
 
 <div align="center">
-<sub>Built by Tongji University &amp; IM · controllable MCP for the YunOS cockpit</sub>
+<sub>CodeAgent @ MCP · BRIDGE — built by Tongji University &amp; IM · controllable MCP for the YunOS cockpit</sub>
 </div>
