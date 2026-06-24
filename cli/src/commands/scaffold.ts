@@ -340,6 +340,13 @@ export function scaffoldProject(analysis: AnalysisData, outputDir: string, frame
     if (!sel || !Array.isArray(sel.selected)) {
       throw new Error(`selection.json missing or invalid (expected { "selected": [...] }): ${selPath}`);
     }
+    if (sel.selected.length === 0) {
+      throw new Error(`selection.json has an empty "selected" list — nothing to generate: ${selPath}`);
+    }
+    const missing = sel.selected.filter((id) => !analysis.capabilities.some((c) => c.id === id));
+    if (missing.length > 0) {
+      throw new Error(`selection.json references unknown capability ids (not in analysis): ${missing.join(", ")}`);
+    }
     analysis = { ...analysis, capabilities: analysis.capabilities.filter((c) => sel.selected.includes(c.id)) };
   }
   const resolvedFramework = resolve(frameworkPath ?? DEFAULT_FRAMEWORK_PATH);

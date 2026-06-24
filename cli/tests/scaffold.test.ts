@@ -133,6 +133,21 @@ describe("scaffoldProject", () => {
     expect(() => scaffoldProject(analysis, OUTPUT_DIR, undefined, { selectionPath: resolve(OUTPUT_DIR, "does-not-exist.json") })).toThrow(/selection\.json/);
   });
 
+  it("throws when selection.json lists unknown capability ids", () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    mkdirSync(OUTPUT_DIR, { recursive: true });
+    const selPath = resolve(OUTPUT_DIR, "selection.json");
+    writeFileSync(selPath, JSON.stringify({ selected: ["does_not_exist"] }));
+    expect(() => scaffoldProject(analysis, OUTPUT_DIR, undefined, { selectionPath: selPath })).toThrow(/unknown capability/);
+  });
+  it("throws when selection.json has an empty selected list", () => {
+    const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
+    mkdirSync(OUTPUT_DIR, { recursive: true });
+    const selPath = resolve(OUTPUT_DIR, "selection.json");
+    writeFileSync(selPath, JSON.stringify({ selected: [] }));
+    expect(() => scaffoldProject(analysis, OUTPUT_DIR, undefined, { selectionPath: selPath })).toThrow(/empty/);
+  });
+
   it("scaffoldCommand --selection filters capabilities end-to-end", async () => {
     const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
     mkdirSync(OUTPUT_DIR, { recursive: true });
