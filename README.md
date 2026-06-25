@@ -22,6 +22,12 @@ A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces vi
 
 Given an app's source + manifest, it emits a ready-to-run MCP Server that an upstream agent can call to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock.
 
+## 🧠 How it works
+
+Three views of one system. **Offline**, the host agent builds a verified server from an app. **Online**, that server drives the real device over a file mailbox — no network. A concrete capability (`soundstage_read`) is threaded through to keep it specific.
+
+**Fig. 1 — End-to-end pipeline.** The agent extracts capabilities; the CLI deterministically generates the server; the agent extracts per-op wire specs (the one judgment step, screened by two fail-closed gates); at runtime a file-mailbox RPC actuates the device and a reply descriptor unwraps the answer.
+
 ```mermaid
 flowchart TD
     classDef agent fill:#eef2ff,stroke:#4338ca,stroke-width:1.5px,color:#1e1b4b
@@ -31,42 +37,100 @@ flowchart TD
     classDef art fill:#f8fafc,stroke:#94a3b8,stroke-width:1.2px,color:#334155
     classDef key fill:#3730a3,stroke:#1e1b4b,stroke-width:2px,color:#ffffff
 
-    SRC["app artifact<br/>manifest · proxy source"]:::art
+    SRC["app source + manifest<br/>e.g. AudioPolicyProxy.getSoundStage()"]:::art
 
-    subgraph OFF ["Offline synthesis · deterministic backbone"]
+    subgraph OFF ["Offline — build the server"]
       direction TB
-      EXT["interface extraction · agent<br/>capability model C : params · returns ·<br/>safety level · error codes · source ref"]:::agent
-      SEL["selection · agent · S ⊆ C · optional"]:::agent
-      SYN["deterministic synthesis · CLI<br/>RPC bridge · adapter rpcCall → DTO map<br/>tool surface · safety guards · car engine<br/>zero app literals — byte-reproducible"]:::det
-      BIND["wire binding · agent — sole judgment locus<br/>contract Ω : capability → wire spec, return-shape δ"]:::key
-      G1{{"gate G₁ · validity<br/>schema · coverage · dispatchable"}}:::gate
-      G2{{"gate G₂ · equivalence<br/>proxy ↔ contract"}}:::gate
+      EXT["analyze · agent — extract capabilities<br/>e.g. soundstage_read: params ∅ · returns {mode,fade,balance}<br/>safety: readonly · errors AUDIO (2xxx)"]:::agent
+      SEL["curate · agent — pick subset (optional)"]:::agent
+      SYN["scaffold · CLI — generate server code<br/>rpc-bridge · adapter rpcCall→DTO · tools (Zod + safety guard)<br/>registry · car-side RpcEngine · zero app literals"]:::det
+      BIND["generate · agent — extract per-op wire specs<br/>e.g. soundstage_read → bus com.yunos.audiopolicyservice · method request<br/>reply {read: json, unwrap: result.data}"]:::key
+      G1{{"gate · validity<br/>schema · coverage · dispatchable"}}:::gate
+      G2{{"gate · equivalence<br/>proxy ↔ wire spec"}}:::gate
       EXT --> SEL --> SYN --> BIND --> G1 --> G2
     end
 
     SRC --> EXT
-    G2 -->|"verified"| TS["MCP tool surface · runtime artifact"]:::art
+    G2 -->|"verified"| TS["MCP tool surface<br/>one tool per capability · safety-annotated"]:::art
 
-    subgraph ON ["Online actuation · file-mailbox RPC · no network"]
+    subgraph ON ["Online — drive the device (no network)"]
       direction LR
-      CALL["host agent · tool call"]:::agent
+      CALL["host agent calls tool<br/>soundstage_read"]:::agent
       ADP["adapter · rpcCall"]:::rt
-      MAIL["file mailbox<br/>cmd · result · reqId-matched"]:::art
-      ENG["car RpcEngine<br/>constructDbusCall"]:::rt
-      DEV["YunOS device"]:::art
-      NORM["return-shape normalize · δ → DTO<br/>unwrap · parseJson · valueField"]:::key
+      MAIL["file mailbox<br/>/sdcard/imrpc/cmd + result"]:::art
+      ENG["car RpcEngine<br/>constructDbusCall → D-Bus"]:::rt
+      DEV["YunOS device<br/>returns {result:{data:{mode,fade,balance}}}"]:::art
+      NORM["applyReply · unwrap result.data<br/>→ DTO {mode,fade,balance}"]:::key
       CALL --> ADP
-      ADP -->|"① write cmd"| MAIL
-      ADP -.->|"② sendlink"| ENG
+      ADP -->|"write {reqId,op,args}"| MAIL
+      ADP -.->|"sendlink spawn"| ENG
       ENG <-->|"D-Bus"| DEV
-      ENG -.->|"③ write result"| MAIL
-      MAIL -->|"④ poll · reqId"| NORM
+      ENG -.->|"write {reqId,ok,data}"| MAIL
+      MAIL -->|"poll · reqId match"| NORM
     end
 
     TS --> CALL
 ```
 
-*Fig. 1 — Offline synthesis distills an app into a verified MCP tool surface: a deterministic backbone plus a single agent-judgment locus (the wire contract **Ω**), screened by two fail-closed gates (validity, equivalence). Online actuation drives the device over a serialized file-mailbox RPC; the return-shape descriptor **δ** normalizes the device's varied replies into typed DTOs. **Agent** = host agent (Claude Code / Codex); the CLI embeds no model.*
+**Fig. 2 — Return-shape extraction (the key design).** The device answers reads in three different shapes. A tiny 4-field descriptor (`read / unwrap / parseJson / valueField`) lives in each wire spec and tells the adapter exactly how to reach the payload — so generated servers extract the right fields instead of reading blindly off the top level.
+
+```mermaid
+flowchart LR
+    classDef dev fill:#f1f5f9,stroke:#64748b,stroke-width:1.3px,color:#334155
+    classDef d fill:#eef2ff,stroke:#4338ca,stroke-width:1.5px,color:#1e1b4b
+    classDef dto fill:#ecfdf5,stroke:#059669,stroke-width:1.5px,color:#064e3b
+
+    subgraph C1 ["case 1 · object reply → unwrap"]
+      direction TB
+      D1["device readJSON()<br/>{ result: { data: {mode, fade, balance} } }"]:::dev
+      X1["descriptor<br/>{read: json<br/>unwrap: result.data}"]:::d
+      O1["DTO {mode, fade, balance}"]:::dto
+      D1 --> X1 --> O1
+    end
+    subgraph C2 ["case 2 · scalar reply → valueField"]
+      direction TB
+      D2["device readDouble()<br/>returns 0"]:::dev
+      X2["descriptor<br/>{read: double<br/>valueField: success}"]:::d
+      O2["DTO {success: true}<br/>(0 = success)"]:::dto
+      D2 --> X2 --> O2
+    end
+    subgraph C3 ["case 3 · string reply → parseJson"]
+      direction TB
+      D3["device readString()<br/>a JSON-encoded string"]:::dev
+      X3["descriptor<br/>{read: string<br/>parseJson: true}"]:::d
+      O3["DTO {parsed object}"]:::dto
+      D3 --> X3 --> O3
+    end
+```
+
+**Fig. 3 — Real-device round-trip.** The host writes a command file, wakes the car page with `sendlink`, and polls the result file by `reqId`. One shared mailbox ⇒ calls are serialized; a device failure propagates as a domain error code.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent as host agent
+    participant Server as MCP server (adapter)
+    participant Mailbox as mailbox /sdcard/imrpc
+    participant Engine as car RpcEngine
+    participant Device as YunOS device
+
+    Agent->>Server: call tool soundstage_read
+    Server->>Mailbox: write cmd {reqId, op, args}
+    Server->>Engine: sendlink page://app.yunos.com/rpcagent
+    Note over Engine: spawned page reads cmd · looks up wire spec
+    Engine->>Device: constructDbusCall → D-Bus request
+    Device-->>Engine: readJSON() {result:{data:{...}}}
+    Engine->>Mailbox: write result {reqId, ok, data}
+    Server->>Mailbox: poll result (reqId match)
+    Mailbox-->>Server: {reqId, ok, data}
+    alt ok
+        Server->>Server: applyReply(descriptor) → DTO
+        Server-->>Agent: {success, mode, fade, balance}
+    else not ok
+        Server-->>Agent: error (device code → domain code)
+    end
+    Note over Server: serialized — one shared mailbox, calls run in sequence
+```
 
 ## 🛡️ Why it's reliable
 
@@ -86,7 +150,7 @@ validate › analyze › [curate] › scaffold › generate › test › build �
   (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
 ```
 
-Each step is either a **deterministic CLI** subcommand or a **host-LLM skill**. Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `--only`, `--step`, `--batch`.
+Each step is either a **deterministic CLI** subcommand or an **agent skill**. Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `--only`, `--step`, `--batch`.
 
 > The two gates (`validate-config` + `wire-check`) are inline sub-steps of `generate`, retried until both pass before the pipeline advances. `[curate]` is optional.
 
@@ -167,7 +231,7 @@ No device handy? Local verification always works: `mcp-pipeline verify --dir <se
 im-mcp-codeagent/
 ├── .claude-plugin/       Claude Code manifest + marketplace
 ├── .codex-plugin/        Codex manifest (dual-end mirror)
-├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test  (methodology, no LLM calls)
+├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test  (methodology, no model calls)
 ├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
 ├── hooks/                SessionStart → polyglot build (run-hook.cmd → session-init.sh)
 ├── cli/                  @im/mcp-pipeline-cli — deterministic Node
