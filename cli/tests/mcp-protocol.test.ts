@@ -177,8 +177,9 @@ describe("MCP protocol integration", () => {
 
     const data = JSON.parse(resp!.result.content[0].text);
     expect(data.success).toBe(true);
-    expect(data.data).toBeDefined();
-    expect(data.data.currentPage).toBeDefined();
+    // N3: formatSuccess no longer double-wraps an already-shaped DTO — currentPage sits at the top level.
+    expect(data.data).toBeUndefined();
+    expect(data.currentPage).toBeDefined();
   });
 
   it("executes read_gear_status and returns mock data", async () => {
@@ -195,7 +196,9 @@ describe("MCP protocol integration", () => {
 
     const data = JSON.parse(resp!.result.content[0].text);
     expect(data.success).toBe(true);
-    expect(data.data.isParked).toBe(true);
+    // N3: formatSuccess no longer double-wraps — isParked sits at the top level.
+    expect(data.data).toBeUndefined();
+    expect(data.isParked).toBe(true);
   });
 
   it("executes capture_pet with number param", async () => {
