@@ -45,7 +45,7 @@ flowchart TD
   APP -->|source| AN
   GK{{"⊗ validate-config + wire-check<br/>fail-closed gate"}}:::gate
   GN -->|rpc/config.json| GK
-  GK -->|produces| MCP([("★ MCP Server<br/>controllable tools")]):::hub
+  GK -->|produces| MCP["★ MCP Server<br/>controllable tools"]:::hub
   MCP -->|tool call| HA["Host Agent<br/>Claude / Codex"]:::skill
   MCP -->|rpcCall| BR["RPC Bridge<br/>adb / sendlink"]:::rt
   BR -->|adb| CE["Car-side RpcEngine"]:::rt
