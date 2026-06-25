@@ -26,31 +26,55 @@ Given an app's source + manifest, it emits a ready-to-run MCP Server that an ups
 
 The deliverable is a set of **MCP tool definitions** — the function schemas an upstream agent (Claude / Codex) is injected with and calls. The server that hosts them is secondary; the schema surface is the point. Two views of how an app becomes that surface.
 
-**Fig. 1 — From app to tool definition.** A horizontal pipeline: the agent extracts capabilities, the CLI deterministically scaffolds the server, the agent authors per-op wire specs (the one judgment step, gated), and each capability becomes one tool definition registered to the upstream agent.
+**Fig. 1 — Anatomy of generation.** Four phases — analyze → scaffold → generate → register — each opened to its real components. The agent supplies judgment (extract, author wire specs); the CLI is deterministic (scaffold, gates). Two fail-closed gates retry on failure; the deliverable is the set of MCP tool definitions injected into the upstream agent.
 
 ```mermaid
 flowchart LR
-    classDef src fill:#f1f5f9,stroke:#64748b,color:#334155
+    classDef data fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
     classDef agent fill:#eef2ff,stroke:#4338ca,color:#1e1b4b
-    classDef det fill:#ffffff,stroke:#475569,color:#0f172a
+    classDef cli fill:#f8fafc,stroke:#475569,color:#0f172a
     classDef gate fill:#fff7ed,stroke:#b45309,color:#7c2d12
     classDef schema fill:#3730a3,stroke:#1e1b4b,color:#ffffff,stroke-width:2px
-    classDef user fill:#ecfdf5,stroke:#059669,color:#064e3b
+    classDef actor fill:#ecfdf5,stroke:#059669,color:#064e3b
 
-    SRC[/app source/]:::src
-    AN("analyze · agent"):::agent
-    CAP[/capabilities/]:::src
-    SC("scaffold · CLI"):::det
-    GN("generate · agent"):::agent
-    GK{{"validate · equivalence"}}:::gate
-    TOOL["MCP tool definition<br/>inputSchema ← params<br/>annotations ← safety<br/>handler → wire spec"]:::schema
-    UP(("upstream agent")):::user
+    subgraph AN ["① analyze · agent"]
+      direction TB
+      A1[/app source + manifest/]:::data
+      A2("extract capabilities"):::agent
+      A3[/"capability model<br/>id · params · returns<br/>safety · errors · sourceRef"/]:::data
+    end
 
-    SRC --> AN --> CAP --> SC --> GN --> GK
-    GK -.->|"fail · retry"| GN
-    GK -->|"pass"| TOOL
-    TOOL -->|"register"| UP
-    UP -.->|"invoke"| TOOL
+    subgraph SC ["② scaffold · CLI · deterministic"]
+      direction TB
+      S1["rpc-bridge<br/>rpc-client · adb-executor"]:::cli
+      S2["adapter · rpcCall → DTO"]:::cli
+      S3["tools · Zod + safety guard"]:::cli
+      S4["registry · car-side RpcEngine"]:::cli
+    end
+
+    subgraph GN ["③ generate · agent"]
+      direction TB
+      G1("author wire specs"):::agent
+      G2[/"wire spec<br/>bus · method · arg · reply δ"/]:::data
+      G3{{"validate-config"}}:::gate
+      G4{{"wire-check"}}:::gate
+    end
+
+    subgraph OUT ["④ register"]
+      direction TB
+      T1["MCP tool definitions<br/>name · inputSchema ← params<br/>annotations ← safety"]:::schema
+      UP(("upstream agent")):::actor
+    end
+
+    A3 --> S1
+    S4 --> G1
+    G1 --> G2 --> G3
+    G3 --> G4
+    G3 -.->|"fail"| G1
+    G4 --> T1
+    G4 -.->|"fail"| G1
+    T1 -->|"inject"| UP
+    UP -.->|"invoke"| T1
 ```
 
 **Fig. 2 — The generation process.** Who does what: the host agent supplies judgment (extraction, wire authoring), the CLI is deterministic (scaffold, gates). Each capability is mapped to one tool definition — `name ← id`, `inputSchema ← params`, `annotations ← safety`.
