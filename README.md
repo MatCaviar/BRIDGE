@@ -63,7 +63,7 @@ flowchart LR
     subgraph OUT ["④ register"]
       direction TB
       T1["MCP tool definitions<br/>name · inputSchema ← params<br/>annotations ← safety"]:::schema
-      UP(("🤖 upstream agent")):::actor
+      UP(("🎛️ upstream agent")):::actor
     end
 
     A3 --> S1
@@ -82,10 +82,10 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Agent as 🤖 host agent
-    participant Source as 📦 app source
-    participant CLI as ⚙️ deterministic CLI
-    participant Tool as 🧰 MCP tool schemas
+    participant Agent as 🎛️ host agent
+    participant Source as 🧱 app source
+    participant CLI as 🛠️ deterministic CLI
+    participant Tool as 🧩 MCP tool schemas
 
     Agent->>Source: read proxy + manifest
     Source-->>Agent: methods · capabilities
