@@ -60,13 +60,18 @@ export function generateToolHandlers(analysis: AnalysisData): Map<string, string
     }
     if (allErrorImports.length > 0) {
       lines.push(`import { ${allErrorImports.join(", ")} } from "../types/errors.js";`);
+    } else {
+      // No analysis.errorCodes for this domain → synthetic generic (stable, never the dead literal 1000).
+      lines.push(`const ${domain.toUpperCase()}_GENERIC = 9000 as const;`);
     }
+    // RpcError lives at ../rpc/rpc-types.js in the generated project; the catch block maps device RPC failures.
+    lines.push(`import { RpcError } from "../rpc/rpc-types.js";`);
 
     function capErrorCode(cap: CapabilityDef): string {
-      if (!analysis.errorCodes) return "1000";
+      if (!analysis.errorCodes) return `${domain.toUpperCase()}_GENERIC`;
       for (const [key, domain_2] of Object.entries(analysis.errorCodes)) {
         if (domain_2.domainName !== domain) continue;
-        for (const [codeName, code] of Object.entries(domain_2.codes)) {
+        for (const [codeName, _code] of Object.entries(domain_2.codes)) {
           const errorCode = `${key.toUpperCase()}_${codeName}`;
           if (codeName.toLowerCase().includes(cap.action.split("_")[0]) ||
               cap.action.includes(codeName.split("_")[0].toLowerCase())) {
@@ -75,7 +80,7 @@ export function generateToolHandlers(analysis: AnalysisData): Map<string, string
         }
         return `${key.toUpperCase()}_${Object.keys(domain_2.codes)[0]}`;
       }
-      return "1000";
+      return `${domain.toUpperCase()}_GENERIC`;
     }
 
     const guardParams = hasSafetySensitive
@@ -142,6 +147,11 @@ export function generateToolHandlers(analysis: AnalysisData): Map<string, string
       lines.push(`        return formatSuccess(result);`);
       const capErrCode = capErrorCode(cap);
       lines.push(`      } catch (error) {`);
+      lines.push(`        if (error instanceof RpcError) {`);
+      lines.push(`          // device RPC failure → translate error.code to the generated domain code (e.g. SET_FAILED for set ops)`);
+      lines.push(`          const rpcCode = error.code;`);
+      lines.push(`          return formatError(${capErrCode}, "[" + rpcCode + "] " + error.message, "${domain}");`);
+      lines.push(`        }`);
       lines.push(`        if (error instanceof Error) {`);
       lines.push(`          return formatError(${capErrCode}, error.message, "${domain}");`);
       lines.push(`        }`);
