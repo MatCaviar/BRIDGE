@@ -1,6 +1,6 @@
 {
   "name": "im-mcp-codeagent",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Auto-generate controllable MCP Servers from YunOS HDT apps (Claude Code + Codex).",
   "author": { "name": "Tongji University & IM" },
   "homepage": "https://github.com/MatCaviar/im-mcp-codeagent",
