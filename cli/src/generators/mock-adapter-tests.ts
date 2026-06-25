@@ -40,13 +40,39 @@ export function generateMockAdapterTests(analysis: AnalysisData): string {
     }
     if (cap.returns) {
       lines.push("      expect(result).toBeDefined();");
-    }
-    const returnFields = cap.returns?.fields ?? [];
-    if (returnFields.some((f) => typeof f === "string" ? f === "success" : f.name === "success")) {
-      lines.push("      expect(result.success).toBe(true);");
+      const returnFields = (cap.returns.fields ?? []).map((f) => typeof f === "string" ? f : f.name);
+      const hasSuccess = returnFields.includes("success");
+      const isScalarSet = cap.action === "set" && !returnFields.some((f) => f !== "success");
+      if (hasSuccess && isScalarSet) {
+        // N12: set op → mock returns the device scalar (0 = success); assert the scalar directly,
+        // not a pre-shaped { success: true } (the tautology we removed).
+        lines.push("      expect(Number(result)).toBe(0);");
+      } else if (hasSuccess) {
+        lines.push("      expect(result.success).toBe(true);");
+      }
+      // N11: assert a NON-success field was extracted (the mock built the device envelope
+      // { result: { data } } then unwrapped result.data → these fields). Proves extraction, not
+      // just that success===true (the tautology we removed).
+      const probeField = returnFields.find((f) => f !== "success");
+      if (probeField) {
+        lines.push(`      // field reaches here via result.data unwrap`);
+        lines.push(`      expect((result as any).${probeField}).toBeDefined();`);
+      }
     }
     lines.push("    });");
     lines.push("");
+
+    if (cap.action === "read" && cap.returns) {
+      const rf = (cap.returns.fields ?? []).map((f) => typeof f === "string" ? f : f.name).filter((f) => f !== "success");
+      if (rf.length > 0) {
+        lines.push(`    it("${methodName} extracts field from device envelope (result.data)", async () => {`);
+        lines.push(`      const result = await adapter.${methodName}(${(cap.params ?? []).map(() => '"x"').join(", ")});`);
+        lines.push(`      // mock returned { result: { data: { ${rf[0]} } } }; adapter unwrapped result.data`);
+        lines.push(`      expect((result as any).${rf[0]}).toBeDefined();`);
+        lines.push(`    });`);
+        lines.push("");
+      }
+    }
 
     lines.push(`    it("${methodName} propagates injected errors", async () => {`);
     lines.push(`      control.setError("${methodName}", new Error("injected error"));`);

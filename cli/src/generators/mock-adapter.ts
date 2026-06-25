@@ -17,28 +17,24 @@ function defaultForType(type: string, n: string): string {
   }
 }
 
-function defaultReturn(dtoName: string, fields: readonly (string | TypedField)[]): string {
+/** N11/N12: the mock constructs the SAME envelope the real device returns ({ result: { data: ... } }
+ *  for json read ops; scalar 0 for double set ops) and then unwraps it exactly as the generated
+ *  yunos adapter's applyReply() does — so the round-trip is exercised and downstream consumers
+ *  still receive the DTO shape. The envelope literal stays in the source (proof the mock is realistic). */
+function defaultReturn(dtoName: string, fields: readonly (string | TypedField)[], action: string): string {
+  void dtoName;
   const nonEmpty = fields.filter((f) => fieldName(f) && fieldName(f) !== "success");
-  if (nonEmpty.length === 0) {
-    return `frozen<${dtoName}>({ success: true } as ${dtoName})`;
-  }
-
   const fieldValues = nonEmpty.map((f) => {
     const n = safeFieldName(fieldName(f));
-    // Specific computed patterns - highest priority (must precede generic boolean patterns)
     if (n.toLowerCase().includes("isparked")) return `${n}: state.gearStatus === "P"`;
     if (n.toLowerCase().includes("gear") && !n.toLowerCase().includes("isparked")) return `${n}: state.gearStatus`;
-    // Generic boolean patterns
-    if (/^(is|has|can|should)/i.test(n)) return `${n}: false`;
-    if (/enabled|active|visible|loading|playing|paused|available/i.test(n)) return `${n}: true`;
-    // Page-related patterns - but only for actual page names, not boolean fields
-    if ((n === "currentPage" || n === "currentpage") && !/^(is|has)/i.test(n)) return `${n}: state.pageStack[state.pageStack.length - 1]`;
+    if ((n === "currentPage" || n === "currentpage")) return `${n}: state.pageStack[state.pageStack.length - 1]`;
     if (n === "stackDepth" || n === "stackdepth") return `${n}: state.pageStack.length`;
-    // Remaining specific patterns
+    if (/^(is|has|can|should)/i.test(n)) return `${n}: true`;
+    if (/enabled|active|visible|loading|playing|paused|available/i.test(n)) return `${n}: true`;
     if (n.toLowerCase().includes("ignoremode")) return `${n}: "false"`;
     if (n.toLowerCase().includes("rawvalue")) return `${n}: 2`;
     if (/id$/i.test(n)) return `${n}: nextMockId()`;
-    // Type-based patterns
     if (inferFieldType(n) === "number" && /(timestamp|time|date)/i.test(n)) return `${n}: Date.now()`;
     if (/url|uri|href|path$/i.test(n)) return `${n}: "mock://test"`;
     if (/message|msg|text/i.test(n)) return `${n}: "mock response"`;
@@ -47,7 +43,18 @@ function defaultReturn(dtoName: string, fields: readonly (string | TypedField)[]
     return defaultForType(inferFieldType(n), n);
   });
 
-  return `frozen<${dtoName}>({ success: true, ${fieldValues.join(", ")} } as ${dtoName})`;
+  // set op → device returns scalar 0 (readDouble convention: 0 = success). The mock returns the
+  // raw scalar 0; the generated yunos adapter's scalarSnippet maps it onto success.
+  if (action === "set" && nonEmpty.length === 0) {
+    return `{ return 0 ${castSuffix(dtoName)}; }`;
+  }
+  // read op (or set with non-success fields) → PolicyResponse envelope, then unwrap result.data.
+  const inner = `{ ${fieldValues.join(", ")} }`;
+  return `{ const mockReply = frozen<{ result: { data: Record<string, unknown> } }>({ result: { data: ${inner} } }); const payload = mockReply.result.data; return frozen({ success: true, ...(payload as Record<string, unknown>) } as object) ${castSuffix(dtoName)}; }`;
+}
+
+function castSuffix(dtoName: string): string {
+  return dtoName ? `as unknown as ${dtoName}` : "";
 }
 
 export function generateMockAdapter(analysis: AnalysisData): string {
@@ -153,8 +160,12 @@ export function generateMockAdapter(analysis: AnalysisData): string {
       bodyLines.push(`state = { ...state, isLoading: false };`);
     }
 
-    const statefulReturn = cap.returns ? defaultReturn(retType, (cap.returns?.fields ?? [])) : `undefined as unknown as Promise<${retType}>`;
-    bodyLines.push(`return ${statefulReturn};`);
+    if (cap.returns) {
+      // defaultReturn emits its own block (constructs the device envelope then unwraps → DTO).
+      bodyLines.push(defaultReturn(retType, (cap.returns?.fields ?? []), cap.action));
+    } else {
+      bodyLines.push(`return undefined as unknown as Promise<${retType}>;`);
+    }
 
     lines.push(`    async ${methodName}(${params.join(", ")}): Promise<${retType}> {`);
     for (const bl of bodyLines) {
