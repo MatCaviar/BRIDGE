@@ -22,7 +22,35 @@ A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces vi
 
 Given an app's source + manifest, it emits a ready-to-run MCP Server that an upstream agent can call to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock.
 
-<p align="center"><img src="assets/framework.svg" alt="BRIDGE — framework overview" width="920"></p>
+```mermaid
+flowchart TD
+  classDef skill fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.4px,color:#1f2937
+  classDef det fill:#eef2ff,stroke:#4f46e5,stroke-width:1.4px,color:#1f2937
+  classDef gate fill:#fffbeb,stroke:#d97706,stroke-width:1.7px,color:#b45309
+  classDef rt fill:#ecfeff,stroke:#0e7490,stroke-width:1.4px,color:#1f2937
+  classDef art fill:#f3f4f6,stroke:#6b7280,stroke-width:1.4px,color:#1f2937
+  classDef hub fill:#4338ca,stroke:#4f46e5,stroke-width:1.8px,color:#ffffff
+
+  APP["YunOS HDT app<br/>source + manifest"]:::art
+  subgraph OFF ["Offline · Synthesis — deterministic + verified"]
+    direction LR
+    AN["Analyze"]:::skill
+    CU["Curate ✦ optional"]:::skill
+    SC["Scaffold"]:::det
+    GN["Generate"]:::skill
+    AN -->|capabilities| SC
+    CU -.->|selection.json| SC
+    SC -->|skeleton| GN
+  end
+  APP -->|source| AN
+  GK{{"⊗ validate-config + wire-check<br/>fail-closed gate"}}:::gate
+  GN -->|rpc/config.json| GK
+  GK -->|produces| MCP([("★ MCP Server<br/>controllable tools")]):::hub
+  MCP -->|tool call| HA["Host Agent<br/>Claude / Codex"]:::skill
+  MCP -->|rpcCall| BR["RPC Bridge<br/>adb / sendlink"]:::rt
+  BR -->|adb| CE["Car-side RpcEngine"]:::rt
+  CE -->|actuate| DEV["YunOS Device"]:::art
+```
 
 ## 🛡️ Why it's reliable
 
