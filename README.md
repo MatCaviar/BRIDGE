@@ -18,39 +18,55 @@
 
 ---
 
-A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces via Deterministic Gated Execution*): host-LLM **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent executes. **No LLM calls live inside the plugin** — every generated artifact is reproducible.
+A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces via Deterministic Gated Execution*): agent-driven **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent drives every step. **No model calls live inside the plugin** — the host agent supplies all judgment, and every generated artifact is byte-for-byte reproducible.
 
 Given an app's source + manifest, it emits a ready-to-run MCP Server that an upstream agent can call to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock.
 
 ```mermaid
 flowchart TD
-  classDef skill fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.4px,color:#1f2937
-  classDef det fill:#eef2ff,stroke:#4f46e5,stroke-width:1.4px,color:#1f2937
-  classDef gate fill:#fffbeb,stroke:#d97706,stroke-width:1.7px,color:#b45309
-  classDef rt fill:#ecfeff,stroke:#0e7490,stroke-width:1.4px,color:#1f2937
-  classDef art fill:#f3f4f6,stroke:#6b7280,stroke-width:1.4px,color:#1f2937
-  classDef hub fill:#4338ca,stroke:#4f46e5,stroke-width:1.8px,color:#ffffff
+    classDef agent fill:#eef2ff,stroke:#4338ca,stroke-width:1.5px,color:#1e1b4b
+    classDef det fill:#ffffff,stroke:#475569,stroke-width:1.4px,color:#0f172a
+    classDef gate fill:#fff7ed,stroke:#b45309,stroke-width:1.7px,color:#7c2d12
+    classDef rt fill:#ecfeff,stroke:#0e7490,stroke-width:1.4px,color:#155e75
+    classDef art fill:#f8fafc,stroke:#94a3b8,stroke-width:1.2px,color:#334155
+    classDef key fill:#3730a3,stroke:#1e1b4b,stroke-width:2px,color:#ffffff
 
-  APP["YunOS HDT app<br/>source + manifest"]:::art
-  subgraph OFF ["Offline · Synthesis — deterministic + verified"]
-    direction LR
-    AN["Analyze"]:::skill
-    CU["Curate ✦ optional"]:::skill
-    SC["Scaffold"]:::det
-    GN["Generate"]:::skill
-    AN -->|capabilities| SC
-    CU -.->|selection.json| SC
-    SC -->|skeleton| GN
-  end
-  APP -->|source| AN
-  GK{{"⊗ validate-config + wire-check<br/>fail-closed gate"}}:::gate
-  GN -->|rpc/config.json| GK
-  GK -->|produces| MCP["★ MCP Server<br/>controllable tools"]:::hub
-  MCP -->|tool call| HA["Host Agent<br/>Claude / Codex"]:::skill
-  MCP -->|rpcCall| BR["RPC Bridge<br/>adb / sendlink"]:::rt
-  BR -->|adb| CE["Car-side RpcEngine"]:::rt
-  CE -->|actuate| DEV["YunOS Device"]:::art
+    SRC["app artifact<br/>manifest · proxy source"]:::art
+
+    subgraph OFF ["Offline synthesis · deterministic backbone"]
+      direction TB
+      EXT["interface extraction · agent<br/>capability model C : params · returns ·<br/>safety level · error codes · source ref"]:::agent
+      SEL["selection · agent · S ⊆ C · optional"]:::agent
+      SYN["deterministic synthesis · CLI<br/>RPC bridge · adapter rpcCall → DTO map<br/>tool surface · safety guards · car engine<br/>zero app literals — byte-reproducible"]:::det
+      BIND["wire binding · agent — sole judgment locus<br/>contract Ω : capability → wire spec, return-shape δ"]:::key
+      G1{{"gate G₁ · validity<br/>schema · coverage · dispatchable"}}:::gate
+      G2{{"gate G₂ · equivalence<br/>proxy ↔ contract"}}:::gate
+      EXT --> SEL --> SYN --> BIND --> G1 --> G2
+    end
+
+    SRC --> EXT
+    G2 -->|"verified"| TS["MCP tool surface · runtime artifact"]:::art
+
+    subgraph ON ["Online actuation · file-mailbox RPC · no network"]
+      direction LR
+      CALL["host agent · tool call"]:::agent
+      ADP["adapter · rpcCall"]:::rt
+      MAIL["file mailbox<br/>cmd · result · reqId-matched"]:::art
+      ENG["car RpcEngine<br/>constructDbusCall"]:::rt
+      DEV["YunOS device"]:::art
+      NORM["return-shape normalize · δ → DTO<br/>unwrap · parseJson · valueField"]:::key
+      CALL --> ADP
+      ADP -->|"① write cmd"| MAIL
+      ADP -.->|"② sendlink"| ENG
+      ENG <-->|"D-Bus"| DEV
+      ENG -.->|"③ write result"| MAIL
+      MAIL -->|"④ poll · reqId"| NORM
+    end
+
+    TS --> CALL
 ```
+
+*Fig. 1 — Offline synthesis distills an app into a verified MCP tool surface: a deterministic backbone plus a single agent-judgment locus (the wire contract **Ω**), screened by two fail-closed gates (validity, equivalence). Online actuation drives the device over a serialized file-mailbox RPC; the return-shape descriptor **δ** normalizes the device's varied replies into typed DTOs. **Agent** = host agent (Claude Code / Codex); the CLI embeds no model.*
 
 ## 🛡️ Why it's reliable
 
