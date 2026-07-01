@@ -59,12 +59,12 @@ sequenceDiagram
     Tool-->>Agent: N tool schemas injected
 ```
 
-**The runtime bridge.** Once built, a tool call flows from the host agent through the generated server and a deterministic bridge to the real device — the transport is swappable (`adb` / file / socket), and the wire is constructed purely from `rpc/config.json`, so the bridge carries zero app literals.
+**The runtime bridge.** Once built, a tool call flows from the upstream agent through the generated server and a deterministic bridge to the real device — the transport is swappable (`adb` / file / socket), and the wire is constructed purely from `rpc/config.json`, so the bridge carries zero app literals.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Agent as 🎛️ host agent
+    participant Agent as 🎛️ upstream agent
     participant Server as 🧩 MCP server
     participant Bridge as 🛠️ rpc bridge
     participant Transport as 🔌 device transport
