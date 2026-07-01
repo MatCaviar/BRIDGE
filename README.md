@@ -64,7 +64,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Agent as 🎛️ upstream agent
+    participant Agent as 🤖 upstream agent
     participant Server as 🧩 MCP server
     participant Bridge as 🛠️ rpc bridge
     participant Transport as 🔌 device transport
