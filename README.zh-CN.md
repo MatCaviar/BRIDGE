@@ -251,5 +251,5 @@ node scripts/check-manifests.js             # claude / codex manifest 漂移守�
 MIT——见 [LICENSE](LICENSE)。`tools/adb/` 内嵌 Google 的 adb，遵循其自身条款。
 
 <div align="center">
-<sub>CodeAgent @ MCP · BRIDGE——由同济大学 & IM 构建 · 面向 YunOS 智能座舱的可控 MCP</sub>
+<sub>代码智能体套件 BRIDGE——由同济大学 & IM 构建 · 面向 YunOS 智能座舱的可控 MCP</sub>
 </div>

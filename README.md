@@ -250,5 +250,5 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 MIT — see [LICENSE](LICENSE). `tools/adb/` bundles Google's adb under its own terms.
 
 <div align="center">
-<sub>CodeAgent @ MCP · BRIDGE — built by Tongji University &amp; IM · controllable MCP for the YunOS cockpit</sub>
+<sub>Code Agent Suite BRIDGE — built by Tongji University &amp; IM · controllable MCP for the YunOS cockpit</sub>
 </div>
