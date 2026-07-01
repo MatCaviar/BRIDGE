@@ -19,7 +19,7 @@
 
 ---
 
-一款 Claude Code / Codex 插件——**BRIDGE**（*Building Real-device Interfaces via Deterministic Gated Execution*，基于确定性门控执行构建真机接口）：由**智能体驱动的 skill** 承载方法论，**确定性** Node CLI 承担繁重计算，宿主智能体驱动每一步。**插件内部不含任何模型调用**——所有判断皆由宿主智能体提供，每个生成产物皆逐字节可复现。
+**BRIDGE**（*Building Real-device Interfaces via Deterministic Gated Execution*，基于确定性门控执行构建真机接口）：由**智能体驱动的 skill** 承载方法论，**确定性** Node CLI 承担繁重计算，宿主智能体驱动每一步。**插件内部不含任何模型调用**——所有判断皆由宿主智能体提供，每个生成产物皆逐字节可复现。
 
 ## 🧠 工作原理
 
@@ -209,8 +209,8 @@ mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<
 
 生成的 server 经 adb / file 桥驱动车机。真实设备响应前需：
 
-1. **同事**构建并安装车端 `RpcEngine.ts`，并注册 `page://<app>.yunos.com/rpcagent` manifest page——二者皆产出于 `car-side/`。
-2. 对 YunOS 设备的 **`adb -host`** 可达性。
+1. **同事**构建并安装车端 `RpcEngine.ts`，并注册 `page://<app>/rpcagent` manifest page——二者皆产出于 `car-side/`。
+2. 对设备的 **`adb -host`** 可达性。
 3. **ZebraAlfred** 保活（或等价手段）——否则设备休眠，sendlink 会间歇性返回 exit `-1`。
 
 手头没有设备？本地验证始终可用：`mcp-pipeline verify --dir <server>`（安装 + tsc + 工具响应性 + 桥就绪性）。
@@ -251,5 +251,5 @@ node scripts/check-manifests.js             # claude / codex manifest 漂移守�
 MIT——见 [LICENSE](LICENSE)。`tools/adb/` 内嵌 Google 的 adb，遵循其自身条款。
 
 <div align="center">
-<sub>代码智能体套件 BRIDGE——由同济大学 & IM 构建 · 面向 YunOS 智能座舱的可控 MCP</sub>
+<sub>代码智能体套件 BRIDGE——由同济大学 & IM 构建 · 面向智能座舱的可控 MCP</sub>
 </div>

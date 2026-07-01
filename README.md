@@ -18,7 +18,7 @@
 
 ---
 
-A Claude Code / Codex plugin — **BRIDGE** (*Building Real-device Interfaces via Deterministic Gated Execution*): agent-driven **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent drives every step. **No model calls live inside the plugin** — the host agent supplies all judgment, and every generated artifact is byte-for-byte reproducible.
+**BRIDGE** (*Building Real-device Interfaces via Deterministic Gated Execution*): agent-driven **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent drives every step. **No model calls live inside the plugin** — the host agent supplies all judgment, and every generated artifact is byte-for-byte reproducible.
 
 ## 🧠 How it works
 
@@ -208,8 +208,8 @@ Verify the installed version:
 
 The generated server drives the car over an adb / file bridge. Before a real device responds:
 
-1. **Colleague** builds + installs the car-side `RpcEngine.ts` and registers the `page://<app>.yunos.com/rpcagent` manifest page — both emitted under `car-side/`.
-2. **`adb -host`** reachability to the YunOS device.
+1. **Colleague** builds + installs the car-side `RpcEngine.ts` and registers the `page://<app>/rpcagent` manifest page — both emitted under `car-side/`.
+2. **`adb -host`** reachability to the device.
 3. **ZebraAlfred** keep-alive (or equivalent) — otherwise the device sleeps and sendlink intermittently returns exit `-1`.
 
 No device handy? Local verification always works: `mcp-pipeline verify --dir <server>` (install + tsc + tool responsiveness + bridge readiness).
@@ -250,5 +250,5 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 MIT — see [LICENSE](LICENSE). `tools/adb/` bundles Google's adb under its own terms.
 
 <div align="center">
-<sub>Code Agent Suite BRIDGE — built by Tongji University &amp; IM · controllable MCP for the YunOS cockpit</sub>
+<sub>Code Agent Suite BRIDGE — built by Tongji University &amp; IM · controllable MCP for the cockpit</sub>
 </div>
