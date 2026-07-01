@@ -65,20 +65,17 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant Agent as 🤖 upstream agent
-    participant Server as 🧩 MCP server
+    participant Server as 🖥️ MCP server
     participant Bridge as 🛠️ rpc bridge
-    participant Transport as 🔌 device transport
     participant Engine as ⚙️ car-side engine
 
     Agent->>Server: tools/call (name, args)
     Note over Server: safety-gated tools verify a precondition first (fail-closed)
     Server->>Bridge: dispatch(tool, args)
     Bridge->>Bridge: build wire from rpc/config.json
-    Bridge->>Transport: write command
-    Transport->>Engine: deliver command
+    Bridge->>Engine: command (adb / file / socket)
     Engine->>Engine: drive the real app operation
-    Engine-->>Transport: write reply
-    Transport-->>Bridge: reply (polled / pushed)
+    Engine-->>Bridge: reply
     Bridge->>Bridge: parse reply → tool return shape
     Bridge-->>Server: typed result
     Server-->>Agent: tool result
