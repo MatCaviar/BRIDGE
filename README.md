@@ -65,7 +65,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant Agent as ⚛️ upstream agent
-    participant Server as 🖥️ MCP server
+    participant Server as 📡 MCP server
     participant Bridge as 🔌 rpc bridge
     participant Engine as ⚙️ car-side engine
 
