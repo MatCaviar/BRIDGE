@@ -40,7 +40,7 @@ Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Agent as 🎛️ host agent
+    participant Agent as 🎛️ host codeAgent
     participant Source as 🧱 app source
     participant CLI as 🛠️ deterministic CLI
     participant Tool as 🧩 MCP tool schemas
@@ -64,10 +64,10 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Agent as 🤖 upstream agent
-    participant Server as 🖥️ MCP server
+    participant Agent as ⚛️ upstream agent
+    participant Server as 🛎️ MCP server
     participant Bridge as 🔌 rpc bridge
-    participant Engine as ⚙️ car-side engine
+    participant Engine as 🏎️ car-side engine
 
     Agent->>Server: tools/call (name, args)
     Note over Server: safety-gated tools verify a precondition first (fail-closed)
