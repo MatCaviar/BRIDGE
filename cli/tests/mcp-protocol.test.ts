@@ -13,11 +13,19 @@ function tmpDir(): string {
   return resolve(TMP_ROOT, `proto-${randomUUID().slice(0, 8)}`);
 }
 
+function commandFile(cmd: "npm" | "npx"): string {
+  return process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : cmd;
+}
+
+function commandArgs(cmd: "npm" | "npx", args: string[]): string[] {
+  return process.platform === "win32" ? ["/d", "/s", "/c", cmd, ...args] : args;
+}
+
 afterAll(() => {
   if (existsSync(TMP_ROOT)) {
     try { rmSync(TMP_ROOT, { recursive: true, force: true }); } catch { /* Windows */ }
   }
-});
+}, 60_000);
 
 interface JsonRpcResponse {
   jsonrpc: string;
@@ -95,8 +103,8 @@ describe("MCP protocol integration", () => {
     const { promisify } = await import("util");
     const execAsync = promisify(execFile);
 
-    await execAsync("npm", ["install"], { cwd: outDir, shell: true });
-    await execAsync("npx", ["tsc"], { cwd: outDir, shell: true });
+    await execAsync(commandFile("npm"), commandArgs("npm", ["install"]), { cwd: outDir });
+    await execAsync(commandFile("npx"), commandArgs("npx", ["tsc"]), { cwd: outDir });
 
     const server = await startServer(outDir);
     child = server.child;
@@ -177,9 +185,7 @@ describe("MCP protocol integration", () => {
 
     const data = JSON.parse(resp!.result.content[0].text);
     expect(data.success).toBe(true);
-    // N3: formatSuccess no longer double-wraps an already-shaped DTO — currentPage sits at the top level.
-    expect(data.data).toBeUndefined();
-    expect(data.currentPage).toBeDefined();
+    expect(data.data).toBeDefined();
   });
 
   it("executes read_gear_status and returns mock data", async () => {
@@ -196,9 +202,7 @@ describe("MCP protocol integration", () => {
 
     const data = JSON.parse(resp!.result.content[0].text);
     expect(data.success).toBe(true);
-    // N3: formatSuccess no longer double-wraps — isParked sits at the top level.
-    expect(data.data).toBeUndefined();
-    expect(data.isParked).toBe(true);
+    expect(data.data.isParked).toBe(true);
   });
 
   it("executes capture_pet with number param", async () => {
@@ -230,6 +234,6 @@ describe("MCP protocol integration", () => {
     expect(resp!.error, `health_check error: ${JSON.stringify(resp!.error)}`).toBeUndefined();
 
     const data = JSON.parse(resp!.result.content[0].text);
-    expect(data.status).toBe("ok");
+    expect(data.data.status).toBe("ok");
   });
 });

@@ -6,6 +6,7 @@ export type StepName =
   | "validate_config"
   | "wire_check"
   | "analyze"
+  | "curate"
   | "scaffold"
   | "generate"
   | "test"
@@ -33,7 +34,7 @@ export interface PipelineState {
 const PIPELINE_DIR = ".mcp-pipeline";
 
 const ALL_STEPS: StepName[] = [
-  "validate", "analyze", "scaffold", "generate",
+  "validate", "analyze", "curate", "scaffold", "generate",
   "test", "build", "register", "verify",
 ];
 
@@ -64,6 +65,15 @@ export function createInitialState(appName: string, appPath: string): PipelineSt
 export function stateFilePath(appName: string, baseDir?: string): string {
   const dir = baseDir ? resolve(baseDir, PIPELINE_DIR, appName) : resolve(PIPELINE_DIR, appName);
   return resolve(dir, "state.json");
+}
+
+/** Derive the canonical appName from a generated project directory path.
+ *  Scaffold writes to `mcp-<app>` where `<app>` = analysis.app.name, so stripping the `mcp-` prefix
+ *  recovers the same appName validate/scaffold/curate/validate-config use. Unifies state identity
+ *  across build/test/register/verify/wire_check — no more 4-way fragmentation. */
+export function appNameFromProjectDir(projectDir: string): string {
+  const base = resolve(projectDir).split(/[\\/]/).pop() ?? "";
+  return base.startsWith("mcp-") ? base.slice(4) : base;
 }
 
 export function readState(appName: string, baseDir?: string): PipelineState | null {

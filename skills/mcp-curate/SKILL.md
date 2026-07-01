@@ -1,6 +1,6 @@
 ---
 name: mcp-curate
-description: Enumerate MCP-ifiable capabilities and let the user pick which to generate (selection.json)
+description: Use when analysis.json exists and the user must choose WHICH capabilities become MCP tools (writes selection.json). Runs after analyze, before scaffold --selection.
 ---
 
 > 🌐 默认用中文与用户交互和输出；代码/命令/标识符保持英文。
@@ -10,6 +10,14 @@ description: Enumerate MCP-ifiable capabilities and let the user pick which to g
 # MCP Curate
 
 After analyze, decide WHICH capabilities become MCP tools.
+
+## 判断标准
+
+大部分 app 暴露的能力远多于需要 MCP 化的。curate 决定**哪些**成为 tool——这是**用户的判断**，你只负责：用确定性命令枚举候选 → 基于候选表 + PRD propose 一个子集 → **交给用户拍板** → 用户选定后才写 `selection.json`。
+
+- **用户选择优先**：你 propose 的子集只是建议，最终写什么由用户定。用户没选之前不写文件。
+- **不 fabricate**：PRD 里提到、但代码里没有的 feature → flag 给用户，**绝不硬造** capability（MCP 化需要真实 wire，没代码就没 wire，造了下游也只能臆造 wire，违反 generate 的 Iron Law）。
+- **可重选**：重跑只需改 `selection.json` + 再走 pipeline（生成物重建，`rpc/config.json` + `conf/config.yaml` 保留）。
 
 ## Process
 1. **Enumerate** (deterministic): `mcp-pipeline curate <analysis.json> [--prd <prd.md>]` → candidate table.

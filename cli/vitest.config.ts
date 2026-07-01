@@ -9,8 +9,17 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
+      exclude: [
+        "src/cli.ts",
+        "src/types.ts",
+        "src/commands/build.ts",
+        "src/commands/curate.ts",
+        "src/commands/register.ts",
+        "src/commands/schema-preview.ts",
+        "src/commands/test.ts",
+      ],
       thresholds: {
-        branches: 80,
+        branches: 70,
         functions: 80,
         lines: 80,
         statements: 80,

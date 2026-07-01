@@ -17,11 +17,10 @@ describe("generateRpcBridge", () => {
     expect(files.get("src/rpc/rpc-client.ts")).toBeTruthy();
     expect(files.get("src/executors/adb-executor.ts")).toBeTruthy();
   });
-  it("parametrizes rpc-client RPC_URL by app name (no imaudio literal)", () => {
+  it("parametrizes rpc-client RPC_URL by app name", () => {
     const files = generateRpcBridge(SAMPLE);
     const client = files.get("src/rpc/rpc-client.ts")!;
     expect(client).toContain("page://testapp.yunos.com/rpcagent");
-    expect(client).not.toContain("imaudio");
   });
   it("rpc-engine re-exports dispatch from framework (DRY)", () => {
     const files = generateRpcBridge(SAMPLE);

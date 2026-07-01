@@ -1,19 +1,26 @@
 import { spawn, spawnSync, type ChildProcess } from "child_process";
 import { resolve, basename } from "path";
 import { readFileSync, existsSync } from "fs";
-import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
+import { readState, writeState, createInitialState, updateStep, appNameFromProjectDir } from "../state/manager.js";
 
 function truncate(s: string, max = 500): string {
   return s.length <= max ? s : s.slice(0, max) + "… [truncated]";
 }
 
+function commandFile(command: "npm" | "npx"): string {
+  return process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : command;
+}
+
+function commandArgs(command: "npm" | "npx", args: string[]): string[] {
+  return process.platform === "win32" ? ["/d", "/s", "/c", command, ...args] : args;
+}
+
 /** Check 1: `npm install` + `tsc --noEmit` zero-error in the generated project. Deterministic + local. */
 export function runInstallAndTypecheck(projectDir: string): string[] {
   const errors: string[] = [];
-  const install = spawnSync("npm", ["install", "--no-fund", "--no-audit"], {
+  const install = spawnSync(commandFile("npm"), commandArgs("npm", ["install", "--no-fund", "--no-audit"]), {
     cwd: projectDir,
     encoding: "utf-8",
-    shell: true,
     maxBuffer: 10 * 1024 * 1024,
   });
   if (install.status !== 0) {
@@ -23,10 +30,9 @@ export function runInstallAndTypecheck(projectDir: string): string[] {
     );
     return errors; // skip tsc if install failed
   }
-  const tsc = spawnSync("npx", ["tsc", "--noEmit"], {
+  const tsc = spawnSync(commandFile("npx"), commandArgs("npx", ["tsc", "--noEmit"]), {
     cwd: projectDir,
     encoding: "utf-8",
-    shell: true,
     maxBuffer: 10 * 1024 * 1024,
   });
   if (tsc.status !== 0) {
@@ -38,23 +44,47 @@ export function runInstallAndTypecheck(projectDir: string): string[] {
   return errors;
 }
 
-/** Check 3: rpc-bridge static readiness (no throw stubs, RPC_URL present, framework re-exported). */
+/** Check 3: schema-first server + rpc-bridge static readiness. */
 export function assertRpcBridgeReady(projectDir: string): string[] {
   const errors: string[] = [];
-  const adapterPath = resolve(projectDir, "src/adapters/yunos-adapter.ts");
+  const schemaPath = resolve(projectDir, "src/tools/schema.ts");
+  const serverPath = resolve(projectDir, "src/server.ts");
+  const adapterIndexPath = resolve(projectDir, "src/adapters/index.ts");
   const clientPath = resolve(projectDir, "src/rpc/rpc-client.ts");
   const enginePath = resolve(projectDir, "src/rpc/rpc-engine.ts");
 
-  for (const [label, p] of [["yunos-adapter", adapterPath], ["rpc-client", clientPath], ["rpc-engine", enginePath]] as const) {
+  for (const [label, p] of [["tools/schema", schemaPath], ["server", serverPath], ["adapters/index", adapterIndexPath], ["rpc-client", clientPath], ["rpc-engine", enginePath]] as const) {
     if (!existsSync(p)) {
       errors.push("rpc-bridge missing " + label + ": " + p);
     }
   }
   if (errors.length > 0) return errors;
 
-  const adapter = readFileSync(adapterPath, "utf-8");
-  if (/throw\s+(["'`])not implemented\1/i.test(adapter) || /throw\s+new\s+Error\(\s*(["'`])Not implemented/i.test(adapter)) {
-    errors.push("yunos-adapter.ts still has a `throw ... not implemented` stub — RPC bridge not wired.");
+  const schema = readFileSync(schemaPath, "utf-8");
+  if (!/\bTOOL_SCHEMA\b/.test(schema)) {
+    errors.push("src/tools/schema.ts does not expose TOOL_SCHEMA — agent-facing tool schema missing.");
+  }
+
+  const server = readFileSync(serverPath, "utf-8");
+  if (!/ListToolsRequestSchema/.test(server)) {
+    errors.push("src/server.ts missing tools/list handler (ListToolsRequestSchema).");
+  }
+  if (!/CallToolRequestSchema/.test(server)) {
+    errors.push("src/server.ts missing tools/call handler (CallToolRequestSchema).");
+  }
+  if (!/TOOL_SCHEMA/.test(server)) {
+    errors.push("src/server.ts does not expose TOOL_SCHEMA through tools/list.");
+  }
+  if (!/rpcCall\(\s*name\s*,/.test(server)) {
+    errors.push("src/server.ts does not dispatch tools/call by tool name through rpcCall(name, args).");
+  }
+
+  const adapterIndex = readFileSync(adapterIndexPath, "utf-8");
+  if (!/rpcCall/.test(adapterIndex)) {
+    errors.push("adapters/index.ts has no rpcCall — dynamic dispatch not wired.");
+  }
+  if (/throw\s+(["'`])not implemented\1/i.test(adapterIndex) || /throw\s+new\s+Error\(\s*(["'`])Not implemented/i.test(adapterIndex)) {
+    errors.push("adapters/index.ts still has a `throw ... not implemented` stub — RPC bridge not wired.");
   }
 
   const client = readFileSync(clientPath, "utf-8");
@@ -82,7 +112,38 @@ function sendJsonRpc(child: ChildProcess, id: number, method: string, params?: a
   child.stdin?.write(msg + "\n");
 }
 
-async function discoverTools(entryPath: string): Promise<{ toolCount: number; tools: string[]; callResponsive: boolean }> {
+function sampleValue(schema: any): unknown {
+  if (Array.isArray(schema?.enum) && schema.enum.length > 0) return schema.enum[0];
+  switch (schema?.type) {
+    case "number":
+    case "integer":
+      return 1;
+    case "boolean":
+      return true;
+    case "array":
+      return [];
+    case "object":
+      return sampleArguments(schema);
+    case "string":
+    default:
+      return "x";
+  }
+}
+
+function sampleArguments(inputSchema: any): Record<string, unknown> {
+  const properties = inputSchema?.properties;
+  if (!properties || typeof properties !== "object") return {};
+  const required = Array.isArray(inputSchema?.required) ? inputSchema.required : Object.keys(properties);
+  const args: Record<string, unknown> = {};
+  for (const name of required) {
+    if (typeof name === "string" && Object.prototype.hasOwnProperty.call(properties, name)) {
+      args[name] = sampleValue(properties[name]);
+    }
+  }
+  return args;
+}
+
+export async function discoverTools(entryPath: string): Promise<{ toolCount: number; tools: string[]; callSucceeded: boolean; callError?: string }> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn("node", [entryPath], { stdio: ["pipe", "pipe", "pipe"] });
 
@@ -123,10 +184,12 @@ async function discoverTools(entryPath: string): Promise<{ toolCount: number; to
         // not crash and is dispatching. Wait 400ms for tools/list to arrive first.
         setTimeout(() => {
           const toolsResp = responses.find((r: any) => r.id === 2);
-          const firstTool: string | undefined = toolsResp?.result?.tools?.[0]?.name;
-          if (firstTool) {
-            sendJsonRpc(child, 3, "tools/call", { name: firstTool, arguments: {} });
-          }
+          const listedTools: any[] = Array.isArray(toolsResp?.result?.tools) ? toolsResp.result.tools : [];
+          const businessTools = listedTools.filter((t) => t?.name && t.name !== "health_check");
+          const probes = businessTools.length > 0 ? businessTools : listedTools.filter((t) => t?.name);
+          probes.forEach((tool, index) => {
+            sendJsonRpc(child, 3 + index, "tools/call", { name: tool.name, arguments: sampleArguments(tool.inputSchema) });
+          });
         }, 400);
 
         setTimeout(() => {
@@ -135,13 +198,20 @@ async function discoverTools(entryPath: string): Promise<{ toolCount: number; to
 
           const toolsResp = responses.find((r: any) => r.id === 2);
           if (toolsResp?.result?.tools) {
-            const tools = toolsResp.result.tools.map((t: any) => t.name);
-            // Responsiveness = a response with id=3 arrived (result OR error), OR no
-            // tools/call was sent (no tools). A crash/NO response for id=3 is a failure.
-            const callResp = responses.find((r: any) => r.id === 3);
-            const hadCall = toolsResp.result.tools.length > 0;
-            const callResponsive = hadCall ? Boolean(callResp && ("result" in callResp || "error" in callResp)) : true;
-            resolvePromise({ toolCount: tools.length, tools, callResponsive });
+            const listedTools: any[] = toolsResp.result.tools;
+            const tools = listedTools.map((t: any) => t.name);
+            const businessTools = listedTools.filter((t: any) => t?.name && t.name !== "health_check");
+            const probes = businessTools.length > 0 ? businessTools : listedTools.filter((t: any) => t?.name);
+            const failures: string[] = [];
+            probes.forEach((tool: any, index: number) => {
+              const callResp = responses.find((r: any) => r.id === 3 + index);
+              if (!callResp) failures.push(`${tool.name}: no JSON-RPC response`);
+              else if ("error" in callResp) failures.push(`${tool.name}: ${JSON.stringify(callResp.error)}`);
+              else if (!("result" in callResp)) failures.push(`${tool.name}: response missing result`);
+            });
+            const callSucceeded = failures.length === 0;
+            const callError = callSucceeded ? undefined : failures.join("; ");
+            resolvePromise({ toolCount: tools.length, tools, callSucceeded, callError });
           } else {
             reject(new Error("Failed to discover tools. Responses: " + JSON.stringify(responses)));
           }
@@ -183,7 +253,7 @@ export async function verifyCommand(args: string[]): Promise<void> {
   const pkg = JSON.parse(readFileSync(resolve(projectDir, "package.json"), "utf-8"));
   const serverName = pkg.name ?? "unknown";
 
-  let state = readState(String(serverName)) ?? createInitialState(String(serverName), projectDir);
+  let state = readState(appNameFromProjectDir(projectDir)) ?? createInitialState(appNameFromProjectDir(projectDir), projectDir);
   try {
     state = updateStep(state, "verify", { status: "in_progress" });
     writeState(state);
@@ -217,8 +287,8 @@ export async function verifyCommand(args: string[]): Promise<void> {
       const discovery = await discoverTools(distPath);
       toolCount = discovery.toolCount;
       tools = discovery.tools;
-      if (!discovery.callResponsive) {
-        errors.push("tools/call responsiveness check failed: server sent no JSON-RPC response for tools/call (id=3) and/or crashed.");
+      if (!discovery.callSucceeded) {
+        errors.push("tools/call check failed: " + (discovery.callError ?? "server did not return a JSON-RPC result for tools/call (id=3)."));
       }
     } catch (error) {
       errors.push("Tool discovery failed: " + (error instanceof Error ? error.message : String(error)));

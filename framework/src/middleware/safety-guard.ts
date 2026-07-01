@@ -1,9 +1,4 @@
-export type SafetyLevel =
-  | "readonly"
-  | "normal"
-  | "p_gear_required"
-  | "p_gear_and_confirm"
-  | "p_gear_and_network";
+export type SafetyLevel = string;
 
 export class SafetyGuardError extends Error {
   constructor(
@@ -29,7 +24,35 @@ export interface SafetyAdapter {
   getHotspotInfo(): Promise<HotspotInfo>;
 }
 
-export function createSafetyGuard(adapter: SafetyAdapter) {
+/** A declared precondition for a safety level. Composable — a level can require any combination of
+ *  gear/confirm/hotspot. This is the data-driven rule set: apps declare custom levels (or override a
+ *  standard one) in analysis.safetyRules without touching framework code. */
+export interface SafetyRule {
+  readonly requiresGear?: boolean;
+  readonly requiresHotspot?: boolean;
+  readonly requiresConfirm?: boolean;
+  readonly description?: string;
+}
+
+export type SafetyRules = Readonly<Record<string, SafetyRule>>;
+
+/** Built-in rules for the 5 standard levels — same behavior as the old fixed switch, so existing
+ *  apps keep working unchanged. Apps extend/override via analysis.safetyRules. */
+export const BUILTIN_SAFETY_RULES: SafetyRules = {
+  readonly: {},
+  normal: {},
+  p_gear_required: { requiresGear: true, description: "P-gear required" },
+  p_gear_and_confirm: { requiresGear: true, requiresConfirm: true, description: "P-gear + user confirmation" },
+  p_gear_and_network: { requiresGear: true, requiresHotspot: true, description: "P-gear + WiFi hotspot" },
+};
+
+/** Merge app-declared rules over the built-ins. An app can override a standard level (e.g. weaken
+ *  p_gear_and_confirm to drop the hotspot check) or add custom levels (e.g. door_locked, speed_limited). */
+export function resolveSafetyRules(appRules?: SafetyRules): SafetyRules {
+  return appRules ? { ...BUILTIN_SAFETY_RULES, ...appRules } : BUILTIN_SAFETY_RULES;
+}
+
+export function createSafetyGuard(adapter: SafetyAdapter, rules: SafetyRules = BUILTIN_SAFETY_RULES) {
   async function assertParked(): Promise<void> {
     const status = await adapter.getGearStatus();
     if (!status.isParked && !status.ignoreMode) {
@@ -51,25 +74,12 @@ export function createSafetyGuard(adapter: SafetyAdapter) {
   }
 
   return async function enforce(level: SafetyLevel, input: Record<string, unknown>): Promise<void> {
-    switch (level) {
-      case "readonly":
-      case "normal":
-        return;
-      case "p_gear_required":
-        await assertParked();
-        return;
-      case "p_gear_and_confirm":
-        await assertParked();
-        assertConfirmed(input);
-        return;
-      case "p_gear_and_network":
-        await assertParked();
-        await assertHotspotAvailable();
-        return;
-      default: {
-        const _exhaustive: never = level;
-        throw new SafetyGuardError(1000, `Unknown safety level: ${String(level)}`);
-      }
+    const rule = rules[level];
+    if (!rule) {
+      throw new SafetyGuardError(1000, `Unknown safety level: ${String(level)}`);
     }
+    if (rule.requiresGear) await assertParked();
+    if (rule.requiresConfirm) assertConfirmed(input);
+    if (rule.requiresHotspot) await assertHotspotAvailable();
   };
 }

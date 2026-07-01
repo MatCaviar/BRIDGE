@@ -7,7 +7,7 @@ import { verifyCommand } from "./commands/verify.js";
 import { validateConfigCommand } from "./commands/validate-config.js";
 import { wireCheckCommand } from "./commands/wire-check.js";
 import { curateCommand } from "./commands/curate.js";
-import { deployCommand } from "./commands/deploy.js";
+import { schemaPreviewCommand } from "./commands/schema-preview.js";
 
 type CommandHandler = (args: string[]) => Promise<void>;
 
@@ -21,7 +21,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   register: registerCommand,
   verify: verifyCommand,
   curate: curateCommand,
-  deploy: deployCommand,
+  schema_preview: schemaPreviewCommand,
 };
 
 export async function dispatch(argv: string[]): Promise<number> {
@@ -39,7 +39,7 @@ export async function dispatch(argv: string[]): Promise<number> {
     process.stderr.write("  register   Register to gateway config\n");
     process.stderr.write("  verify     Verify connectivity and tool discovery\n");
   process.stderr.write("  curate     Enumerate MCP-ifiable capabilities\n");
-  process.stderr.write("  deploy     tsc-compile car-side + push config/RpcEngine to device (N13/N14)\n");
+  process.stderr.write("  schema_preview <analysis.json> [<rpc/config.json>]  Project MCP schema to tools-schema.json (no build)\n");
     return 1;
   }
 

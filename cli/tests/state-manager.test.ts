@@ -17,7 +17,7 @@ describe("createInitialState", () => {
     expect(state.app).toBe("test-app");
     expect(state.appPath).toBe("/path/to/app");
     expect(state.currentStep).toBe("validate");
-    expect(Object.keys(state.steps)).toHaveLength(8);
+    expect(Object.keys(state.steps)).toHaveLength(9);
     for (const step of Object.values(state.steps)) {
       expect(step.status).toBe("pending");
     }
@@ -42,7 +42,7 @@ describe("updateStep", () => {
 
   it("advances to done after verify completes", () => {
     let state = createInitialState("test", "/path");
-    for (const step of ["validate", "analyze", "scaffold", "generate", "test", "build", "register", "verify"] as const) {
+    for (const step of ["validate", "analyze", "curate", "scaffold", "generate", "test", "build", "register", "verify"] as const) {
       state = updateStep(state, step, { status: "completed" });
     }
     expect(state.currentStep).toBe("done");
@@ -58,7 +58,7 @@ describe("updateStep", () => {
 
   it("validate_config / wire_check are inline sub-steps — recorded but do NOT change currentStep", () => {
     let state = createInitialState("test", "/path");
-    for (const step of ["validate", "analyze", "scaffold"] as const) state = updateStep(state, step, { status: "completed" });
+    for (const step of ["validate", "analyze", "curate", "scaffold"] as const) state = updateStep(state, step, { status: "completed" });
     expect(state.currentStep).toBe("generate");
     // regression: completing an inline sub-step used to reset currentStep to "validate"
     state = updateStep(state, "validate_config", { status: "completed" });

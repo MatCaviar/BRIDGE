@@ -29,8 +29,8 @@ describe("scaffoldProject", () => {
       "src/types/enums.ts",
       "src/types/errors.ts",
       "src/tools/registry.ts",
+      "src/tools/schema.ts",
       "tests/contract/registry.test.ts",
-      "tests/unit/mock-adapter.test.ts",
     ];
 
     for (const file of requiredFiles) {
@@ -112,13 +112,13 @@ describe("scaffoldProject", () => {
       expect(existsSync(resolve(OUTPUT_DIR, f)), `Missing: ${f}`).toBe(true);
     }
   });
-  it("adapter factory wires the RPC yunos-adapter in production mode (no throw-stub)", () => {
+  it("adapter factory exposes schema-first rpcCall dispatch (no legacy adapter / no throw-stub)", () => {
     const analysis = JSON.parse(readFileSync(FIXTURE_PATH, "utf-8"));
     scaffoldProject(analysis, OUTPUT_DIR);
     const indexTs = readFileSync(resolve(OUTPUT_DIR, "src/adapters/index.ts"), "utf-8");
-    // SP-B: mock_mode:false must return createYunosAdapter (rpcCall-based), not throw.
-    expect(indexTs).toContain('import { createYunosAdapter } from "./yunos-adapter.js"');
-    expect(indexTs).toContain("createYunosAdapter(config.adb)");
+    // Dynamic server: every tool dispatches through one rpcCall(op, args).
+    expect(indexTs).toContain("rpcCall");
+    expect(indexTs).not.toContain("createYunosAdapter");
     expect(indexTs).not.toContain("throw new Error");
     expect(indexTs).not.toContain("not yet generated");
   });

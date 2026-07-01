@@ -47,13 +47,13 @@ export function generateRegistry(analysis: AnalysisData): string {
 
   for (const cap of analysis.capabilities) {
     lines.push("  {");
-    lines.push(`    id: "${cap.id}",`);
-    lines.push(`    domain: "${cap.domain}",`);
-    lines.push(`    object: "${cap.object}",`);
-    lines.push(`    action: "${cap.action}",`);
-    lines.push(`    safetyLevel: "${cap.safetyLevel}",`);
-    lines.push(`    sdkCalls: [${cap.sdkCalls.map((s) => `"${s}"`).join(", ")}],`);
-    lines.push(`    sourceRef: "${cap.sourceRef}",`);
+    lines.push(`    id: ${JSON.stringify(cap.id)},`);
+    lines.push(`    domain: ${JSON.stringify(cap.domain)},`);
+    lines.push(`    object: ${JSON.stringify(cap.object)},`);
+    lines.push(`    action: ${JSON.stringify(cap.action)},`);
+    lines.push(`    safetyLevel: ${JSON.stringify(cap.safetyLevel)},`);
+    lines.push(`    sdkCalls: [${cap.sdkCalls.map((s) => JSON.stringify(s)).join(", ")}],`);
+    lines.push(`    sourceRef: ${JSON.stringify(cap.sourceRef)},`);
     lines.push("  },");
   }
 
@@ -63,7 +63,7 @@ export function generateRegistry(analysis: AnalysisData): string {
   lines.push("");
   lines.push("export const DOMAINS = [");
   for (const d of domains) {
-    lines.push(`  "${d}",`);
+    lines.push(`  ${JSON.stringify(d)},`);
   }
   lines.push("] as const;");
   lines.push("");

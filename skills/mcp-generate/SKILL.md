@@ -1,31 +1,63 @@
 ---
 name: mcp-generate
-description: Extract rpc/config.json wire-specs from proxy source code for the scaffolded rpc-calling project
+description: Use when the scaffolded MCP Server project exists and rpc/config.json (the op→wire map) must be authored from the app's proxy/manager source — the sole LLM-judgment step before the gates and build. Not for scaffolding (deterministic) or analyzing (separate skill).
 ---
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
 
-> 本 skill 的 base dir = 加载时显示的路径；CLI 调用形式为 `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（${SKILL_DIR} 即本 skill 的 base dir）。若 `${SKILL_DIR}` 未展开，改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`（CLAUDE_PLUGIN_ROOT 即插件根目录，CLI 在 `<根>/cli/bin`，勿加 `../../`）。
+> CLI：`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（`${SKILL_DIR}` 未展开时改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`）。
 
 # MCP Generate
 
-Read the scaffolded MCP Server project and the original YunOS app source code, then produce the ONE file that only an LLM can produce: `rpc/config.json` — the op→wire-spec map that wires each capability to its real D-Bus / native call, so the generated adapter controls the car through the RPC bridge instead of throwing.
+Read the scaffolded MCP Server project and the original YunOS app source code, then produce the ONE file that only a host codeagent can produce: `rpc/config.json` — the op→wire-spec map that wires each capability to its real D-Bus / native call, so the generated MCP server can dispatch tool calls through the RPC bridge instead of pretending a mock is the final integration.
 
-**New reality (SP-B):** scaffold now **deterministically** produces both the RPC bridge **and** the `yunos-adapter.ts`. Every adapter method is already `await rpcCall("<cap.id>", {<params>}, adbConfig)` + a map-by-name DTO (no `throw`). The host agent's **ONLY** judgment product this step is `rpc/config.json`. No adapter source is written here.
+## Iron Law
+
+```
+NO INVENTED WIRE
+```
+
+`rpc/config.json` 里每一个非 `_deferred` 的 op，其 `bus`/`path`/`method`/`interface`/`arg.funcName`/`arg.data`/`writes`/`stringify`/`reply`/`replyParts` 都必须**逐字**可追溯到 app proxy/manager 源码里的真实调用点。找不到真实依据 → 写进 `_deferred` 并注明原因。没有例外。
+
+**违反字面就是违反精神**——没有"我 adapt 了一下但守了精神"这种事。按命名规律推 `bus` 名、给 `funcName` 填"符合格式"的字符串、因 `validate_config` 过了就默认 wire 对、从旧 config/fixture 抄找不到源码依据的 entry，都是臆造，都是违规。
+
+**为什么**：你抽的 wire 会让生成的 MCP server 在**真车上真的发出这条 D-Bus/native 调用**。臆造的 `funcName`/`bus` 不报错——只会静默地控制错误的东西。这是整条链的安全命门；"config 能过 gate" ≠ "wire 真实"。
+
+## 借口预驳
+
+| 你心里的话 | 现实 |
+|---|---|
+| "validate_config 过了，wire 应该对" | validate_config 只查 schema + coverage + dispatchable，**完全不读源码**，对 wire 真伪零判断 |
+| "wire_check 会兜底，过了就行" | wire_check 校验你**传入的** proxy + funcName 字面存在；它不读 bus/path 语义，也不是"wire 正确"的充分证明 |
+| "proxy 里没找到，但 fixture / 旧 config 有这个 bus 名" | fixture 不是 ground truth，proxy 源码才是。找不到 → `_deferred`，不抄 fixture |
+| "这个 funcName 符合命名规律，应该对" | funcName 是精确接口路径，必须逐字来自源码，"符合规律" ≠ 存在 |
+| "sourceRef 指的文件没这方法，可能重构了" | 去 app 源码 grep 真实 proxy/manager（按 object/action、bus 名、`createMethodCallMessage` 调用点）。仍找不到 → `_deferred` + 原因 |
+| "先发一版，后面再核对" | 臆造 wire 上车 = 静默错配。没有"先发的臆造版"，只有 verified 或 deferred |
+
+## 判断标准（何为 verified wire）
+
+一条 op 算 **verified**，当且仅当你能对**每个字段**指出"这逐字来自源码哪里"：
+- `bus`/`path` ← proxy 构造函数 / `BUS_NAME`/`BUS_PATH` 常量
+- `method` ← `createMethodCallMessage("<这个>")` 的字面参数
+- `arg.funcName` ← 源码 `writeString` 对象里 `funcName:` 的字面值
+- `arg.data` 的 `${var}` ← 与 capability `params` 名字一一对应（单占位符、类型保留）
+- `stringify` ← 与源码 `JSON.stringify(...)` 目标路径一致
+- `reply` ← `readJSON()`→`json` / `readString()`→`string` / 类型读 → `int`/`double`/`bool`
+
+任一字段无法指出源码位置 → 这条不是 verified：要么继续 grep 找，要么进 `_deferred`。**两个 gate 全绿 ≠ 这些字段对**——gate 只查下限。
+
+Scaffold **deterministically** produces the schema-first MCP runtime: `TOOL_SCHEMA`, `TOOL_REGISTRY`, server wiring, the weak-typed `rpcCall(op, args)` adapter, the RPC bridge, and the car-side artifacts. Your **only** judgment product this step is `rpc/config.json`. Do not edit generated adapter/server/tool source here; fix the judgment artifact and rerun the deterministic gates.
 
 ## What scaffold already generates (DO NOT regenerate these)
 
 The scaffold CLI command (`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" scaffold ...`) already deterministically generates:
-- `src/rpc/rpc-types.ts`, `rpc-engine.ts`, `rpc-client.ts` — the RPC bridge (from Phase-1, de-hardcoded; `RPC_URL` = `page://<domain>/rpcagent`)
+- `src/tools/schema.ts` — the agent-facing `TOOL_SCHEMA` single source of truth, later projected by `schema_preview`
+- `src/tools/registry.ts` — capability metadata and safety levels
+- `src/server.ts` — MCP tools/list + tools/call wiring, with safety guard for sensitive tools
+- `src/adapters/index.ts` — the generalized `rpcCall(op, args)` adapter factory; mock mode returns deterministic placeholders, real mode routes to the RPC bridge
+- `src/rpc/rpc-types.ts`, `rpc-engine.ts`, `rpc-client.ts` — the RPC bridge (de-hardcoded; `RPC_URL` = `page://<app>.yunos.com/rpcagent`)
 - `src/executors/adb-executor.ts` — sendlink + shell executor
-- `src/adapters/yunos-adapter.ts` — production adapter, every method → `rpcCall(op, args)` + map-by-name DTO (no `throw`)
-- `src/adapters/types.ts` — IAdapter interface + all DTO types
-- `src/adapters/mock-adapter.ts` — mock adapter with error injection
-- `src/adapters/index.ts` — adapter factory (mock/production switch)
-- `src/tools/<domain>.ts` — tool handlers per domain with Zod schemas, safety guard, error handling
-- `src/tools/registry.ts` — tool registry with safety levels
-- `src/server.ts` — server wiring with safety guard for sensitive tools
-- `src/shutdown.ts`, `src/config.ts`, `src/index.ts` — infrastructure
+- `src/config.ts`, `src/index.ts` — infrastructure
 - `conf/config.yaml` — server configuration (incl. `adb:` block)
 - `car-side/RpcEngine.ts`, `car-side/manifest-page.json` — car-side deliverables for the colleague
 
@@ -40,7 +72,7 @@ The user runs `/mcp-generate` from within the scaffolded project directory, or p
 ## Prerequisites
 
 Before running this Skill:
-- The scaffold CLI command (`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" scaffold ...`) has been run — the project directory exists with all auto-generated files, including the RPC bridge and the rpc-calling `yunos-adapter.ts` (NO `throw`)
+- The scaffold CLI command (`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" scaffold ...`) has been run — the project directory exists with all auto-generated files, including `src/tools/schema.ts`, `src/server.ts`, `src/adapters/index.ts`, and the RPC bridge
 - `analysis.json` exists with capabilities, params, returns, safety levels, SDK calls, error codes — each capability carries a `sourceRef` pointing into the app source
 - The original YunOS app source code is accessible (referenced by `analysis.json` sourceRef fields) — the proxy/manager `.ts` files are the ground truth for wire extraction
 
@@ -60,28 +92,28 @@ For each capability in `analysis.json`, extract how it is actually called on the
 
 **Procedure:**
 1. **Locate the proxy/manager source** via the capability's `sourceRef`. Read that file. The proxy source is the ground truth — `analysis.json` is interface-level only (method-name strings, no D-Bus wire details).
-2. **Extract the wire-spec** by reading the proxy's actual call:
-   - **D-Bus** (the common YunOS case): the proxy uses `createMethodCallMessage("<method>")`, then `writeString(JSON.stringify({ funcName: "<...>", data: {...} }))`, and reads the reply via `readJSON()` / `readString()`. Extract:
-     - `bus` / `path` — from the proxy's constructor / `BUS_NAME` / `BUS_PATH` constants
-     - `method` — the string passed to `createMethodCallMessage` (e.g. `"request"`)
-     - `arg` — the object written: `{ funcName, data: { ... } }`. Parameterize call inputs with `${var}` placeholders matching the capability `params` names (single placeholder, type-preserving — Phase-1 TDD bug fix)
-     - `stringify` — the dotted paths inside `arg` that must be `JSON.stringify`-ed before send (e.g. `["data"]`)
-     - `reply` — `readJSON()` → `"json"`; `readString()` → `"string"`; typed reads → `"int"` / `"double"` / `"bool"`. **DESIGN A (read/write extraction — C2):** `reply` can ALSO be an object to tell the host adapter how to reach the payload in the device's varied response shapes. The object form allows ONLY these 4 fields (minimal — no others):
-       - `read` — which UBus reply reader the car-side uses (`"json"` | `"string"` | `"int"` | `"double"` | `"bool"`). **Required.** Legacy string `reply: "<kind>"` ≡ `{ read: "<kind>" }`.
-       - `unwrap` — dotted path into the read value to the payload object. The device's `readJSON()` often returns a `PolicyResponse`-style envelope `{ result: { data: { ... } } }`; set `unwrap: "result.data"` so the adapter reaches the real fields.
-       - `parseJson` — `true` when the read value (after `unwrap`) is a JSON-encoded **string** that must be `JSON.parse`-d into an object before field mapping (common when the proxy uses `readString()` but the string body is JSON).
-       - `valueField` — when the unwrapped value is a **scalar** (a set-op success code from `readDouble()`, or a single-value read), map it onto this DTO field name. For set ops the device convention is `0 = success`, so use `valueField: "success"` and the adapter maps `0 → success:true`.
-   - **Native** (`require`/factory + method): extract `require`, optional `factory`, `method`, and the literal `args` array.
+2. **Extract the wire-spec** by reading the proxy's actual call. The engine (DbusSpec) models **5 wire patterns** — pick the one the proxy actually uses (read the source, don't assume):
+   - **Common fields (all D-Bus patterns):**
+     - `bus` / `path` — from the proxy's constructor `super({ busName, busPath, ... })` or `BUS_NAME`/`BUS_PATH` constants
+     - `method` — the literal string passed to `createMethodCallMessage("<…>")`
+     - `interface` — **read the proxy's actual interface** (the 3rd arg to `createInterface` / `super({ interface })`). If it equals `bus + ".interface"` (the BaseProxy default), **omit** `interface`. If it is the bare bus name or any other literal (common for `mafservice`/`music` proxies that pass `interface: "<bus>"`), **set `interface` explicitly** — the engine defaults to `bus+".interface"`, which would be WRONG. This is a frequent silent-failure; `wire_check` provenance now catches a mismatched `interface`.
+   - **Pattern A — single JSON write (most common):** proxy does `createMethodCallMessage("m")` + `writeString(JSON.stringify({ funcName, data }))` + one read. Use `arg` + optional `stringify` + `reply`.
+     - `arg` — the object written: `{ funcName, data: { ... } }`. Parameterize inputs with `${var}` matching capability `params` names. A **single** `${var}` placeholder preserves the value's type (number stays number, object stays object) — so `arg: { body: "${info}" }` passes the whole `info` object through verbatim (no need to flatten).
+     - `stringify` — dotted paths inside `arg` that the proxy `JSON.stringify`s before send (e.g. `["data"]` when the proxy nests a stringified blob).
+     - `reply` — `readJSON()`→`"json"` / `readString()`→`"string"` / `readInt32()`→`"int"` / `readDouble()`→`"double"` / `readBool()`→`"bool"`.
+   - **Pattern B — positional multi-write:** proxy does several `writeString(...)` / `writeInt32(...)` in order (NOT one `writeString(JSON.stringify(...))`). Use **`writes`** (an ordered array) instead of `arg`. Each item `{ kind, value }`: `kind` = `"string"`|`"int32"`|`"double"`|`"bool"`|`"json"`; `value` = literal or `${var}`. `kind:"json"` ⇒ `writeString(JSON.stringify(value))`; `kind:"string"` ⇒ bare `writeString(value)` (no JSON quotes). This is how you wire capabilities the old engine had to defer — **6 positional writes is fine, not "partial"**.
+   - **Pattern C — bare-string write:** proxy does a single `writeString(cpType)` with a raw string (not JSON). Use `writes: [ { kind: "string", value: "${cpType}" } ]` — `kind:"string"` writes the value bare; `kind:"json"` would wrongly wrap it in quotes and corrupt the value.
+   - **Pattern D — multi-segment read:** proxy reads several values (`readString()` then `readInt32()`, etc.). Use **`replyParts`** (ordered array of `{ kind }`); the engine returns an array of the segments in order. Omit `replyParts` for the common single-read case (then `reply` drives one read).
+   - **Device-context vars:** if the proxy injects device state (VIN from `CarInfoModel`, auth token, etc.) into the wire — i.e. a value the agent cannot know and the generic engine cannot read — template it as **`${__device__.vin}`** and ensure `analysis.app.deviceSources` lists `"vin"`. The car-side engine resolves `__device__.*` on-device and **fail-closes** (throws, never leaks the marker) if unresolved. Do NOT make device-injected values into agent `params` (the agent can't supply them) and do NOT hardcode a fake — use `${__device__.X}`.
+   - **Native** (`require`/factory + method): extract `require`, optional `factory`, `method`, and the literal `args` array (each item a `${var}` or `{ expr: "arithmetic" }`).
 3. **Write the entry** into `rpc/config.json` with `op` = `capability.id` (the key under which the spec is stored).
 
 **sourceRef 对不上真实源码时的处理（绝不臆造 wire）**：
 1. 若 sourceRef 指向的方法在真实源码里不存在或方法名不符，**不要按 fixture 臆造 wire**——在 app 源码里搜索该 capability 真正的 proxy/manager（按 capability 的 object/action 关键词、D-Bus bus 名、`createMethodCallMessage` 调用点grep）。
 2. 找到真实 proxy → 按其 `createMethodCallMessage`+`funcName`+`stringify` 模式抽真实 wire-spec，写入 config（verified）。
-3. 若该 capability **不走 dbus/native RPC 模型**（如 launch_app=adb sendlink、VIN=系统属性 native 调用、appstatus=进程内读取），**defer 它**：在 `rpc/config.json` 顶层写入 `_deferred` 允许清单——`"_deferred": { "<cap.id>": "<原因>" }`（例 `"_deferred": { "launch_app": "adb sendlink — 非 RPC", "carinfo_read": "sysprop native" }`）。**不要给它写 wire-spec**；`_deferred` 里登记即代表有意不提供 wire。`validate-config` 的 coverage 闸门会豁免 `_deferred` 登记的 capability，并把它们作为 `deferred` 信息型字段返回。
+3. **先排除"可 wire 却误判为 defer"**（最常见的能力丢失）：位置式多写（`writeString`/`writeInt32` × N）、裸字符串写、多段读 **都是 dbus RPC**（见上 Pattern B/C/D），**必须用 `writes`/`replyParts` wire，不得 defer**。"参数多/写多段" 不是 defer 理由——引擎支持任意段。只有**真不走 dbus/native RPC**（如 `launch_app`=adb sendlink、`appstatus`=进程内读取、纯 UI 页面跳转）才 defer：在 `rpc/config.json` 顶层写入 `_deferred` 允许清单——`"_deferred": { "<cap.id>": "<原因>" }`（例 `"_deferred": { "launch_app": "adb sendlink — 非 RPC" }`）。**不要给它写 wire-spec**；`_deferred` 里登记即代表有意不提供 wire。`validate_config` 的 coverage 闸门会豁免 `_deferred` 登记的 capability，并把它们作为 `deferred` 信息型字段返回。
 4. 报告里清晰区分每条 capability：`verified`（源码核对过 wire）vs `deferred`（写入 `_deferred`+原因）。**禁止把 inferred/猜测的 wire 当 verified 发出。**
-5. `validate-config` 会要求每个进 config 的 capability 都 dispatchable；deferred 的只进 `_deferred`（不进 wire-spec）——覆盖率闸门对它们放行（它们不在 RPC 模型内，机器可读地登记在 `_deferred` 里）。
-
-   > **覆盖率闸门说明（供 controller 知悉）**：`validate-config` 的 coverage 检查期望 `analysis.json` 里**每一个** capability 在 config 中都有对应 `op` **或** 登记在顶层 `_deferred` 允许清单里（`{ "_deferred": { "<cap.id>": "<原因>" } }`）。`_deferred` 里的 key = 有意不提供 wire-spec 的 capability id；value = 原因字符串。gate 会跳过（不报错）这些 capability，并在结果里把它们的 id 作为 `deferred` 字段返回（信息型，非错误）。`_deferred` 本身不是 capability，因此不会进入 dispatchable/wire 检查（它无 `.type`/`.arg.funcName`，是惰性的）。非对象型的 `_deferred`（如字符串）会被当作空、静默忽略。
+5. `validate_config` 会要求每个进 config 的 capability 都 dispatchable；deferred 的只进 `_deferred`（不进 wire-spec）——覆盖率闸门对它们放行（它们不在 RPC 模型内，机器可读地登记在 `_deferred` 里）。
 
 4. **Run both gates** (these are deterministic CLI gates — the reliability spine). On failure, read the gate's error message, fix the config, and re-run. Retry up to 3 attempts; if still failing, surface the gate errors to the user and stop.
 
@@ -91,27 +123,27 @@ For each capability in `analysis.json`, extract how it is actually called on the
    ```
 
    - `validate_config` checks: schema conformance (RpcConfig), **coverage** (every capability has a matching `op`), and **dispatchable** (`constructDbusCall`/`constructNativeCall` runs against sample args synthesized from `cap.params` without crashing, `${var}` interpolation and `stringify` correct).
-   - `wire_check` statically parses the proxy source for the shared `createMethodCallMessage("m") ... funcName: "f"` pattern, reconstructs the expected wire, and compares it against `constructDbusCall(config[op])`. A mismatch means your extracted `bus`/`path`/`method`/`arg`/`stringify` does not match the real proxy — fix the entry and re-run. 注意方向：`wire_check` 只校验 **proxy→config**（对 proxy 里每个 `funcName` 找 config 对应项）——你凭空多写/猜的一个 config op（`funcName` 不在 proxy 源码里）**不会被拦**。因此每个非 `_deferred` 的 op 都必须对应 proxy 里真实存在的 `funcName`；非 RPC 能力请用 `config._deferred` 声明。
+   - `wire_check` 现在双向校验。**正向（proxy→config）**：解析 proxy 的 `createMethodCallMessage("m") ... funcName: "f"` 模式，重建期望 wire，与 `constructDbusCall(config[op])` 比较。**反向（config→proxy 共现溯源）**：每个非 `_deferred` dbus op 的 `method`/`funcName` 必须出现在某个 proxy 文件里，**且其 `bus`/`path`/`interface` 必须与该 method/funcName 同文件共现**（防止 method 在 proxy A、bus 却取自 proxy B；或 interface 误用 `bus+".interface"` 而源码用的是裸 bus 名——后者是高频静默失败，现已能被拦）。app 跨多 proxy 时传**全部** `--proxy`，按文件粒度校验。任一方向 mismatch → 修对应 entry 重跑。**仍要记住**：wire_check 校验字面存在 + bus/path/interface 共现，但 `arg` 字段是否齐全/语义正确仍需你逐字段核对源码（见「判断标准」），别把 wire_check 当成 wire 正确的充分证明。`wire_check` 还会**信息性报告**未被任何 op 接线的 proxy method（surface coverage）——可能是遗漏的 capability，也可能是有意 defer/internal，需你判断。
 
-**Worked example — `soundstage.read` / `soundstage.set`** (copied verbatim from the Phase-1 reference `imaudio_app_code/rpc/config.json`; the proxy is `imaudio_app_code/ts/proxy/AudioPolicyProxy.ts`, whose `getSoundStage` / `setSoundStage` use `createMethodCallMessage("request")` + `writeString(JSON.stringify({ funcName, data }))` + `readJSON()`):
+**Worked example — `feature.read` / `feature.set`** (the proxy is `demo_app/ts/proxy/FeatureProxy.ts`, whose `getFeature` / `setFeature` use `createMethodCallMessage("request")` + `writeString(JSON.stringify({ funcName, data }))` + `readJSON()`):
 
 ```json
 {
-  "soundstage.read": {
+  "feature.read": {
     "type": "dbus",
-    "bus": "com.yunos.audiopolicyservice",
-    "path": "/com/yunos/audiopolicyservice",
+    "bus": "com.example.featureservice",
+    "path": "/com/example/featureservice",
     "method": "request",
-    "arg": { "funcName": "audiopolicyservice.yunos.com/baseModeules/requstGetSoundEffectsMode" },
+    "arg": { "funcName": "featureservice.example.com/modules/getFeature" },
     "reply": "json"
   },
-  "soundstage.set": {
+  "feature.set": {
     "type": "dbus",
-    "bus": "com.yunos.audiopolicyservice",
-    "path": "/com/yunos/audiopolicyservice",
+    "bus": "com.example.featureservice",
+    "path": "/com/example/featureservice",
     "method": "request",
     "arg": {
-      "funcName": "audiopolicyservice.yunos.com/baseModeules/requstSetSoundEffectsMode",
+      "funcName": "featureservice.example.com/modules/setFeature",
       "data": { "mode": "${mode}", "fade": "${fade}", "balance": "${balance}" }
     },
     "stringify": ["data"],
@@ -122,53 +154,63 @@ For each capability in `analysis.json`, extract how it is actually called on the
 
 Note how this mirrors the proxy exactly: `method` `"request"` matches `createMethodCallMessage("request")`; `arg.funcName` matches the proxy's `funcName` constant; the `set` op's `data` uses `${mode}`/`${fade}`/`${balance}` placeholders for the call inputs and is listed under `stringify` because the proxy does `JSON.stringify({ ..., data })`. `reply` is `"json"` because the proxy reads via `readJSON()`.
 
-**Worked example — object `reply` for read/write extraction (DESIGN A):**
+**Worked example — positional multi-write / bare-string / multi-read / device var / interface** (mirrors real YunOS media+music proxies; these are the patterns the engine now supports — wire them, don't defer):
 
 ```json
 {
-  "soundstage_read": {
+  "card_content_read": {
     "type": "dbus",
-    "bus": "com.yunos.audiopolicyservice",
-    "path": "/com/yunos/audiopolicyservice",
-    "method": "request",
-    "arg": { "funcName": ".../requstGetSoundEffectsMode" },
-    "reply": { "read": "json", "unwrap": "result.data" }
+    "bus": "cn.alios.mafservice.data.music",
+    "path": "/cn/alios/mafservice/data/music",
+    "interface": "cn.alios.mafservice.data.music",
+    "method": "getCardContent",
+    "writes": [
+      { "kind": "string", "value": "${cpId}" },
+      { "kind": "string", "value": "${requestType}" },
+      { "kind": "string", "value": "${collectId}" },
+      { "kind": "int32", "value": "${pageNo}" },
+      { "kind": "int32", "value": "${pageSize}" },
+      { "kind": "string", "value": "${sort}" }
+    ],
+    "reply": "json"
   },
-  "volume_set": {
+  "default_cp_read": {
     "type": "dbus",
-    "bus": "com.yunos.audiopolicyservice",
-    "path": "/com/yunos/audiopolicyservice",
-    "method": "request",
-    "arg": { "funcName": ".../requstSetAllCarAndHeadrestVolumeLevel", "data": { "volume": "${volume}", "streamType": "${streamType}", "zoneId": "${zoneId}" } },
-    "stringify": ["data"],
-    "reply": { "read": "double", "valueField": "success" }
+    "bus": "cn.alios.mafservice.data.music",
+    "path": "/cn/alios/mafservice/data/music",
+    "interface": "cn.alios.mafservice.data.music",
+    "method": "getDefaultCp",
+    "writes": [ { "kind": "string", "value": "${cpType}" } ],
+    "reply": "string",
+    "replyParts": [ { "kind": "string" }, { "kind": "int32" } ]
   },
-  "mic_vocal_read": {
+  "sound_library_query": {
     "type": "dbus",
-    "bus": "com.yunos.audiopolicyservice",
-    "path": "/com/yunos/audiopolicyservice",
-    "method": "request",
-    "arg": { "funcName": ".../requstGetMicVocal" },
-    "reply": { "read": "string", "parseJson": true }
+    "bus": "imaudio.alios.cn",
+    "path": "/imaudio/alios/cn",
+    "method": "querySoundLibrary",
+    "arg": { "body": { "pathType": "${pathType}", "vin": "${__device__.vin}", "pageNumber": "${pageNumber}", "pageSize": "${pageSize}" }, "header": { "token": "" } },
+    "reply": "json"
   }
 }
 ```
 
-- `soundstage_read`: device returns `{ result: { data: { mode, fade, balance } } }` via `readJSON()` → `unwrap: "result.data"` reaches the fields.
-- `volume_set`: device returns a scalar `double` (0 = success) → `valueField: "success"` maps it; no `unwrap` (it's already the scalar).
-- `mic_vocal_read`: device returns a JSON-encoded string via `readString()` → `parseJson: true` parses it into an object before field mapping.
+- `card_content_read`: **6 positional writes** (3 string + 2 int32 + 1 string) via `writes[]` — fully wireable, **never defer for "too many writes"**. `interface` is the **bare bus name** (this proxy passes `interface: "<bus>"`, not the default `bus+".interface"`) → set it explicitly, or the engine dials the wrong interface.
+- `default_cp_read`: one **bare-string** write (`kind:"string"` — NOT `kind:"json"`, which would corrupt `music` into `"\"music\""`), plus a **2-segment read** (`replyParts`: cpid string + code int32 → returns `[cpid, code]`).
+- `sound_library_query`: single JSON write (Pattern A) with `vin` as `${__device__.vin}` (resolved on-car, fail-closed; must be declared in `app.deviceSources`). `interface` **omitted** — this proxy uses the default `bus+".interface"`.
 
 ### Step 3: Verify via the gates
 
-The two gates from Step 2.4 **are** the verification — they are deterministic and authorless. Do not hand-wave: both must print success before this step is complete. If either fails after 3 fix attempts, stop and surface the errors.
+The two gates are the verification: both must print success before this step is done. If either fails after 3 fix attempts, stop and surface the errors.
 
 (TypeScript compilation / test runs happen in the pipeline's `test` and `build` steps, not here — this Skill produces only `rpc/config.json`.)
 
 ## Quality Checklist
 
+- [ ] **Iron Law 满足**：每个非 `_deferred` op 的 bus/path/method/funcName/stringify/reply 都逐字可追溯到真实 proxy/manager 源码（不是 guessed、不是抄 fixture）——两个 gate 全绿 ≠ 满足此条
 - [ ] Every capability in `analysis.json` has a matching `op` (= `capability.id`) in `rpc/config.json` — no missing, no extra
 - [ ] Each D-Bus `op`'s `bus`/`path`/`method`/`arg`/`stringify`/`reply` is copied from the real proxy source, not guessed
 - [ ] `${var}` placeholders match the capability `params` names; `stringify` paths match the proxy's `JSON.stringify` targets
 - [ ] `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" validate_config rpc/config.json --analysis <analysis.json>` passes (schema + coverage + dispatchable)
 - [ ] `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" wire_check rpc/config.json --proxy <Proxy.ts>` passes (wire matches the proxy source)
-- [ ] No `throw "not implemented"` anywhere in the generated `yunos-adapter.ts` (confirm the scaffolded adapter calls `rpcCall` per method — do **not** edit the adapter here)
+- [ ] The generated server/tool surface remains schema-first: `src/tools/schema.ts` exposes `TOOL_SCHEMA`, `src/server.ts` dispatches tool calls by name, and `src/adapters/index.ts` routes real mode through `rpcCall(op, args)` — do **not** edit generated source in this skill
