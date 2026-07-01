@@ -59,6 +59,31 @@ sequenceDiagram
     Tool-->>Agent: N tool schemas injected
 ```
 
+**The runtime bridge.** Once built, a tool call flows from the host agent through the generated server and a deterministic bridge to the real device — the transport is swappable (`adb` / file / socket), and the wire is constructed purely from `rpc/config.json`, so the bridge carries zero app literals.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as 🎛️ host agent
+    participant Server as 🧩 MCP server
+    participant Bridge as 🛠️ rpc bridge
+    participant Transport as 🔌 device transport
+    participant Engine as ⚙️ car-side engine
+
+    Agent->>Server: tools/call (name, args)
+    Note over Server: safety-gated tools verify a precondition first (fail-closed)
+    Server->>Bridge: dispatch(tool, args)
+    Bridge->>Bridge: build wire from rpc/config.json
+    Bridge->>Transport: write command
+    Transport->>Engine: deliver command
+    Engine->>Engine: drive the real app operation
+    Engine-->>Transport: write reply
+    Transport-->>Bridge: reply (polled / pushed)
+    Bridge->>Bridge: parse reply → tool return shape
+    Bridge-->>Server: typed result
+    Server-->>Agent: tool result
+```
+
 ## 📦 Deliverables
 
 A successful run should produce a reviewable delivery bundle, not just a generated folder:
