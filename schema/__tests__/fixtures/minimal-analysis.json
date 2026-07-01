@@ -14,7 +14,8 @@
       "params": [],
       "safetyLevel": "readonly",
       "sdkCalls": [],
-      "sourceRef": "src/index.ts:ping"
+      "sourceRef": "src/index.ts:ping",
+      "description": "Ping system"
     }
   ]
 }

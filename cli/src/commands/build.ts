@@ -1,7 +1,15 @@
 import { execFile } from "child_process";
-import { resolve, basename } from "path";
+import { resolve } from "path";
 import { existsSync, statSync } from "fs";
-import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
+import { readState, writeState, createInitialState, updateStep, appNameFromProjectDir } from "../state/manager.js";
+
+function commandFile(command: "npm" | "npx"): string {
+  return process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : command;
+}
+
+function commandArgs(command: "npm" | "npx", args: string[]): string[] {
+  return process.platform === "win32" ? ["/d", "/s", "/c", command, ...args] : args;
+}
 
 async function npmInstallIfNeeded(dir: string): Promise<void> {
   const nodeModules = resolve(dir, "node_modules");
@@ -21,9 +29,9 @@ async function npmInstallIfNeeded(dir: string): Promise<void> {
   if (needInstall) {
     await new Promise<void>((resolvePromise, reject) => {
       execFile(
-        "npm",
-        ["install"],
-        { cwd: dir, shell: true, maxBuffer: 10 * 1024 * 1024 },
+        commandFile("npm"),
+        commandArgs("npm", ["install"]),
+        { cwd: dir, maxBuffer: 10 * 1024 * 1024 },
         (error) => {
           if (error) {
             reject(new Error(`npm install failed: ${error.message}`));
@@ -39,9 +47,9 @@ async function npmInstallIfNeeded(dir: string): Promise<void> {
 async function tscBuild(dir: string): Promise<void> {
   await new Promise<void>((resolvePromise, reject) => {
     execFile(
-      "npx",
-      ["tsc"],
-      { cwd: dir, shell: true, maxBuffer: 10 * 1024 * 1024 },
+      commandFile("npx"),
+      commandArgs("npx", ["tsc"]),
+      { cwd: dir, maxBuffer: 10 * 1024 * 1024 },
       (error, _stdout, stderr) => {
         if (error) {
           reject(new Error(`TypeScript build failed:\n${stderr}`));
@@ -70,7 +78,7 @@ export async function buildCommand(args: string[]): Promise<void> {
     throw new Error("Directory not found: " + resolvedDir);
   }
 
-  const appName = basename(resolvedDir);
+  const appName = appNameFromProjectDir(resolvedDir);
   let state = readState(appName) ?? createInitialState(appName, resolvedDir);
   try {
     state = updateStep(state, "build", { status: "in_progress" });

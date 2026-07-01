@@ -13,9 +13,17 @@ function tmpDir(name: string): string {
   return resolve(TMP_ROOT, `${name}-${randomUUID().slice(0, 8)}`);
 }
 
+function commandFile(cmd: string): string {
+  return process.platform === "win32" && (cmd === "npm" || cmd === "npx") ? (process.env.ComSpec ?? "cmd.exe") : cmd;
+}
+
+function commandArgs(cmd: string, args: string[]): string[] {
+  return process.platform === "win32" && (cmd === "npm" || cmd === "npx") ? ["/d", "/s", "/c", cmd, ...args] : args;
+}
+
 function runInDir(dir: string, cmd: string, args: string[], timeout = 60_000): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolvePromise) => {
-    execFile(cmd, args, { cwd: dir, shell: true, maxBuffer: 10 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
+    execFile(commandFile(cmd), commandArgs(cmd, args), { cwd: dir, maxBuffer: 10 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
       resolvePromise({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: error ? 1 : 0 });
     });
   });
@@ -25,7 +33,7 @@ afterAll(() => {
   if (existsSync(TMP_ROOT)) {
     try { rmSync(TMP_ROOT, { recursive: true, force: true }); } catch { /* Windows EPERM */ }
   }
-});
+}, 60_000);
 
 type FixtureName = "hvac" | "minimal" | "collision";
 
@@ -47,15 +55,11 @@ describe.each(FIXTURES)("E2E multi-app: %s", (fixtureName) => {
 
     // Core files must exist
     for (const f of ["package.json", "tsconfig.json", "vitest.config.ts", "conf/config.yaml",
-      "src/index.ts", "src/config.ts", "src/server.ts", "src/shutdown.ts",
-      "src/adapters/types.ts", "src/adapters/mock-adapter.ts", "src/adapters/index.ts",
-      "src/tools/registry.ts", "tests/contract/registry.test.ts", "tests/unit/mock-adapter.test.ts"]) {
+      "src/index.ts", "src/config.ts", "src/server.ts", "src/adapters/index.ts",
+      "src/tools/registry.ts", "src/tools/schema.ts", "tests/contract/registry.test.ts",
+      "src/rpc/rpc-types.ts", "src/rpc/rpc-engine.ts", "src/rpc/rpc-client.ts",
+      "src/executors/adb-executor.ts", "car-side/RpcEngine.ts", "car-side/manifest-page.json"]) {
       expect(existsSync(resolve(outDir, f)), `Missing: ${f}`).toBe(true);
-    }
-
-    // Per-domain tool files must exist
-    for (const d of domains) {
-      expect(existsSync(resolve(outDir, `src/tools/${d}.ts`)), `Missing domain tool: ${d}.ts`).toBe(true);
     }
 
     // Enums and errors only if defined
@@ -93,20 +97,10 @@ describe.each(FIXTURES)("E2E multi-app: %s", (fixtureName) => {
     expect(contract).toContain(`toHaveLength(${capCount})`);
   });
 
-  it("adapter interface has all methods", () => {
-    const types = readFileSync(resolve(outDir, "src/adapters/types.ts"), "utf-8");
-    expect(types).toContain("IAdapter");
+  it("tool schema contains every capability as one upstream tool", () => {
+    const schema = readFileSync(resolve(outDir, "src/tools/schema.ts"), "utf-8");
     for (const cap of analysis.capabilities) {
-      const words = cap.action.split("_");
-      const verb = words[0].toLowerCase();
-      const pascal = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-      const objectParts = cap.object.split("_").map(pascal);
-      const rest = words.slice(1).map(pascal);
-      const preps = new Set(["To", "From", "By", "With", "For", "Into", "Onto", "At"]);
-      const before = rest.filter((w: string) => preps.has(w));
-      const after = rest.filter((w: string) => !preps.has(w));
-      const methodName = verb + [...before, ...objectParts, ...after].join("");
-      expect(types, `Missing method ${methodName} in IAdapter`).toContain(methodName);
+      expect(schema, `Missing tool ${cap.id} in TOOL_SCHEMA`).toContain(`"name": "${cap.id}"`);
     }
   });
 });

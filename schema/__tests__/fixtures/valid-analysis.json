@@ -4,10 +4,16 @@
     "domain": "cockpit",
     "framework": "YunOS HDT",
     "entryFile": "src/index.ts",
-    "pages": ["pages/index/index"],
-    "permissions": ["system.router", "system.network"],
+    "pages": [
+      "pages/index/index"
+    ],
+    "permissions": [
+      "system.router",
+      "system.network"
+    ],
     "voiceEnabled": true,
-    "dualScreen": false
+    "dualScreen": false,
+    "safetyProbes": { "gear": "read_gear_status" }
   },
   "capabilities": [
     {
@@ -16,12 +22,24 @@
       "object": "page",
       "action": "navigate_to",
       "params": [
-        { "name": "pageName", "type": "string" }
+        {
+          "name": "pageName",
+          "type": "string"
+        }
       ],
-      "returns": { "type": "NavigationResult", "fields": ["success", "currentPage"] },
+      "returns": {
+        "type": "NavigationResult",
+        "fields": [
+          "success",
+          "currentPage"
+        ]
+      },
       "safetyLevel": "normal",
-      "sdkCalls": ["@system.router"],
-      "sourceRef": "src/services/router.ts:navigateTo"
+      "sdkCalls": [
+        "@system.router"
+      ],
+      "sourceRef": "src/services/router.ts:navigateTo",
+      "description": "Navigate to for page"
     },
     {
       "id": "capture_pet",
@@ -29,12 +47,25 @@
       "object": "pet",
       "action": "capture",
       "params": [
-        { "name": "fps", "type": "number", "optional": false }
+        {
+          "name": "fps",
+          "type": "number",
+          "optional": false
+        }
       ],
-      "returns": { "type": "CaptureResult", "fields": ["success", "imagePath"] },
+      "returns": {
+        "type": "CaptureResult",
+        "fields": [
+          "success",
+          "imagePath"
+        ]
+      },
       "safetyLevel": "p_gear_required",
-      "sdkCalls": ["@system.camera"],
-      "sourceRef": "src/services/pet.ts:capture"
+      "sdkCalls": [
+        "@system.camera"
+      ],
+      "sourceRef": "src/services/pet.ts:capture",
+      "description": "Capture pet"
     },
     {
       "id": "read_gear_status",
@@ -42,15 +73,30 @@
       "object": "gear",
       "action": "read_status",
       "params": [],
-      "returns": { "type": "GearStatus", "fields": ["isParked", "ignoreMode", "rawValue"] },
+      "returns": {
+        "type": "GearStatus",
+        "fields": [
+          "isParked",
+          "ignoreMode",
+          "rawValue"
+        ]
+      },
       "safetyLevel": "readonly",
-      "sdkCalls": ["@system.vehicle"],
-      "sourceRef": "src/services/vehicle.ts:readGearStatus"
+      "sdkCalls": [
+        "@system.vehicle"
+      ],
+      "sourceRef": "src/services/vehicle.ts:readGearStatus",
+      "description": "Read status for gear"
     }
   ],
   "enums": {
     "GearPosition": {
-      "values": ["P", "R", "N", "D"],
+      "values": [
+        "P",
+        "R",
+        "N",
+        "D"
+      ],
       "type": "string",
       "sourceFile": "src/types/vehicle.ts"
     }
@@ -60,15 +106,24 @@
       "prefix": 2,
       "domainName": "navigation",
       "codes": {
-        "PAGE_NOT_FOUND": { "value": 1, "message": "页面不存在" },
-        "STACK_OVERFLOW": { "value": 2, "message": "导航栈溢出" }
+        "PAGE_NOT_FOUND": {
+          "value": 1,
+          "message": "页面不存在"
+        },
+        "STACK_OVERFLOW": {
+          "value": 2,
+          "message": "导航栈溢出"
+        }
       }
     },
     "pet": {
       "prefix": 3,
       "domainName": "pet",
       "codes": {
-        "CAPTURE_FAILED": { "value": 1, "message": "拍照失败" }
+        "CAPTURE_FAILED": {
+          "value": 1,
+          "message": "拍照失败"
+        }
       }
     }
   }

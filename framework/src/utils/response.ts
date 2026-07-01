@@ -14,11 +14,6 @@ export function formatResponse(data: unknown): McpResponse {
 }
 
 export function formatSuccess(data: unknown): McpResponse {
-  // N3: if the adapter already returned a shaped DTO carrying its own `success` boolean,
-  // pass it through verbatim — do NOT re-wrap (avoids the redundant { success:true, data:{success:true,...} }).
-  if (data && typeof data === "object" && "success" in data && typeof (data as { success: unknown }).success === "boolean") {
-    return formatResponse(data);
-  }
   return formatResponse({ success: true, data });
 }
 

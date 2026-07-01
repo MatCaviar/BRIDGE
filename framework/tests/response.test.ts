@@ -29,23 +29,6 @@ describe("formatSuccess", () => {
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed).toEqual({ success: true, data: { currentPage: "home", stackDepth: 1 } });
   });
-
-  it("N3: does NOT double-wrap an already-shaped { success, ... } payload", () => {
-    const dto = { success: true, mode: 1, fade: 0 };
-    const result = formatSuccess(dto);
-    const parsed = JSON.parse(result.content[0].text) as Record<string, unknown>;
-    // Must flatten: success:true at top + the DTO fields, NOT { success:true, data:{success:true,...} }
-    expect(parsed.success).toBe(true);
-    expect(parsed.mode).toBe(1);
-    expect(parsed.data).toBeUndefined();
-  });
-
-  it("N3: a failure DTO (success:false) is passed through (no forced success:true)", () => {
-    const result = formatSuccess({ success: false, reason: "x" });
-    const parsed = JSON.parse(result.content[0].text) as Record<string, unknown>;
-    expect(parsed.success).toBe(false);
-    expect(parsed.reason).toBe("x");
-  });
 });
 
 describe("formatError", () => {

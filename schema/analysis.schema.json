@@ -52,6 +52,34 @@
           "type": "boolean",
           "description": "Whether the app supports dual-screen display.",
           "default": false
+        },
+        "deviceSources": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Device-resolved variable names usable as ${__device__.X} in wires (resolved on-car, fail-closed if unset)."
+        },
+        "safetyProbes": {
+          "type": "object",
+          "description": "Capability ids the safety guard calls to verify preconditions for p_gear_* tools. Declared explicitly per-app (no hardcoded probe ids). If a probe is omitted, the corresponding p_gear_* tools fail-closed (rejected).",
+          "additionalProperties": false,
+          "properties": {
+            "gear": { "type": "string", "minLength": 1, "description": "Capability id returning {isParked, ignoreMode} — gates p_gear_required / p_gear_and_confirm." },
+            "hotspot": { "type": "string", "minLength": 1, "description": "Capability id returning {ssid} — gates p_gear_and_network." }
+          }
+        },
+        "safetyRules": {
+          "type": "object",
+          "description": "Custom safety rules (level → preconditions). Merged over the framework's 5 built-in levels, so apps can override a standard level or add custom ones (e.g. door_locked, speed_limited) without framework changes.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "requiresGear": { "type": "boolean", "description": "Check the gear probe (isParked) before allowing." },
+              "requiresHotspot": { "type": "boolean", "description": "Check the hotspot probe (ssid != null) before allowing." },
+              "requiresConfirm": { "type": "boolean", "description": "Require args.confirmed === true." },
+              "description": { "type": "string" }
+            }
+          }
         }
       }
     },
@@ -61,7 +89,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "domain", "object", "action", "safetyLevel", "sdkCalls", "sourceRef"],
+        "required": ["id", "domain", "object", "action", "description", "safetyLevel", "sdkCalls", "sourceRef"],
         "additionalProperties": false,
         "properties": {
           "id": {
@@ -85,38 +113,14 @@
             "minLength": 1,
             "description": "Verb phrase (e.g. 'navigate_to', 'capture', 'read_status')."
           },
+          "description": {
+            "type": "string",
+            "description": "Optional description surfaced to upstream agents. Auto-derived from action/object/params/returns if omitted."
+          },
           "params": {
             "type": "array",
-            "description": "Input parameters accepted by this capability.",
-            "items": {
-              "type": "object",
-              "required": ["name", "type"],
-              "additionalProperties": false,
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "minLength": 1,
-                  "pattern": "^[a-z][a-zA-Z0-9]*$",
-                  "description": "Parameter name in camelCase."
-                },
-                "type": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "TypeScript type name (e.g. 'string', 'number', 'FpsRange')."
-                },
-                "enum": {
-                  "type": "array",
-                  "items": { "type": "string", "minLength": 1 },
-                  "minItems": 1,
-                  "description": "Enum values if the type is an enum. References the enums section."
-                },
-                "optional": {
-                  "type": "boolean",
-                  "default": false,
-                  "description": "Whether this parameter can be omitted."
-                }
-              }
-            }
+            "description": "Input parameters accepted by this capability (each a $defs/paramDef). Object params declare `properties`, array params declare `items`; both nest recursively.",
+            "items": { "$ref": "#/$defs/paramDef" }
           },
           "returns": {
             "type": "object",
@@ -131,8 +135,13 @@
               },
               "fields": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 },
-                "description": "Field names in the return type."
+                "description": "Return fields — bare name (string, type unknown) or $defs/typedField. TypedField items/properties project to outputSchema, enabling tool chaining (e.g. read a resourceCode from query_*, feed it to install_*).",
+                "items": {
+                  "oneOf": [
+                    { "type": "string", "minLength": 1 },
+                    { "$ref": "#/$defs/typedField" }
+                  ]
+                }
               }
             }
           },
@@ -156,6 +165,11 @@
             "type": "string",
             "minLength": 1,
             "description": "file:method reference in the original app source."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["verified", "partial", "broken"],
+            "description": "Authoring-confidence marker: verified (wire source-traced) | partial | broken (known no-op/bug)."
           }
         }
       }
@@ -183,6 +197,11 @@
             "type": "string",
             "minLength": 1,
             "description": "Source file where this enum is defined."
+          },
+          "map": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "wireValue → human name map, projected as a reverse lookup export."
           }
         }
       }
@@ -227,6 +246,138 @@
               }
             }
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "paramDef": {
+      "type": "object",
+      "description": "A named field — a capability param or an object-property field. Nested `properties`/`items` make object/array params project to structured JSON-Schema.",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-zA-Z0-9]*$",
+          "description": "Field name in camelCase."
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "TypeScript type name (e.g. 'string', 'number', 'FpsRange', 'ResourceCode[]', 'Array<Band>')."
+        },
+        "enum": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Wire values — the upstream agent passes these verbatim, so they MUST be the real on-the-wire values extracted from source (NOT display names). schema_preview projects them directly into inputSchema.enum."
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this field can be omitted."
+        },
+        "description": {
+          "type": "string",
+          "description": "Per-field description surfaced to upstream agents."
+        },
+        "examples": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Example wire values projected to JSON-Schema examples — strongest LLM steering signal."
+        },
+        "minimum": { "type": "number", "description": "Numeric lower bound (number fields) → JSON-Schema minimum." },
+        "maximum": { "type": "number", "description": "Numeric upper bound (number fields) → JSON-Schema maximum." },
+        "defaultValue": {
+          "type": ["string", "number", "boolean"],
+          "description": "Default value when omitted → JSON-Schema default."
+        },
+        "properties": {
+          "type": "array",
+          "description": "Structured object fields (when `type` names a model) → JSON-Schema `properties`. Each field is itself a paramDef, so nesting recurses.",
+          "items": { "$ref": "#/$defs/paramDef" }
+        },
+        "items": {
+          "$ref": "#/$defs/fieldShape",
+          "description": "Array element shape (when `type` is an array / ends in [] / Array<>). Projects to JSON-Schema `items`."
+        }
+      }
+    },
+    "typedField": {
+      "type": "object",
+      "description": "A named return field — narrower than paramDef (no enum/examples/defaultValue) but carries items/properties/required, so structured/array returns project to outputSchema for tool chaining.",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Return field name."
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "TypeScript type name (e.g. 'boolean', 'ResourceCode[]')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Per-field description surfaced to upstream agents in outputSchema."
+        },
+        "items": {
+          "$ref": "#/$defs/fieldShape",
+          "description": "Array element shape (when `type` is an array). Projects to outputSchema items."
+        },
+        "properties": {
+          "type": "array",
+          "description": "Structured object fields (when `type` names a model). Recurses via paramDef.",
+          "items": { "$ref": "#/$defs/paramDef" }
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Which of `properties` are required in the returned object."
+        }
+      }
+    },
+    "fieldShape": {
+      "type": "object",
+      "description": "A nameless recursive field shape — an array element (`items`) or nested sub-shape. Named fields (params, return fields, object properties) use paramDef/typedField.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "TypeScript type name (e.g. 'string', 'Band', 'Band[]')."
+        },
+        "enum": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Wire values (same wire-truth rule as paramDef.enum)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Per-element description surfaced to upstream agents."
+        },
+        "minimum": { "type": "number", "description": "Numeric lower bound → JSON-Schema minimum." },
+        "maximum": { "type": "number", "description": "Numeric upper bound → JSON-Schema maximum." },
+        "items": {
+          "$ref": "#/$defs/fieldShape",
+          "description": "Element shape when this shape is itself an array (array-of-array)."
+        },
+        "properties": {
+          "type": "array",
+          "description": "Structured object fields (when `type` names a model). Recurses via paramDef.",
+          "items": { "$ref": "#/$defs/paramDef" }
+        },
+        "required": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Which of `properties` are required."
         }
       }
     }

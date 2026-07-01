@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve, basename } from "path";
-import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
+import { resolve } from "path";
+import { readState, writeState, createInitialState, updateStep, appNameFromProjectDir } from "../state/manager.js";
 
 const SAFE_NAME_RE = /^@?[a-z0-9][-a-z0-9\/]*[a-z0-9]$/;
 
@@ -38,7 +38,7 @@ export async function registerCommand(args: string[]): Promise<void> {
     throw new Error("Invalid app name: " + appName + ". Must match " + SAFE_NAME_RE.source);
   }
 
-  let state = readState(appName) ?? createInitialState(appName, projectDir);
+  let state = readState(appNameFromProjectDir(projectDir)) ?? createInitialState(appNameFromProjectDir(projectDir), projectDir);
   try {
     state = updateStep(state, "register", { status: "in_progress" });
     writeState(state);
