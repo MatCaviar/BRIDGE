@@ -2,8 +2,8 @@ export { formatResponse, formatSuccess, formatError } from "./utils/response.js"
 export type { McpResponse, TextContent } from "./utils/response.js";
 export { validateNonEmptyString, validatePath, validateRange } from "./utils/validation.js";
 export type { ValidationResult } from "./utils/validation.js";
-export { createSafetyGuard, SafetyGuardError } from "./middleware/safety-guard.js";
-export type { SafetyLevel, SafetyAdapter } from "./middleware/safety-guard.js";
+export { createSafetyGuard, SafetyGuardError, resolveSafetyRules, BUILTIN_SAFETY_RULES } from "./middleware/safety-guard.js";
+export type { SafetyLevel, SafetyAdapter, SafetyRule, SafetyRules } from "./middleware/safety-guard.js";
 export { wrapHandler } from "./middleware/error-handler.js";
 export { createToolLogger } from "./middleware/logger.js";
 export type { ToolLogger } from "./middleware/logger.js";

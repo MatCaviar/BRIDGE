@@ -13,9 +13,17 @@ function tmpDir(): string {
   return resolve(TMP_ROOT, `e2e-${randomUUID().slice(0, 8)}`);
 }
 
+function commandFile(cmd: string): string {
+  return process.platform === "win32" && (cmd === "npm" || cmd === "npx") ? (process.env.ComSpec ?? "cmd.exe") : cmd;
+}
+
+function commandArgs(cmd: string, args: string[]): string[] {
+  return process.platform === "win32" && (cmd === "npm" || cmd === "npx") ? ["/d", "/s", "/c", cmd, ...args] : args;
+}
+
 function runInDir(dir: string, cmd: string, args: string[], timeout = 60_000): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolvePromise) => {
-    const child = execFile(cmd, args, { cwd: dir, shell: true, maxBuffer: 10 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
+    const child = execFile(commandFile(cmd), commandArgs(cmd, args), { cwd: dir, maxBuffer: 10 * 1024 * 1024, timeout }, (error, stdout, stderr) => {
       resolvePromise({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: error ? 1 : 0 });
     });
     // Allow cleanup
@@ -44,18 +52,18 @@ describe("E2E: scaffold → build → test → verify", () => {
       "src/index.ts",
       "src/config.ts",
       "src/server.ts",
-      "src/shutdown.ts",
-      "src/adapters/types.ts",
-      "src/adapters/mock-adapter.ts",
       "src/adapters/index.ts",
       "src/types/enums.ts",
       "src/types/errors.ts",
       "src/tools/registry.ts",
-      "src/tools/navigation.ts",
-      "src/tools/pet.ts",
-      "src/tools/vehicle.ts",
+      "src/tools/schema.ts",
+      "src/rpc/rpc-types.ts",
+      "src/rpc/rpc-engine.ts",
+      "src/rpc/rpc-client.ts",
+      "src/executors/adb-executor.ts",
+      "car-side/RpcEngine.ts",
+      "car-side/manifest-page.json",
       "tests/contract/registry.test.ts",
-      "tests/unit/mock-adapter.test.ts",
     ];
 
     for (const f of requiredFiles) {
@@ -108,7 +116,6 @@ describe("E2E: scaffold → build → test → verify", () => {
 
       const child: ChildProcess = execFile("node", [distPath], {
         cwd: outDir,
-        shell: true,
         maxBuffer: 1024 * 1024,
       }, (_error, _stdout, stderr) => {
         clearTimeout(timeout);

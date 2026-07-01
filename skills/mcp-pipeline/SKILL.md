@@ -1,6 +1,6 @@
 ---
 name: mcp-pipeline
-description: Orchestrate the full MCP Server generation pipeline — analyze, scaffold, generate, test, build, register, verify
+description: Use when turning a YunOS HDT app into an MCP suite for a host codeagent: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence.
 ---
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
@@ -9,7 +9,17 @@ description: Orchestrate the full MCP Server generation pipeline — analyze, sc
 
 # MCP Pipeline
 
-Orchestrate the end-to-end pipeline that transforms a YunOS HDT application into a production MCP Server.
+Orchestrate the end-to-end pipeline that turns a YunOS HDT app into an **MCP suite** for Claude Code / Codex: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence. 用 `schema_preview <analysis.json> [<rpc/config.json>] --output tools-schema.json` 输出可注入上游 agent 的 schema 预览——这是上游模型理解工具的首要产物。
+
+## 你的角色：协作者，不是按钮执行者
+
+这条 pipeline 是**默认路径**，不是必须盲目照走的铁轨。确定性 CLI 保证每一步可复现，两个 gate（validate_config + wire_check）是**安全网**——拦下明确错误，但**不替代你的判断**。
+
+**你有权、且被鼓励**：
+- 在 analyze 后，若发现 app 特殊（无 dbus、全是 native、capability 异常多/少），**主动向用户说明并建议调整**（建议 curate、跳过某些步骤、或全部 defer 并解释后果），而非机械推进。
+- 在 generate 的 gate retry 中，若 3 次仍失败，**停下来诊断根因**（analysis 漏了？proxy 没找全？capability 不走 RPC 模型？），而不是第 4 次硬试——fix root cause，不 fix symptom。
+- 任一步发现上游产物有问题（如 analysis 的 sourceRef 全对不上），**回头修上游**而非带病推进；`state.json` 支持任意 `--from` 重入。
+- **gate 全绿 ≠ 产物正确**。gate 是下限（schema/coverage/dispatchable/wire 格式）；**上限（wire 真实性、analysis 完整性、测试有效性）是你的判断**，gate 替你查不了。
 
 ## Run Modes
 
@@ -23,12 +33,12 @@ Orchestrate the end-to-end pipeline that transforms a YunOS HDT application into
 
 ## Pipeline Steps
 
-The pipeline is a state machine with 8 steps. Each step has a type (deterministic CLI or LLM Skill) and produces artifacts.
+The pipeline is a state machine with 9 steps (8 deterministic/LLM phases + `schema_preview` as the final, mandatory agent-injection deliverable). Each step has a type (deterministic CLI or LLM Skill) and produces artifacts.
 
 ```
 [validate] → [analyze] → (review) → (curate, optional) → [scaffold] → [generate]
     → (validate_config + wire_check, inline, retried until pass)
-    → [test] → (fix if failed) → [build] → [register] → [verify] → [done]
+    → [test] → (fix if failed) → [build] → [register] → [verify] → [schema_preview] → [done]
 ```
 
 > **Note on `validate_config` / `wire_check`**: These two gates are **inline verification sub-steps run by the host agent during the `generate` phase** — they are retried until both pass before the pipeline advances to `test`/`build`. They are **NOT** sequential linear pipeline phases. They appear in `StepName` / `ALL_STEPS` so the commands can record status into `state.json`, but they do not advance the linear progression on their own; the retry loop is agent-driven (per spec §4.4). The host agent runs them, reads failures, fixes `rpc/config.json` per the `/mcp-generate` methodology, and re-runs — the pipeline only moves forward once both report success.
@@ -65,13 +75,13 @@ In `--step` mode: Pause after this step and ask "Analysis complete. Review analy
 node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" scaffold .mcp-pipeline/<app>/analysis.json --output ./mcp-<app> [--selection .mcp-pipeline/<app>/selection.json]
 ```
 
-Generates the project skeleton with templates and auto-generated files (enums, errors, registry, contract tests, mock adapter tests). **SP-B:** scaffold also deterministically produces the RPC bridge (`src/rpc/*`), the rpc-calling `src/adapters/yunos-adapter.ts` (each method → `rpcCall(op, args)` + map-by-name DTO, **no `throw`**), `src/executors/adb-executor.ts`, the car-side deliverables (`car-side/RpcEngine.ts`, `car-side/manifest-page.json`), and the `adb:` block in `conf/config.yaml`. The host agent creates `rpc/config.json` from scratch in the `generate` step (it is **not** scaffolded).
+Generates the project skeleton with templates and auto-generated files. Scaffold deterministically produces the agent-facing schema (`src/tools/schema.ts`), registry (`src/tools/registry.ts`), MCP server dispatch (`src/server.ts`), generalized adapter (`src/adapters/index.ts` with `rpcCall(op,args)`), RPC bridge (`src/rpc/*`), `src/executors/adb-executor.ts`, the car-side deliverables (`car-side/RpcEngine.ts`, `car-side/manifest-page.json`), and the `adb:` block in `conf/config.yaml`. You create `rpc/config.json` from scratch in the `generate` step (it is **not** scaffolded).
 
 ### Step 4: Generate (LLM Reasoning — `/mcp-generate` Skill) + config gates
 
 Invoke the `/mcp-generate` Skill with the scaffolded project path. The Skill:
 1. Reads `analysis.json` + the original app proxy/manager source (via each capability's `sourceRef`)
-2. Creates `rpc/config.json` from scratch — the op→wire-spec map (`op` = `capability.id`); this is the host agent's ONLY judgment product this step. The adapter, bridge, and all other source are already generated by scaffold — **do not edit them here**.
+2. Creates `rpc/config.json` from scratch — the op→wire-spec map (`op` = `capability.id`); this is the host agent's ONLY judgment product this step. The schema, server, adapter, bridge, and all other source are already generated by scaffold — **do not edit them here**.
 
 After the Skill produces `rpc/config.json`, run the two deterministic gates (the reliability spine). **Both must pass before proceeding to test/build:**
 
@@ -81,7 +91,7 @@ node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" wire_check rpc/config.json --p
 ```
 
 - `validate_config` — schema conformance + coverage (every capability has a matching `op`) + dispatchable (`constructDbusCall`/`constructNativeCall` runs against sample args without crashing, `${var}` and `stringify` correct).
-- `wire_check` — statically parses the proxy source for the shared `createMethodCallMessage("m") ... funcName: "f"` pattern and compares `constructDbusCall(config[op])` against it. 注意方向：只校验 **proxy→config**（对 proxy 里每个 `funcName` 找 config 对应项）——凭空多写/猜的 config op（`funcName` 不在 proxy 源码里）不会被拦；每个非 `_deferred` 的 op 都必须对应 proxy 里真实存在的 `funcName`，非 RPC 能力用 `config._deferred` 声明。
+- `wire_check` — 双向校验：正向（proxy→config）解析 `createMethodCallMessage("m") ... funcName: "f"` 比对 `constructDbusCall`；反向（config→proxy）确认每个非 `_deferred` dbus op 的 funcName 真实出现在 proxy 源码（拦臆造 wire）。app 跨多 proxy 时传多个 `--proxy`，对并集校验。详见 `/mcp-generate` 的「判断标准」。
 
 **If either gate fails:** return to the `/mcp-generate` methodology — read the gate's error, fix the offending `rpc/config.json` entry, and re-run the gate. Retry up to 3 attempts; if still failing after 3, surface the gate errors to the user and stop (do NOT proceed to build). These two gates are inline sub-steps of the `generate` phase, retried until pass (see the note above the steps).
 
@@ -122,6 +132,14 @@ node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" verify --dir ./mcp-<app> --gat
 ```
 
 Verifies connectivity and tool discovery. If verification fails, report what failed.
+
+### Step 9: schema_preview (Deterministic — CLI) — **mandatory final deliverable, do NOT skip**
+
+```bash
+node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" schema_preview .mcp-pipeline/<app>/analysis.json ./mcp-<app>/rpc/config.json --output .mcp-pipeline/<app>/tools-schema.json
+```
+
+Projects `analysis.json` (+ `rpc/config.json` `_deferred`) into `tools-schema.json` — **the primary artifact an upstream agent (Claude/Codex) consumes to understand the tool surface**: every tool's description, `inputSchema` (real wire-value enums, `examples`, bounds, `outputSchema`), and `executable` flag. It is a **pure projection of analysis** (no build/server run needed), so it can be regenerated any time analysis or `_deferred` changes. **This is part of the main flow, not an optional add-on** — the 8 steps above produce a runnable server, but without `tools-schema.json` the upstream host agent has no machine-readable tool surface to call against. Running it is how you hand the suite to the host codeagent.
 
 ## State Management
 
@@ -182,10 +200,12 @@ Batch Report:
 Before reporting pipeline complete, verify:
 
 - [ ] All 8 steps completed successfully
+- [ ] **`schema_preview` run** — `tools-schema.json` produced (the primary upstream-agent artifact; not optional)
 - [ ] `state.json` shows all steps as "completed"
 - [ ] `rpc/config.json` passes both gates: `validate_config` (schema + coverage + dispatchable) and `wire_check` (wire matches proxy source)
-- [ ] Generated `yunos-adapter.ts` calls `rpcCall` per method (no `throw "not implemented"`)
+- [ ] Generated schema/server/adapter remain schema-first: `src/tools/schema.ts` exposes `TOOL_SCHEMA`, `src/server.ts` dispatches by tool name, and `src/adapters/index.ts` routes real mode through `rpcCall(op,args)`
 - [ ] TypeScript compiles with zero errors
 - [ ] All tests pass
 - [ ] Generated server starts and responds to health check
 - [ ] Gateway config updated with new server entry
+- [ ] **No capability lost to outdated wire assumptions** — positional multi-write / bare-string / multi-segment-read capabilities are wired via `writes`/`replyParts`, not deferred or excluded (per `/mcp-generate` Patterns B/C/D)

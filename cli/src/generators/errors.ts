@@ -1,4 +1,5 @@
 import type { AnalysisData } from "../types.js";
+import { assertIdent } from "../utils/sanitize.js";
 
 export function generateErrors(analysis: AnalysisData): string {
   const errorCodes = analysis.errorCodes;
@@ -15,13 +16,13 @@ export function generateErrors(analysis: AnalysisData): string {
 
   for (const [key, domain] of Object.entries(errorCodes)) {
     const prefix = domain.prefix;
-    const constName = key.toUpperCase();
+    const constName = assertIdent(key.toUpperCase(), `error domain "${key}"`);
 
     for (const [codeName, def] of Object.entries(domain.codes)) {
       const fullCode = prefix * 1000 + def.value;
-      const fullName = `${constName}_${codeName}`;
+      const fullName = assertIdent(`${constName}_${codeName}`, `error code "${codeName}" in domain "${key}"`);
       lines.push(`export const ${fullName} = ${fullCode} as const;`);
-      errorEntries.push(`  [${fullName}]: { code: ${fullName}, message: "${def.message}" },`);
+      errorEntries.push(`  [${fullName}]: { code: ${fullName}, message: ${JSON.stringify(def.message)} },`);
     }
   }
 

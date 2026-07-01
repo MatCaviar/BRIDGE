@@ -41,7 +41,7 @@
   <!-- Verify (gate) -->
   <rect x="670" y="120" width="140" height="56" rx="8" fill="#FFFBEB" stroke="#D97706" stroke-width="1.6"/>
   <text x="740" y="143" text-anchor="middle" class="ttl">Verify</text>
-  <text x="740" y="159" text-anchor="middle" class="sub">validate-config · wire-check</text>
+  <text x="740" y="159" text-anchor="middle" class="sub">validate_config · wire_check</text>
 
   <!-- MCP Server (output artifact) -->
   <rect x="855" y="120" width="130" height="56" rx="8" fill="#F3F4F6" stroke="#6B7280" stroke-width="1.4"/>

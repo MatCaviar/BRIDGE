@@ -21,12 +21,27 @@ const CMD_PATH = "/sdcard/imrpc/cmd.json";
 const RESULT_PATH = "/sdcard/imrpc/result.json";
 
 // ---- dispatch 算法（镜像 MCP server 框架）----
+// 解析 ${var} 键（支持点号嵌套，如 __device__.vin）。${__device__.x} 未解析时 fail-closed（抛错），
+// 绝不把设备上下文标记当字面量发到 wire。
+function resolveVar(vars: Record<string, any>, key: string): any {
+  const segs = key.split(".");
+  let cur: any = vars;
+  for (const seg of segs) {
+    if (cur == null || typeof cur !== "object") {
+      if (key.startsWith("__device__.")) throw new Error("unresolved device variable: ${" + key + "}");
+      return undefined;
+    }
+    cur = cur[seg];
+  }
+  if (cur === undefined && key.startsWith("__device__.")) throw new Error("unresolved device variable: ${" + key + "}");
+  return cur;
+}
 function interpolate(template: any, vars: Record<string, any>): any {
   if (typeof template === "string") {
     // 单独一个 ${var} 占位 → 保留原类型（number 仍是 number），匹配真实 wire/方法签名
-    const single = template.match(/^\$\{(\w+)\}$/);
-    if (single) return vars[single[1]];
-    return template.replace(/\$\{(\w+)\}/g, (_m, k) => (vars[k] === undefined ? "" : String(vars[k])));
+    const single = template.match(/^\$\{([\w.]+)\}$/);
+    if (single) return resolveVar(vars, single[1]);
+    return template.replace(/\$\{([\w.]+)\}/g, (_m, k) => { const v = resolveVar(vars, k); return v === undefined ? "" : String(v); });
   }
   if (Array.isArray(template)) return template.map((v: any) => interpolate(v, vars));
   if (template && typeof template === "object") {
@@ -46,9 +61,38 @@ function applyStringify(arg: any, paths: string[] = []): void {
   }
 }
 function evalExpr(expr: string, vars: Record<string, any>): any {
-  const s = expr.replace(/\$\{(\w+)\}/g, (_m, k) => String(vars[k] ?? 0));
+  const s = expr.replace(/\$\{([\w.]+)\}/g, (_m, k) => String(resolveVar(vars, k) ?? 0));
   if (!/^[-+*/().\s\d]+$/.test(s)) throw new Error("bad expr: " + expr);
   return Function('"use strict"; return (' + s + ");")();
+}
+// 构造顺序写列表（spec.writes 优先；否则退化为单 JSON 写 [arg stringify]）。
+function buildWrites(spec: any, args: Record<string, any>): any[] {
+  if (spec.writes && spec.writes.length > 0) {
+    return spec.writes.map((w: any) => ({ kind: w.kind, value: interpolate(JSON.parse(JSON.stringify(w.value)), args) }));
+  }
+  if (spec.arg === undefined) {
+    throw new Error("dbus spec requires arg (single JSON write) or a non-empty writes[] — neither was provided");
+  }
+  const arg = interpolate(JSON.parse(JSON.stringify(spec.arg)), args);
+  applyStringify(arg, spec.stringify || []);
+  return [{ kind: "json", value: arg }];
+}
+function readOne(result: any, kind: string): any {
+  switch (kind) {
+    case "json": return result.readJSON();
+    case "string": return result.readString();
+    case "int": case "int32": return result.readInt32();
+    case "double": return result.readDouble();
+    case "bool": return result.readBool();
+    default: return result.readJSON();
+  }
+}
+// 读回复：spec.replyParts 存在 → 按序读多段返回数组；否则按 reply 单读。
+function readReply(spec: any, result: any): any {
+  if (spec.replyParts && spec.replyParts.length > 0) {
+    return spec.replyParts.map((r: any) => readOne(result, r.kind));
+  }
+  return readOne(result, spec.reply);
 }
 
 // ---- 同步文件 API（参考 utils/EqualizerConfigStore.ts）----
@@ -110,25 +154,21 @@ class RpcEngine extends BMPage {
 
   private callDbus(spec: any, args: Record<string, any>): Promise<any> {
     return new Promise((resolve, reject) => {
-      const arg = interpolate(JSON.parse(JSON.stringify(spec.arg)), args);
-      applyStringify(arg, spec.stringify || []);
+      const writes = buildWrites(spec, args);
       const ubus = new UBus("dbus");
-      const iface = ubus.createInterface(spec.bus, spec.path, spec.bus + ".interface");
+      const iface = ubus.createInterface(spec.bus, spec.path, spec.interface || (spec.bus + ".interface"));
       const msg = iface.createMethodCallMessage(spec.method);
-      msg.writeString(JSON.stringify(arg));
+      for (const w of writes) {
+        if (w.kind === "json") msg.writeString(JSON.stringify(w.value));
+        else if (w.kind === "string") msg.writeString(typeof w.value === "string" ? w.value : String(w.value));
+        else if (w.kind === "int32") msg.writeInt32(typeof w.value === "number" ? w.value : Number(w.value));
+        else if (w.kind === "double") msg.writeDouble(typeof w.value === "number" ? w.value : Number(w.value));
+        else if (w.kind === "bool") msg.writeBool(!!w.value);
+      }
       iface.sendMethodCallMessage(msg, (err: any, result: any) => {
         if (err) { reject(err); return; }
         try {
-          let data: any;
-          switch (spec.reply) {
-            case "json": data = result.readJSON(); break;
-            case "string": data = result.readString(); break;
-            case "int": data = result.readInt32(); break;
-            case "double": data = result.readDouble(); break;
-            case "bool": data = result.readBool(); break;
-            default: data = result.readJSON();
-          }
-          resolve(data);
+          resolve(readReply(spec, result));
         } catch (e) {
           reject(e);
         } finally {

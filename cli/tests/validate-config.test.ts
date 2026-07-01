@@ -48,6 +48,38 @@ describe("validateConfig", () => {
     expect(r.valid).toBe(false);
     expect(r.errors.join("\n")).toContain("no capabilities");
   });
+  it("invalid: unknown config op is not silently ignored", () => {
+    const config = {
+      read_status: dbusSpec("read"),
+      ghost_status: dbusSpec("ghost"),
+    };
+    const r = validateConfig(config, ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("unknown config op: ghost_status");
+  });
+  it("invalid: dbus templates may only reference declared params", () => {
+    const config = {
+      read_status: {
+        type: "dbus",
+        bus: "b",
+        path: "p",
+        method: "request",
+        arg: { funcName: "read", body: { mode: "${mode}", missing: "${missingParam}" } },
+        reply: "json",
+      },
+    };
+    const r = validateConfig(config, ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("unknown template variable missingParam");
+  });
+  it("invalid: dbus specs must declare bus/path/method/reply", () => {
+    const config = {
+      read_status: { type: "dbus", bus: "", path: "p", method: "request", arg: {}, reply: "json" },
+    };
+    const r = validateConfig(config, ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("dbus.bus must be a non-empty string");
+  });
 });
 
 describe("validateConfig — _deferred allowlist", () => {
@@ -114,9 +146,101 @@ describe("validateConfig — _deferred allowlist", () => {
     expect(r.valid).toBe(false); // launch_app/carinfo_read missing, no valid deferred list
     expect(r.deferred).toEqual([]);
   });
+
+  it("invalid: _deferred may only name known capabilities", () => {
+    const config = {
+      soundstage_read: dbusSpec("ssr"),
+      soundstage_set: dbusSpec("sss"),
+      launch_app: dbusSpec("la"),
+      carinfo_read: dbusSpec("cr"),
+      _deferred: { ghost_capability: "not real" },
+    };
+    const r = validateConfig(config, ANALYSIS_MIXED);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("unknown _deferred capability: ghost_capability");
+  });
 });
+describe("validateConfig — Phase 2 (writes/replyParts/device vars)", () => {
+  const DEV_ANALYSIS = {
+    app: { name: "devapp", domain: "cockpit", framework: "YunOS HDT", entryFile: "src/index.ts", deviceSources: ["vin"] },
+    capabilities: [
+      { id: "get_content", domain: "music", object: "card", action: "get",
+        params: [{ name: "cpId", type: "string" }, { name: "pageNo", type: "number" }],
+        safetyLevel: "readonly", sdkCalls: ["ubus"], sourceRef: "p.ts:g" },
+      { id: "query", domain: "audio", object: "lib", action: "query",
+        params: [], safetyLevel: "readonly", sdkCalls: ["ubus"], sourceRef: "p.ts:q" },
+    ],
+  };
+  const queryOp = { type: "dbus", bus: "m", path: "/m", method: "query", arg: {}, reply: "json" };
+
+  it("valid: positional writes[] with no arg", () => {
+    const r = validateConfig({
+      get_content: { type: "dbus", bus: "m", path: "/m", method: "getCardContent",
+        writes: [{ kind: "string", value: "${cpId}" }, { kind: "int32", value: "${pageNo}" }], reply: "json" },
+      query: queryOp,
+    }, DEV_ANALYSIS);
+    expect(r.valid).toBe(true);
+  });
+
+  it("invalid: writes[] with bad kind", () => {
+    const r = validateConfig({
+      get_content: { type: "dbus", bus: "m", path: "/m", method: "g", writes: [{ kind: "blob", value: "${cpId}" }], reply: "json" },
+      query: queryOp,
+    }, DEV_ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("writes[0].kind");
+  });
+
+  it("valid: replyParts multi-read", () => {
+    const r = validateConfig({
+      get_content: { type: "dbus", bus: "m", path: "/m", method: "g", writes: [{ kind: "string", value: "${cpId}" }], reply: "string", replyParts: [{ kind: "string" }, { kind: "int32" }] },
+      query: queryOp,
+    }, DEV_ANALYSIS);
+    expect(r.valid).toBe(true);
+  });
+
+  it("invalid: replyParts with bad kind", () => {
+    const r = validateConfig({
+      get_content: { type: "dbus", bus: "m", path: "/m", method: "g", writes: [{ kind: "string", value: "${cpId}" }], reply: "json", replyParts: [{ kind: "xml" }] },
+      query: queryOp,
+    }, DEV_ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("replyParts[0].kind");
+  });
+
+  it("valid: ${__device__.vin} declared in app.deviceSources", () => {
+    const r = validateConfig({
+      get_content: { type: "dbus", bus: "m", path: "/m", method: "g", arg: { body: { vin: "${__device__.vin}" } }, reply: "json" },
+      query: queryOp,
+    }, DEV_ANALYSIS);
+    expect(r.valid).toBe(true);
+  });
+
+  it("invalid: ${__device__.token} NOT declared in app.deviceSources (fail-closed at gate)", () => {
+    const r = validateConfig({
+      get_content: { type: "dbus", bus: "m", path: "/m", method: "g", arg: { token: "${__device__.token}" }, reply: "json" },
+      query: queryOp,
+    }, DEV_ANALYSIS);
+    expect(r.valid).toBe(false);
+    expect(r.errors.join("\n")).toContain("undeclared device source");
+  });
+});
+
 describe("sampleArgs", () => {
   it("synthesizes by type, skips optional", () => {
     expect(sampleArgs([{ name: "n", type: "number" }, { name: "s", type: "string" }, { name: "b", type: "boolean" }, { name: "o", type: "string", optional: true }])).toEqual({ n: 1, s: "x", b: true });
+  });
+  it("honors defaultValue over synthetic", () => {
+    expect(sampleArgs([{ name: "lvl", type: "number", defaultValue: 7 }])).toEqual({ lvl: 7 });
+  });
+  it("array types → empty array (not the legacy 'x' string)", () => {
+    expect(sampleArgs([{ name: "ids", type: "string[]" }, { name: "items", type: "Array<{x:number}>" }])).toEqual({ ids: [], items: [] });
+  });
+  it("object/named-model types → empty object", () => {
+    expect(sampleArgs([{ name: "info", type: "EqualizerItemModel" }])).toEqual({ info: {} });
+  });
+  it("named enum resolves to first wire value (numeric for number enums)", () => {
+    const enums = { Gear: { values: ["P", "R"], type: "string" }, Mode: { values: ["0", "9"], type: "number" } };
+    expect(sampleArgs([{ name: "g", type: "Gear" }, { name: "m", type: "Mode" }], enums)).toEqual({ g: "P", m: 0 });
   });
 });

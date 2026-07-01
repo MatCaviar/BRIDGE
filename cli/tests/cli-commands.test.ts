@@ -13,9 +13,17 @@ function tmpDir(): string {
   return resolve(TMP_ROOT, `cli-${randomUUID().slice(0, 8)}`);
 }
 
+function commandFile(cmd: string): string {
+  return process.platform === "win32" && (cmd === "npm" || cmd === "npx") ? (process.env.ComSpec ?? "cmd.exe") : cmd;
+}
+
+function commandArgs(cmd: string, args: string[]): string[] {
+  return process.platform === "win32" && (cmd === "npm" || cmd === "npx") ? ["/d", "/s", "/c", cmd, ...args] : args;
+}
+
 function run(cmd: string, args: string[], opts?: { cwd?: string; timeout?: number }): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolvePromise) => {
-    execFile(cmd, args, { cwd: opts?.cwd, shell: true, maxBuffer: 10 * 1024 * 1024, timeout: opts?.timeout ?? 60_000 }, (error, stdout, stderr) => {
+    execFile(commandFile(cmd), commandArgs(cmd, args), { cwd: opts?.cwd, maxBuffer: 10 * 1024 * 1024, timeout: opts?.timeout ?? 60_000 }, (error, stdout, stderr) => {
       resolvePromise({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: error ? 1 : 0 });
     });
   });

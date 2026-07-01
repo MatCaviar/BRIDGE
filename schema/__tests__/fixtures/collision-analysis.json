@@ -12,10 +12,19 @@
       "object": "speed",
       "action": "read",
       "params": [],
-      "returns": { "type": "SpeedResult", "fields": ["success", "value"] },
+      "returns": {
+        "type": "SpeedResult",
+        "fields": [
+          "success",
+          "value"
+        ]
+      },
       "safetyLevel": "readonly",
-      "sdkCalls": ["@system.vehicle"],
-      "sourceRef": "src/services/vehicle.ts:readSpeed"
+      "sdkCalls": [
+        "@system.vehicle"
+      ],
+      "sourceRef": "src/services/vehicle.ts:readSpeed",
+      "description": "Read speed"
     },
     {
       "id": "read_engine_rpm",
@@ -23,10 +32,19 @@
       "object": "rpm",
       "action": "read",
       "params": [],
-      "returns": { "type": "RpmResult", "fields": ["success", "value"] },
+      "returns": {
+        "type": "RpmResult",
+        "fields": [
+          "success",
+          "value"
+        ]
+      },
       "safetyLevel": "readonly",
-      "sdkCalls": ["@system.vehicle"],
-      "sourceRef": "src/services/vehicle.ts:readRpm"
+      "sdkCalls": [
+        "@system.vehicle"
+      ],
+      "sourceRef": "src/services/vehicle.ts:readRpm",
+      "description": "Read rpm"
     },
     {
       "id": "read_fuel_level",
@@ -34,32 +52,69 @@
       "object": "fuel",
       "action": "read",
       "params": [],
-      "returns": { "type": "FuelResult", "fields": ["success", "percentage"] },
+      "returns": {
+        "type": "FuelResult",
+        "fields": [
+          "success",
+          "percentage"
+        ]
+      },
       "safetyLevel": "readonly",
-      "sdkCalls": ["@system.vehicle"],
-      "sourceRef": "src/services/vehicle.ts:readFuel"
+      "sdkCalls": [
+        "@system.vehicle"
+      ],
+      "sourceRef": "src/services/vehicle.ts:readFuel",
+      "description": "Read fuel"
     },
     {
       "id": "set_light_front",
       "domain": "light",
       "object": "light",
       "action": "set_front",
-      "params": [{ "name": "brightness", "type": "number" }],
-      "returns": { "type": "LightResult", "fields": ["success", "brightness"] },
+      "params": [
+        {
+          "name": "brightness",
+          "type": "number"
+        }
+      ],
+      "returns": {
+        "type": "LightResult",
+        "fields": [
+          "success",
+          "brightness"
+        ]
+      },
       "safetyLevel": "normal",
-      "sdkCalls": ["@system.light"],
-      "sourceRef": "src/services/light.ts:setFront"
+      "sdkCalls": [
+        "@system.light"
+      ],
+      "sourceRef": "src/services/light.ts:setFront",
+      "description": "Set front for light"
     },
     {
       "id": "set_light_rear",
       "domain": "light",
       "object": "light",
       "action": "set_rear",
-      "params": [{ "name": "brightness", "type": "number" }],
-      "returns": { "type": "LightResult", "fields": ["success", "brightness"] },
+      "params": [
+        {
+          "name": "brightness",
+          "type": "number"
+        }
+      ],
+      "returns": {
+        "type": "LightResult",
+        "fields": [
+          "success",
+          "brightness"
+        ]
+      },
       "safetyLevel": "normal",
-      "sdkCalls": ["@system.light"],
-      "sourceRef": "src/services/light.ts:setRear"
+      "sdkCalls": [
+        "@system.light"
+      ],
+      "sourceRef": "src/services/light.ts:setRear",
+      "description": "Set rear for light"
     }
   ]
 }

@@ -1,7 +1,15 @@
 import { execFile } from "child_process";
-import { resolve, basename } from "path";
+import { resolve } from "path";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
+import { readState, writeState, createInitialState, updateStep, appNameFromProjectDir } from "../state/manager.js";
+
+function commandFile(command: "npx"): string {
+  return process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : command;
+}
+
+function commandArgs(command: "npx", args: string[]): string[] {
+  return process.platform === "win32" ? ["/d", "/s", "/c", command, ...args] : args;
+}
 
 export interface TestResults {
   readonly passed: number;
@@ -20,9 +28,9 @@ export async function runTests(dir: string): Promise<TestResults> {
 
   return new Promise((resolvePromise, reject) => {
     execFile(
-      "npx",
-      ["vitest", "run", "--reporter=json"],
-      { cwd: resolvedDir, shell: true, maxBuffer: 10 * 1024 * 1024 },
+      commandFile("npx"),
+      commandArgs("npx", ["vitest", "run", "--reporter=json"]),
+      { cwd: resolvedDir, maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
         const output = stdout || stderr;
         if (!output) {
@@ -76,7 +84,7 @@ export async function testCommand(args: string[]): Promise<void> {
     throw new Error("Directory not found: " + resolvedDir);
   }
 
-  const appName = basename(resolvedDir);
+  const appName = appNameFromProjectDir(resolvedDir);
   let state = readState(appName) ?? createInitialState(appName, resolvedDir);
   try {
     state = updateStep(state, "test", { status: "in_progress" });
