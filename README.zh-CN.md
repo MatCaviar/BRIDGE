@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎛️ CodeAgent @ MCP
+# 🎛️ 代码智能体套件 BRIDGE
 
 <img src="assets/bridge.svg" alt="BRIDGE" height="76">
 
@@ -19,15 +19,15 @@
 
 ---
 
-一款 Claude Code / Codex 插件——**BRIDGE**（*Building Real-device Interfaces via Deterministic Gated Execution*，基于确定性门控执行构建真机接口）：由**代理驱动的 skill** 承载方法论，**确定性** Node CLI 承担繁重计算，宿主代理驱动每一步。**插件内部不含任何模型调用**——所有判断皆由宿主代理提供，每个生成产物皆逐字节可复现。
+一款 Claude Code / Codex 插件——**BRIDGE**（*Building Real-device Interfaces via Deterministic Gated Execution*，基于确定性门控执行构建真机接口）：由**智能体驱动的 skill** 承载方法论，**确定性** Node CLI 承担繁重计算，宿主智能体驱动每一步。**插件内部不含任何模型调用**——所有判断皆由宿主智能体提供，每个生成产物皆逐字节可复现。
 
 ## 🧠 工作原理
 
-给定应用源码与 manifest，BRIDGE 产出一套 **MCP 套件**：面向代理的函数 schema、可运行的 MCP Server、RPC wire 契约、车端桥接产物与验证证据。上游代理可调用这些工具**真正驱动设备**——EQ、声场、Beosonic、卡拉 OK、车辆信号等——而非桩式 mock。函数 schema 接口面是供上游模型理解的首要产物；套件的其余部分使这些工具可执行、可审计。
+给定应用源码与 manifest，BRIDGE 产出一套 **MCP 套件**：面向智能体的函数 schema、可运行的 MCP Server、RPC wire 契约、车端桥接产物与验证证据。上游智能体可调用这些工具**真正驱动设备**——EQ、声场、Beosonic、卡拉 OK、车辆信号等——而非桩式 mock。函数 schema 接口面是供上游模型理解的首要产物；套件的其余部分使这些工具可执行、可审计。
 
 下方 pipeline 给出各阶段；其后的图展示生成期各角色的分工。
 
-**Pipeline**——每一步均为确定性 CLI 子命令或代理 skill：
+**Pipeline**——每一步均为确定性 CLI 子命令或智能体 skill：
 
 ```
 validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
@@ -38,7 +38,7 @@ validate › analyze › [curate] › scaffold › generate › test › build �
 
 > 两道闸门（`validate_config` + `wire_check`）是 `generate` 的内联子步骤，二者均通过后 pipeline 才会推进（失败即重试）。`[curate]` 为可选。
 
-**生成过程。** 分工：宿主代理提供判断（抽取、wire 编写），CLI 负责确定性执行（scaffold、闸门）。每个能力映射到一个工具定义——`name ← id`、`inputSchema ← params`、`annotations ← safety`。
+**生成过程。** 分工：宿主智能体提供判断（抽取、wire 编写），CLI 负责确定性执行（scaffold、闸门）。每个能力映射到一个工具定义——`name ← id`、`inputSchema ← params`、`annotations ← safety`。
 
 ```mermaid
 sequenceDiagram
@@ -62,12 +62,12 @@ sequenceDiagram
     Tool-->>Agent: 注入 N 个工具 schema
 ```
 
-**运行期桥接。** 构建完成后，一次工具调用从上游代理经生成出的 server 与确定性桥接流向真实设备——传输层可替换（`adb` / file / socket），wire 纯由 `rpc/config.json` 构造，故桥接不含任何 app 字面量。
+**运行期桥接。** 构建完成后，一次工具调用从上游智能体经生成出的 server 与确定性桥接流向真实设备——传输层可替换（`adb` / file / socket），wire 纯由 `rpc/config.json` 构造，故桥接不含任何 app 字面量。
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Agent as ⚛️ 上游代理
+    participant Agent as ⚛️ 上游智能体
     participant Server as 📡 MCP 服务器
     participant Bridge as 🔌 RPC 桥
     participant Engine as ⚙️ 车端引擎
@@ -90,12 +90,12 @@ sequenceDiagram
 
 | 读者 | 交付物 | 位置 | 为何重要 |
 |---|---|---|---|
-| **上游代理** | 函数 schema 接口面 | `schema_preview` 产出的 `tools-schema.json`，以及生成 server 内的 `src/tools/schema.ts` | 注入 Claude / Codex 的精确工具名、描述、输入 schema、安全 annotation 与可执行性标记。 |
+| **上游智能体** | 函数 schema 接口面 | `schema_preview` 产出的 `tools-schema.json`，以及生成 server 内的 `src/tools/schema.ts` | 注入 Claude / Codex 的精确工具名、描述、输入 schema、安全 annotation 与可执行性标记。 |
 | **MCP 宿主** | 可运行的 MCP Server | 生成 server 目录、构建后的 `dist/index.js` 与 `conf/config.yaml` | 托管工具的 stdio 服务器。 |
 | **应用 / 设备集成方** | RPC wire 契约 | `rpc/config.json`、`src/rpc/*` 与 `car-side/` | 从每次工具调用到真实 app / 设备操作的可追溯桥接。 |
 | **评审者** | 验证证据 | `.mcp-pipeline/<app>/state.json`、`.mcp-pipeline/test-results.json`、闸门输出、构建输出、verify 输出 | 呈现 schema 合法性、wire 覆盖率、可构建性、工具发现与工具调用响应性的审计轨迹。 |
 
-可直接由 analysis（及可选的 wire 状态）产出面向上游代理的 schema：
+可直接由 analysis（及可选的 wire 状态）产出面向上游智能体的 schema：
 
 ```bash
 mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-schema.json
@@ -150,11 +150,11 @@ mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-s
 mcp-pipeline validate <analysis.json>
 mcp-pipeline scaffold <analysis.json> --output <server>
 
-# 宿主代理判断产物 + 确定性闸门
+# 宿主智能体判断产物 + 确定性闸门
 mcp-pipeline validate_config <server>/rpc/config.json --analysis <analysis.json>
 mcp-pipeline wire_check <server>/rpc/config.json --proxy <path/to/Proxy.ts>
 
-# 上游代理 schema 与运行期证据
+# 上游智能体 schema 与运行期证据
 mcp-pipeline schema_preview <analysis.json> <server>/rpc/config.json --output <server>/tools-schema.json
 mcp-pipeline test --dir <server>
 mcp-pipeline build --dir <server>
@@ -165,13 +165,13 @@ mcp-pipeline verify --dir <server>
 
 ## 🧩 能力筛选
 
-多数 app 暴露的能力远多于你欲 MCP 化的数目。安装并完成首轮 `analyze` 后，**curate** 允许你选择子集——用户的取舍优先级最高。
+多数 app 暴露的能力远多于实际需要 MCP 化的数目。安装并完成首轮 `analyze` 后，可通过 **curate** 选定子集——用户的取舍优先级最高。
 
 ```bash
 # 1. 确定性地枚举候选（不写任何文件）
 mcp-pipeline curate <analysis.json> [--prd <prd.md>]
 
-# 2. /mcp-curate 提议子集，你拍板 → 写 selection.json
+# 2. /mcp-curate 提议子集，由用户拍板 → 写 selection.json
 # 3. scaffold 仅生成被选中的能力
 mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<app>/selection.json
 ```

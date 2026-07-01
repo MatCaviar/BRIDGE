@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎛️ CodeAgent @ MCP
+# 🎛️ Code Agent Suite BRIDGE
 
 <img src="assets/bridge.svg" alt="BRIDGE" height="76">
 
