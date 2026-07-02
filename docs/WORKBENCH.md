@@ -9,7 +9,7 @@ npm install
 npm run workbench:dev
 ```
 
-The API binds to `127.0.0.1:43140` and Vite to `127.0.0.1:43141`. Neither command opens a browser. Set `CODEX_EXECUTABLE` when Codex is not on `PATH`. Use `npm run workbench:build` for production assets.
+The command first builds the shared contracts, then binds the API to `127.0.0.1:43140` and Vite to `127.0.0.1:43141`. It does not open a browser. Set `CODEX_EXECUTABLE` when Codex is not on `PATH`. Use `npm run workbench:build` for production assets.
 
 ## Workflow
 

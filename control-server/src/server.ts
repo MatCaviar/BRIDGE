@@ -9,8 +9,11 @@ export function createWorkbenchServer(options: { readonly config?: ControlServer
   return createServer((request, response) => void router.handle(request, response));
 }
 
-const isEntry = process.argv[1] && new URL(import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/, (value) => value.slice(1)).replaceAll("/", "\\").toLowerCase() === process.argv[1].toLowerCase();
-if (isEntry) {
+// Keep direct `tsx .../server.ts` development launches working. The normal
+// package entry is start.ts, while imports from tests and libraries stay inert.
+if (process.argv.some((argument) => /(?:^|[\\/])server\.ts$/i.test(argument))) {
   const config = createConfig();
-  createWorkbenchServer({ config }).listen(config.port, config.host, () => process.stdout.write(`BRIDGE Workbench API http://${config.host}:${config.port}\n`));
+  createWorkbenchServer({ config }).listen(config.port, config.host, () => {
+    process.stdout.write(`BRIDGE Workbench API http://${config.host}:${config.port}\n`);
+  });
 }
