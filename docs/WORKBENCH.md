@@ -21,7 +21,7 @@ The command first builds the shared contracts, then binds the API to `127.0.0.1:
 
 ## Workflow
 
-1. Import a source directory and target MCP JSON Schema into an isolated workspace.
+1. Import a source directory and target MCP schema into an isolated workspace. The importer accepts a normal JSON object, a JSON array of tool descriptors, or legacy files containing adjacent top-level JSON tool objects.
 2. Run Analyze, which invokes Codex with `$mcp-analyze` in workspace-write sandbox mode.
 3. Review capabilities and save a Curate selection.
 4. Run Scaffold, Generate, validation gates, tests, build, registration, verification, and schema preview.
@@ -45,10 +45,14 @@ The Aether field uses Canvas 2D, capped at 64 particles, about 45 FPS, and DPR 1
 
 Both modes communicate with a real MCP stdio process. Mock mode targets generated mock transports. Real mode is visually distinct and requires a fresh typed project-name confirmation per call; it does not bypass generated-server safety checks.
 
+Android projects are scanned from Gradle, manifest, Kotlin, Java, AIDL, XML, and bundled SDK-reference files. Analyze only promotes interfaces backed by source evidence. A target schema entry that exists only in documentation is displayed as a coverage gap. The current real transport generator targets the BRIDGE/YunOS RPC runtime; an Android AIDL or vehicle-SDK capability remains deferred until the imported project supplies a compatible bridge adapter. Mock mode can still exercise the generated MCP contract without claiming that it controls a vehicle.
+
 ## Troubleshooting
 
 - API offline: check port 43140 and run `npm run workbench:api`.
 - Analyze/Generate cannot start: configure `CODEX_EXECUTABLE`.
+- Analyze reports a usage limit: the UI now includes the useful process error; wait for the stated reset time and retry the stage.
+- Android target remains unmatched: confirm that the requested method exists in Kotlin/Java/AIDL source, not only in a reference Markdown file, and provide a bridge adapter for real transport.
 - Scaffold blocked: save a non-empty Curate selection.
 - Build blocked: resolve validation and wire-check findings.
 - MCP start fails: build the generated server and verify `dist/index.js`.

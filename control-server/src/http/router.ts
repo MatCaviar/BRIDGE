@@ -99,7 +99,7 @@ export class WorkbenchRouter {
       if (request.method === "POST" && stageMatch) {
         const confirmation = confirmationSchema.parse(await readJson(request, this.config.maxRequestBytes));
         const operation = stageMatch[1] as Parameters<PipelineRunner["runStage"]>[1];
-        const result = await this.pipeline(project).runStage(this.pipelineWorkspace(project), operation, confirmation);
+        const result = await this.pipeline(project).runStage(await this.pipelineWorkspace(project), operation, confirmation);
         return send(response, 200, result);
       }
       if (tail === "mcp" && request.method === "GET") return send(response, 200, this.mcp.get(project.id) ?? { state: "stopped", tools: [], calls: [] });
@@ -142,11 +142,17 @@ export class WorkbenchRouter {
     return runner;
   }
 
-  private pipelineWorkspace(project: ProjectSummary): PipelineWorkspace {
+  private async pipelineWorkspace(project: ProjectSummary): Promise<PipelineWorkspace> {
     const app = safeProjectId(project.name);
     const state = join(project.root, ".mcp-pipeline", app);
     const generated = join(project.root, `mcp-${app}`);
-    return { projectId: project.id, projectName: project.name, root: project.root, sourceRoot: join(project.root, "source"), targetSchemaPath: project.targetSchemaPath, analysisPath: join(state, "analysis.json"), selectionPath: join(state, "selection.json"), generatedRoot: generated, rpcConfigPath: join(generated, "rpc", "config.json"), proxyPaths: [join(project.root, "source", "proxy.ts")] };
+    const sourceRoot = join(project.root, "source");
+    const scan = await scanProject(sourceRoot);
+    const proxyPaths = scan.nodes
+      .filter((node) => node.kind === "file" && /(?:proxy|service|client|controller|manager|\.aidl$)/i.test(node.path) && /\.(?:ts|tsx|js|jsx|kt|java|aidl)$/i.test(node.path))
+      .slice(0, 200)
+      .map((node) => join(sourceRoot, node.path));
+    return { projectId: project.id, projectName: project.name, root: project.root, sourceRoot, targetSchemaPath: project.targetSchemaPath, analysisPath: join(state, "analysis.json"), selectionPath: join(state, "selection.json"), generatedRoot: generated, rpcConfigPath: join(generated, "rpc", "config.json"), proxyPaths };
   }
 
   private streamEvents(request: IncomingMessage, response: ServerResponse, url: URL): void {

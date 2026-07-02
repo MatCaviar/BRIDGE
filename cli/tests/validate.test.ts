@@ -99,6 +99,11 @@ describe("validateAnalysis", () => {
     expect(result.valid).toBe(false);
   });
 
+  it("accepts Android interface analysis", () => {
+    const input = { ...VALID_ANALYSIS, app: { ...VALID_ANALYSIS.app, framework: "Android", entryFile: "app/src/main/AndroidManifest.xml" } };
+    expect(validateAnalysis(input).valid).toBe(true);
+  });
+
   it("returns invalid when required capability fields are missing", () => {
     const input = {
       ...VALID_ANALYSIS,

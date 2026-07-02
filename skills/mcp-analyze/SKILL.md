@@ -1,6 +1,6 @@
 ---
 name: mcp-analyze
-description: Use when given a YunOS HDT app directory and analysis.json (its interface surface — capabilities, params, returns, safety levels, error codes) must be produced, before scaffold/generate. This is the input every later step depends on.
+description: Use when given a YunOS HDT or Android app directory and analysis.json (its interface surface — capabilities, params, returns, safety levels, error codes) must be produced, before scaffold/generate. This is the input every later step depends on.
 ---
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
@@ -9,7 +9,7 @@ description: Use when given a YunOS HDT app directory and analysis.json (its int
 
 # MCP Analyze
 
-Analyze the specified YunOS HDT application and produce a structured `analysis.json` that captures its interface surface — capabilities, parameters, returns, safety levels, and error codes.
+Analyze the specified YunOS HDT or Android application and produce a structured `analysis.json` that captures its interface surface — capabilities, parameters, returns, safety levels, and error codes. Detect the platform from source evidence; never force an Android Gradle/AIDL project into YunOS assumptions.
 
 ## 判断标准
 
@@ -39,6 +39,8 @@ Read these files to understand the app:
 3. **Service files**: Look in `src/services/`, `src/api/`, or equivalent for SDK interaction code.
 4. **Type definitions**: Look in `src/types/`, `src/models/`, or inline types for enums and interfaces.
 
+For Android projects, also inspect `settings.gradle(.kts)`, module `build.gradle(.kts)`, `AndroidManifest.xml`, Kotlin/Java service and repository classes, `.aidl` interfaces, and bundled SDK reference Markdown. Treat AIDL methods, exported bound-service client methods, and source-backed CarControl `IProperty` wrappers as the interface surface. SDK reference documentation alone is evidence that an API exists in a dependency, not evidence that the application has implemented a callable capability: if the target schema requests such an API but no source wrapper exists, report it as a target gap and do not fabricate a capability.
+
 ### Step 2: Identify Capabilities
 
 For each callable function in the service layer that interacts with YunOS SDKs:
@@ -52,7 +54,7 @@ For each callable function in the service layer that interacts with YunOS SDKs:
    - `p_gear_required` — requires P-gear (e.g. `capture_pet`, `take_photo`)
    - `p_gear_and_confirm` — requires P-gear + user confirmation (e.g. `factory_reset`, `delete_data`)
    - `p_gear_and_network` — requires P-gear + active WiFi hotspot (e.g. `share_wifi_qr`, `start_hotspot`)
-5. **Extract SDK calls**: Identify `@system.*` or `@yunos.*` module imports used by the function.
+5. **Extract SDK calls**: Identify `@system.*` or `@yunos.*` module imports used by the function. On Android, record the concrete AIDL interface, Android service/client class, or vehicle SDK class used by the source-backed method.
 6. **Record source reference**: `file:relative_method` format.
 7. **Author descriptions**: For each capability and parameter, write a dense `description` that an upstream agent can act on WITHOUT reading the source. Extract everything from the app code:
    - **capability.description** — what it does + the target object; for each parameter its semantics, type, and **value range** (e.g. `0–40`, `0–100`); when a parameter is an enum, list the **`value=meaning`** pairs by reading the enum's member→value mapping from the source (e.g. `ts/interface/*.ts`); any cross-tool precondition (e.g. "enable the master toggle first") and unsupported cases or units.
@@ -101,7 +103,7 @@ The output must conform to this structure (validated by `analysis.schema.json`):
   "app": {
     "name": "string — kebab-case app identifier",
     "domain": "string — YunOS domain",
-    "framework": "YunOS HDT",
+    "framework": "YunOS HDT | Android",
     "entryFile": "string — relative path to entry TS file",
     "pages": ["string"],
     "permissions": ["string"],
@@ -161,5 +163,5 @@ Before completing, verify:
 - [ ] Structured/array returns use TypedField (`{name,type,items?,properties?}`) so tools chain via `outputSchema`
 - [ ] Error codes have unique full codes (prefix * 1000 + suffix)
 - [ ] The output passes `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" validate` with zero errors
-- [ ] `framework` is always `"YunOS HDT"`
+- [ ] `framework` is `"YunOS HDT"` or `"Android"` according to source evidence
 - [ ] No internal implementation details — only interface surface

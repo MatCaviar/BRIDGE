@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://im.alibaba-inc.com/schemas/analysis.schema.json",
   "title": "MCP CodeAgent Analysis",
-  "description": "Interface-level analysis of a YunOS HDT application, produced by /mcp-analyze. Captures capabilities, params, returns, safety levels, and error codes — NOT internal implementation details.",
+  "description": "Interface-level analysis of a YunOS HDT or Android application, produced by /mcp-analyze. Captures capabilities, params, returns, safety levels, and error codes — NOT internal implementation details.",
   "type": "object",
   "required": ["app", "capabilities"],
   "additionalProperties": false,
@@ -25,13 +25,13 @@
         },
         "framework": {
           "type": "string",
-          "enum": ["YunOS HDT"],
-          "description": "Application framework. V1 only supports YunOS HDT."
+          "enum": ["YunOS HDT", "Android"],
+          "description": "Application framework detected from the imported source."
         },
         "entryFile": {
           "type": "string",
           "minLength": 1,
-          "description": "Relative path to the main TypeScript entry file."
+          "description": "Relative path to the main TypeScript, JavaScript, Kotlin, Java, or manifest entry file."
         },
         "pages": {
           "type": "array",

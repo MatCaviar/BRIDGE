@@ -26,6 +26,7 @@ export interface StageConfirmation { readonly confirmed?: boolean; readonly type
 export interface ProcessExecutor { run(spec: CommandSpec, signal?: AbortSignal, onLog?: (stream: "stdout" | "stderr", text: string) => void): Promise<ProcessResult>; }
 
 const GATES: readonly PipelineStageId[] = ["validate_config", "wire_check", "test"];
+const ANSI_ESCAPE = /\u001B(?:[@-_]|\[[0-?]*[ -/]*[@-~])/g;
 const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
   curate: ["analyze"], scaffold: ["curate"], generate: ["scaffold"],
   validate_config: ["generate"], wire_check: ["generate"], test: ["validate_config", "wire_check"],
@@ -70,7 +71,7 @@ export class PipelineRunner {
       const passed = result.exitCode === 0 && !result.timedOut && !result.aborted;
       this.#states.set(stage, passed ? "passed" : "failed");
       this.events.publish(workspace.projectId, "stage", { stage, status: passed ? "passed" : "failed", exitCode: result.exitCode, timedOut: result.timedOut, aborted: result.aborted });
-      if (!passed) throw new Error(`Stage ${stage} failed`);
+      if (!passed) throw new Error(stageFailure(stage, result));
       return result;
     } finally {
       release();
@@ -85,7 +86,7 @@ export class PipelineRunner {
   }
 
   private commandFor(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">): CommandSpec {
-    if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} against target schema ${workspace.targetSchemaPath}. Write machine-readable analysis to ${workspace.analysisPath}. Do not edit unrelated files or enable network access.`);
+    if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} against target schema ${workspace.targetSchemaPath}. Detect YunOS versus Android from source evidence. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Emit only source-backed callable capabilities; report target-only APIs as gaps rather than inventing implementations. Write machine-readable analysis to ${workspace.analysisPath}. Do not edit unrelated files or enable network access.`);
     if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot} and ${workspace.analysisPath}. Write ${workspace.rpcConfigPath}. Do not edit unrelated files or enable network access.`);
     if (operation === "deploy") throw new Error("Deploy adapter is not configured");
 
@@ -106,6 +107,23 @@ export class PipelineRunner {
   }
 
   private agentCommand(workspace: PipelineWorkspace, operation: "analyze" | "generate", prompt: string): CommandSpec {
-    return { executable: this.config.codexExecutable, args: ["exec", "--sandbox", "workspace-write", "--cd", workspace.root, prompt], cwd: workspace.root, operation, projectId: workspace.projectId };
+    return { executable: this.config.codexExecutable, args: ["exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ephemeral", "--color", "never", "--cd", workspace.root, prompt], cwd: workspace.root, operation, projectId: workspace.projectId };
   }
+}
+
+function stageFailure(stage: PipelineStageId, result: ProcessResult): string {
+  const reason = result.aborted
+    ? "aborted"
+    : result.timedOut
+      ? "timed out"
+      : `exited with code ${result.exitCode ?? "unknown"}`;
+  const output = (result.stderr.trim() || result.stdout.trim())
+    .replace(ANSI_ESCAPE, "")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .slice(-12)
+    .join("\n")
+    .slice(-4000);
+  const truncation = result.truncated ? " (log truncated)" : "";
+  return `Stage ${stage} ${reason}${truncation}${output ? `:\n${output}` : ""}`;
 }

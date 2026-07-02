@@ -1,22 +1,32 @@
 {
   "name": "im-mcp-codeagent",
-  "version": "0.1.8",
-  "description": "Auto-generate controllable MCP Servers from YunOS HDT apps (Claude Code + Codex).",
-  "author": { "name": "Tongji University & IM" },
+  "version": "0.1.8+codex.20260702123657",
+  "description": "Generate auditable MCP Servers from YunOS HDT and supported Android apps (Claude Code + Codex).",
+  "author": {
+    "name": "Tongji University & IM"
+  },
   "homepage": "https://github.com/MatCaviar/im-mcp-codeagent",
   "repository": "https://github.com/MatCaviar/im-mcp-codeagent",
   "license": "MIT",
-  "keywords": ["yunos", "automotive", "mcp", "codex", "rpc-bridge"],
+  "keywords": [
+    "yunos",
+    "automotive",
+    "mcp",
+    "codex",
+    "rpc-bridge"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "CodeAgent @ MCP",
-    "shortDescription": "Auto-generate controllable MCP Servers from YunOS HDT apps.",
-    "longDescription": "Scaffolds an MCP Server from a YunOS HDT app manifest, generates an adb-driven rpc-bridge, and wires a car-side RpcEngine so Claude Code and Codex can drive the device.",
+    "shortDescription": "Generate MCP Servers from YunOS HDT and Android apps.",
+    "longDescription": "Imports application source, analyzes source-backed interfaces, scaffolds an MCP Server, and visualizes the gated bridge from target schema to runtime tools.",
     "developerName": "Tongji University & IM",
     "category": "Developer",
-    "capabilities": ["Write"],
+    "capabilities": [
+      "Write"
+    ],
     "defaultPrompt": [
-      "Scaffold an MCP server from a YunOS HDT app manifest.",
+      "Scaffold an MCP server from a YunOS HDT or Android app source tree.",
       "Generate the rpc-bridge and car-side RpcEngine wiring."
     ]
   }

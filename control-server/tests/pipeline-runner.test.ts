@@ -8,9 +8,10 @@ import type { CommandSpec, ProcessResult } from "../src/pipeline/process-runner.
 class FakeProcessRunner {
   readonly calls: CommandSpec[] = [];
   nextExitCode = 0;
+  stderr = "";
   async run(spec: CommandSpec): Promise<ProcessResult> {
     this.calls.push(spec);
-    return { exitCode: this.nextExitCode, signal: null, stdout: "ok", stderr: "", durationMs: 1, timedOut: false, aborted: false, truncated: false };
+    return { exitCode: this.nextExitCode, signal: null, stdout: "ok", stderr: this.stderr, durationMs: 1, timedOut: false, aborted: false, truncated: false };
   }
 }
 
@@ -37,6 +38,7 @@ describe("PipelineRunner", () => {
     expect(analyze.args.join(" ")).toContain(workspace.sourceRoot);
     expect(analyze.args.join(" ")).toContain(workspace.targetSchemaPath);
     expect(analyze.args.join(" ")).toContain(workspace.analysisPath);
+    expect(analyze.args).toEqual(expect.arrayContaining(["--skip-git-repo-check", "--ephemeral", "--color", "never"]));
 
     runner.markPassed("scaffold");
     await runner.runStage(workspace, "generate", { confirmed: true });
@@ -60,5 +62,16 @@ describe("PipelineRunner", () => {
     await expect(runner.runStage(workspace, "deploy", { typedConfirmation: "demo" })).rejects.toThrow(/blocked/i);
     expect(() => runner.assertRealMcpReady()).toThrow(/blocked/i);
     expect(fake.calls).toHaveLength(0);
+  });
+
+  it("returns the useful tail of failed process output", async () => {
+    const { fake, runner } = createRunner();
+    fake.nextExitCode = 1;
+    fake.stderr = "transport retry\nYou've hit your usage limit; try again at 11:00 PM.";
+
+    await expect(runner.runStage(workspace, "analyze")).rejects.toThrow(
+      /usage limit; try again at 11:00 PM/,
+    );
+    expect(runner.status("analyze")).toBe("failed");
   });
 });

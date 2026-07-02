@@ -103,6 +103,14 @@ export interface ToolProjection {
   readonly executable: boolean;
 }
 
+export interface TargetProjection {
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: Record<string, unknown>;
+  readonly matchedCapabilityIds: readonly string[];
+  readonly executable: boolean;
+}
+
 export interface RpcProjection {
   readonly operation: string;
   readonly type: "dbus" | "native" | "deferred" | "unknown";

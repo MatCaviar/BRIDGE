@@ -20,4 +20,17 @@ describe("scanProject", () => {
     expect(result.nodes.some((node) => node.label === "readStatus" && node.symbolKind === "function")).toBe(true);
     expect(result.nodes.some((node) => node.path.includes("node_modules"))).toBe(false);
   });
+
+  it("discovers Kotlin classes/functions and AIDL interfaces", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bridge-android-scan-"));
+    roots.push(root);
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "src", "LightController.kt"), "class LightController {\n  fun turnOnLight(): Boolean = true\n  override fun closeLight() {}\n}");
+    await writeFile(join(root, "src", "ILightService.aidl"), "interface ILightService {\n  boolean setReadingLight(in String state);\n}");
+    const result = await scanProject(root);
+    expect(result.nodes.some((node) => node.label === "LightController" && node.symbolKind === "class")).toBe(true);
+    expect(result.nodes.some((node) => node.label === "turnOnLight" && node.symbolKind === "method")).toBe(true);
+    expect(result.nodes.some((node) => node.label === "ILightService" && node.symbolKind === "class")).toBe(true);
+    expect(result.nodes.some((node) => node.label === "setReadingLight" && node.symbolKind === "method")).toBe(true);
+  });
 });

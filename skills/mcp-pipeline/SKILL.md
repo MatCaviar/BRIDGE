@@ -1,6 +1,6 @@
 ---
 name: mcp-pipeline
-description: Use when turning a YunOS HDT app into an MCP suite for a host codeagent: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence.
+description: "Use when turning a YunOS HDT or supported Android app into an MCP suite for a host codeagent: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence."
 ---
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
@@ -9,7 +9,7 @@ description: Use when turning a YunOS HDT app into an MCP suite for a host codea
 
 # MCP Pipeline
 
-Orchestrate the end-to-end pipeline that turns a YunOS HDT app into an **MCP suite** for Claude Code / Codex: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence. 用 `schema_preview <analysis.json> [<rpc/config.json>] --output tools-schema.json` 输出可注入上游 agent 的 schema 预览——这是上游模型理解工具的首要产物。
+Orchestrate the end-to-end pipeline that turns a YunOS HDT or supported Android app into an **MCP suite** for Claude Code / Codex: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence. 用 `schema_preview <analysis.json> [<rpc/config.json>] --output tools-schema.json` 输出可注入上游 agent 的 schema 预览——这是上游模型理解工具的首要产物。
 
 ## 你的角色：协作者，不是按钮执行者
 

@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import type { Capability, McpCallRecord, McpTool, ProjectSummary, ProvenanceEdge, RpcProjection, SourceNode, ToolProjection, WorkbenchEvent } from "@bridge/workbench-contracts";
+import type { Capability, McpCallRecord, McpTool, ProjectSummary, ProvenanceEdge, RpcProjection, SourceNode, TargetProjection, ToolProjection, WorkbenchEvent } from "@bridge/workbench-contracts";
 import { workbenchApi } from "../api/client";
 import { subscribeEvents } from "../api/events";
 
-export interface Artifacts { capabilities: Capability[]; tools: ToolProjection[]; rpc: RpcProjection[]; edges: ProvenanceEdge[]; coverage: { discovered: number; selected: number; projected: number; wired: number }; findings: string[]; }
+export interface Artifacts { capabilities: Capability[]; targets: TargetProjection[]; tools: ToolProjection[]; rpc: RpcProjection[]; edges: ProvenanceEdge[]; coverage: { targeted: number; matched: number; discovered: number; selected: number; projected: number; wired: number }; findings: string[]; }
 export interface McpState { state: string; mode?: "mock" | "real"; tools: McpTool[]; calls: McpCallRecord[]; error?: string; }
 interface WorkbenchState {
   project?: ProjectSummary; source: SourceNode[]; artifacts?: Artifacts; events: WorkbenchEvent[]; logs: string[]; mcp?: McpState; connection: "checking" | "online" | "offline"; busy?: string; error?: string;

@@ -1,14 +1,29 @@
-import type { Capability, ProvenanceEdge, RpcProjection, ToolProjection } from "@bridge/workbench-contracts";
+import type { Capability, ProvenanceEdge, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 interface ArtifactProjection {
   readonly capabilities: readonly Capability[];
+  readonly targets: readonly TargetProjection[];
   readonly tools: readonly ToolProjection[];
   readonly rpc: readonly RpcProjection[];
   readonly edges: readonly ProvenanceEdge[];
-  readonly coverage: { readonly discovered: number; readonly selected: number; readonly projected: number; readonly wired: number };
+  readonly coverage: { readonly targeted: number; readonly matched: number; readonly discovered: number; readonly selected: number; readonly projected: number; readonly wired: number };
   readonly findings: readonly string[];
+}
+
+function legacyInputSchema(argumentsValue: unknown): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  if (argumentsValue && typeof argumentsValue === "object" && !Array.isArray(argumentsValue)) {
+    for (const [name, raw] of Object.entries(argumentsValue as Record<string, any>)) {
+      const declared = String(raw?.type ?? "string");
+      const isArray = /^List\[|\[\]$|^Array</i.test(declared);
+      const scalar: Record<string, unknown> = { type: /int|float|double|number/i.test(declared) ? "number" : /bool/i.test(declared) ? "boolean" : "string" };
+      if (Array.isArray(raw?.options)) scalar.enum = raw.options;
+      properties[name] = isArray ? { type: "array", items: scalar, description: String(raw?.description ?? "") } : { ...scalar, description: String(raw?.description ?? "") };
+    }
+  }
+  return { type: "object", properties };
 }
 
 async function optionalJson(path: string, label: string, findings: string[]): Promise<any | undefined> {
@@ -30,6 +45,7 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   const selection = await optionalJson(join(stateRoot, "selection.json"), "selection", findings);
   const schema = await optionalJson(join(stateRoot, "tools-schema.json"), "tools schema", findings);
   const config = await optionalJson(join(projectRoot, `mcp-${appName}`, "rpc", "config.json"), "RPC config", findings);
+  const targetSchema = await optionalJson(join(projectRoot, "target-mcp-schema.json"), "target schema", findings);
   const selected = new Set<string>(Array.isArray(selection?.selected) ? selection.selected : []);
   const tools: ToolProjection[] = Array.isArray(schema?.tools) ? schema.tools.map((tool: any) => ({
     name: String(tool.name),
@@ -62,6 +78,14 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     executable: toolMap.get(String(cap.id))?.executable ?? (rpcSet.has(String(cap.id)) && !deferred.has(String(cap.id))),
     findings: [],
   }));
+  const rawTargets = Array.isArray(targetSchema?.tools) ? targetSchema.tools : targetSchema?.name ? [targetSchema] : [];
+  const targets: TargetProjection[] = rawTargets.filter((target: any) => target && typeof target === "object" && target.name).map((target: any) => {
+    const name = String(target.name);
+    const matches = capabilities.filter((capability) => capability.id === name).map((capability) => capability.id);
+    const executable = matches.some((id) => capabilities.find((capability) => capability.id === id)?.executable === true);
+    return { name, description: String(target.description ?? ""), inputSchema: target.inputSchema && typeof target.inputSchema === "object" ? target.inputSchema : legacyInputSchema(target.arguments), matchedCapabilityIds: matches, executable };
+  });
+  for (const target of targets) if (target.matchedCapabilityIds.length === 0) findings.push(`Target tool '${target.name}' has no source-backed capability`);
   const edges: ProvenanceEdge[] = [];
   for (const cap of capabilities) {
     edges.push({ from: `source:${cap.sourceRef}`, to: `capability:${cap.id}`, relation: "declares" });
@@ -71,10 +95,13 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   }
   return {
     capabilities,
+    targets,
     tools,
     rpc,
     edges,
     coverage: {
+      targeted: targets.length,
+      matched: targets.filter((target) => target.matchedCapabilityIds.length > 0).length,
       discovered: capabilities.length,
       selected: capabilities.filter((cap) => cap.selected).length,
       projected: capabilities.filter((cap) => toolMap.has(cap.id)).length,

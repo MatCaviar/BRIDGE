@@ -15,6 +15,7 @@ describe("readArtifacts", () => {
     const generated = join(root, "mcp-demo", "rpc");
     await mkdir(state, { recursive: true });
     await mkdir(generated, { recursive: true });
+    await writeFile(join(root, "target-mcp-schema.json"), JSON.stringify({ format: "mcp-tool-list", tools: [{ name: "read_status", arguments: {} }, { name: "missing_target", arguments: { state: { type: "str", options: ["on", "off"] } } }] }));
     await writeFile(join(state, "analysis.json"), JSON.stringify({
       app: { name: "demo" },
       capabilities: [{
@@ -29,6 +30,10 @@ describe("readArtifacts", () => {
     expect(result.capabilities[0]).toMatchObject({ id: "read_status", selected: true, executable: true });
     expect(result.edges.map((edge) => edge.relation)).toEqual(expect.arrayContaining(["declares", "selects", "projects", "wires"]));
     expect(result.coverage).toMatchObject({ discovered: 1, selected: 1, projected: 1, wired: 1 });
+    expect(result.targets).toHaveLength(2);
+    expect(result.targets[0]).toMatchObject({ name: "read_status", matchedCapabilityIds: ["read_status"], executable: true });
+    expect(result.targets[1]?.inputSchema).toMatchObject({ properties: { state: { type: "string", enum: ["on", "off"] } } });
+    expect(result.findings).toContain("Target tool 'missing_target' has no source-backed capability");
   });
 
   it("turns malformed optional artifacts into findings", async () => {
