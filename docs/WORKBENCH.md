@@ -9,6 +9,14 @@ npm install
 npm run workbench:dev
 ```
 
+On Windows, the equivalent repository script is:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-workbench.ps1
+```
+
+Use `-Install` on its first run when dependencies have not been installed. Press `Ctrl+C` in that terminal to stop both services.
+
 The command first builds the shared contracts, then binds the API to `127.0.0.1:43140` and Vite to `127.0.0.1:43141`. It does not open a browser. Set `CODEX_EXECUTABLE` when Codex is not on `PATH`. Use `npm run workbench:build` for production assets.
 
 ## Workflow
