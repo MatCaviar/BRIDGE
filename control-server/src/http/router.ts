@@ -105,6 +105,7 @@ export class WorkbenchRouter {
       if (tail === "mcp" && request.method === "GET") return send(response, 200, this.mcp.get(project.id) ?? { state: "stopped", tools: [], calls: [] });
       if (tail === "mcp/start" && request.method === "POST") {
         const input = z.object({ mode: z.enum(["mock", "real"]) }).merge(confirmationSchema).parse(await readJson(request, this.config.maxRequestBytes));
+        if (input.mode === "real") this.pipeline(project).assertRealMcpReady();
         const generated = join(project.root, `mcp-${safeProjectId(project.name)}`);
         return send(response, 200, await this.mcp.start({ projectId: project.id, projectName: project.name, root: project.root }, { executable: process.execPath, args: [join(generated, "dist", "index.js")], cwd: generated }, input.mode, input));
       }
@@ -114,6 +115,7 @@ export class WorkbenchRouter {
       }
       if (tail === "mcp/call" && request.method === "POST") {
         const input = z.object({ toolName: z.string(), args: z.record(z.unknown()), mode: z.enum(["mock", "real"]) }).merge(confirmationSchema).parse(await readJson(request, this.config.maxRequestBytes));
+        if (input.mode === "real") this.pipeline(project).assertRealMcpReady();
         return send(response, 200, await this.mcp.call({ projectId: project.id, projectName: project.name, root: project.root }, input.toolName, input.args, input.mode, input));
       }
       throw new HttpError(404, "Route not found");

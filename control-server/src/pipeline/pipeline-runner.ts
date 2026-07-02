@@ -49,6 +49,14 @@ export class PipelineRunner {
   }
   status(stage: PipelineStageId): StageStatus { return this.#states.get(stage) ?? "pending"; }
 
+  assertRealMcpReady(): void {
+    const failed = GATES.find((gate) => this.status(gate) === "failed");
+    if (failed) throw new Error(`Real MCP mode is blocked by failed gate ${failed}`);
+    for (const required of ["validate_config", "wire_check", "test", "build"] as const) {
+      if (this.status(required) !== "passed") throw new Error(`Real MCP mode is blocked until ${required} passes`);
+    }
+  }
+
   async runStage(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">, confirmation: StageConfirmation = {}, signal?: AbortSignal): Promise<ProcessResult> {
     const stage = operation as PipelineStageId;
     this.assertRunnable(stage);

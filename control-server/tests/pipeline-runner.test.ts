@@ -58,6 +58,7 @@ describe("PipelineRunner", () => {
     runner.markFailed("validate_config", "invalid config");
     await expect(runner.runStage(workspace, "build", { confirmed: true })).rejects.toThrow(/blocked/i);
     await expect(runner.runStage(workspace, "deploy", { typedConfirmation: "demo" })).rejects.toThrow(/blocked/i);
+    expect(() => runner.assertRealMcpReady()).toThrow(/blocked/i);
     expect(fake.calls).toHaveLength(0);
   });
 });
