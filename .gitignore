@@ -12,6 +12,7 @@ dist/
 .claude/
 .superpowers-spb/
 .superpowers-spd/
+.worktrees/
 _sp_*/
 mcp-*/
 _fix_review/
