@@ -1,3 +1,5 @@
+> **Visual Workbench:** run `npm install` and `npm run workbench:dev` for the localhost source-to-MCP control plane. It never opens a browser automatically. See [docs/WORKBENCH.md](docs/WORKBENCH.md).
+
 <div align="center">
 
 # 🎛️ Code Agent Suite BRIDGE

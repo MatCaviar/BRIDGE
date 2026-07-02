@@ -8,6 +8,7 @@ dist/
 
 # Plugin runtime state + session scratch (NOT for distribution)
 .mcp-pipeline/
+.workbench-runtime/
 .claude-data/
 .claude/
 .superpowers-spb/

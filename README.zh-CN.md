@@ -1,3 +1,5 @@
+> **可视化工作台：**执行 `npm install` 与 `npm run workbench:dev` 启动仅绑定本机的 Source-to-MCP 控制面；脚本不会自动打开浏览器。详见 [docs/WORKBENCH.md](docs/WORKBENCH.md)。
+
 <div align="center">
 
 # 🎛️ 代码智能体套件 BRIDGE

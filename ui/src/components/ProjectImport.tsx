@@ -1,0 +1,11 @@
+import { useState, type ChangeEvent } from "react";
+import { workbenchApi } from "../api/client";
+import { useWorkbench } from "../state/workbench";
+
+async function asBase64(file: File): Promise<string> { return await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(reader.error); reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? ""); reader.readAsDataURL(file); }); }
+export function ProjectImport() {
+  const { setProject, setError } = useWorkbench(); const [name, setName] = useState(""); const [files, setFiles] = useState<File[]>([]); const [schema, setSchema] = useState<File>(); const [busy, setBusy] = useState(false);
+  const chooseFiles = (event: ChangeEvent<HTMLInputElement>) => setFiles(Array.from(event.target.files ?? []));
+  const submit = async () => { if (!name || !files.length || !schema) return setError("请选择项目目录、目标 Schema，并填写项目名"); setBusy(true); setError(undefined); try { const targetSchema = JSON.parse(await schema.text()); const payload = await Promise.all(files.map(async (file) => ({ path: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name, contentBase64: await asBase64(file) }))); setProject(await workbenchApi.importProject({ projectName: name, files: payload, targetSchema })); } catch (error) { setError(error instanceof Error ? error.message : String(error)); } finally { setBusy(false); } };
+  return <section id="导入" className="panel glass"><div className="panel-title"><div><p className="eyebrow">01 / INGEST</p><h2>项目与目标 Schema</h2></div><span className="metric">{files.length} files</span></div><div className="import-grid"><label>项目名<input value={name} onChange={(event) => setName(event.target.value)} placeholder="vehicle-control" /></label><label className="file-drop">项目源码目录<input type="file" multiple ref={(node) => { if (node) node.setAttribute("webkitdirectory", ""); }} onChange={chooseFiles} /><small>{files.length ? `${files.length} 个文件已就绪` : "选择本地目录（不上传到远端）"}</small></label><label className="file-drop">目标 MCP Schema<input type="file" accept=".json,application/json" onChange={(event) => setSchema(event.target.files?.[0])} /><small>{schema?.name ?? "选择 JSON 文件"}</small></label><button className="primary" disabled={busy} onClick={() => void submit()}>{busy ? "正在安全导入…" : "建立隔离工作区"}</button></div></section>;
+}
