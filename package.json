@@ -1,0 +1,20 @@
+{
+  "name": "im-mcp-codeagent-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "workbench-contracts",
+    "control-server",
+    "ui"
+  ],
+  "scripts": {
+    "workbench:api": "npm run dev --workspace control-server",
+    "workbench:ui": "npm run dev --workspace ui",
+    "workbench:dev": "concurrently -k -n api,ui npm:workbench:api npm:workbench:ui",
+    "workbench:build": "npm run build --workspaces --if-present",
+    "workbench:test": "npm test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
