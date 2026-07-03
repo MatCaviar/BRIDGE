@@ -56,4 +56,19 @@ describe("WorkspaceManager", () => {
     await expect(readFile(join(project.root, "source", "src", "service.ts"), "utf8")).resolves.toContain("ok");
     await expect(readFile(project.targetSchemaPath, "utf8")).resolves.toContain("Target");
   });
+
+  it("persists the source index and recovers projects after restart", async () => {
+    const workspaces = await manager();
+    const project = await workspaces.importProject({
+      projectName: "audio app",
+      files: [{ path: "src/audio.ts", contentBase64: Buffer.from("class Audio { play() {} }").toString("base64") }],
+      targetSchema: { type: "object" },
+    });
+
+    await expect(readFile(join(project.root, "source-index.json"), "utf8")).resolves.toContain('"play"');
+    const restarted = new WorkspaceManager(workspaces.runtimeRoot, { maxFiles: 3, maxFileBytes: 32, maxTotalBytes: 64 });
+    await expect(restarted.listProjects()).resolves.toEqual([
+      expect.objectContaining({ id: project.id, name: "audio app", root: project.root }),
+    ]);
+  });
 });

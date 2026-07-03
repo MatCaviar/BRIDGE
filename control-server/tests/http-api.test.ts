@@ -22,6 +22,13 @@ async function start(maxRequestBytes = 1024 * 1024) {
   return `http://127.0.0.1:${port}`;
 }
 
+async function startAtRoot(runtimeRoot: string) {
+  const server = createWorkbenchServer({ config: createConfig({ runtimeRoot }) });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
 describe("control HTTP API", () => {
   it("serves health, imports a project, scans source, and reads artifacts", async () => {
     const base = await start();
@@ -40,5 +47,25 @@ describe("control HTTP API", () => {
     const response = await fetch(`${base}/api/projects`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ padding: "x".repeat(200) }) });
     expect(response.status).toBe(413);
     expect(() => createWorkbenchServer({ config: { ...createConfig(), host: "0.0.0.0" as never } })).toThrow(/loopback/i);
+  });
+
+  it("recovers imported projects when the control service restarts", async () => {
+    const runtimeRoot = await mkdtemp(join(tmpdir(), "bridge-http-restart-"));
+    roots.push(runtimeRoot);
+    const firstBase = await startAtRoot(runtimeRoot);
+    const imported = await (await fetch(`${firstBase}/api/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectName: "Recovered", files: [{ path: "src/audio.ts", contentBase64: Buffer.from("class Audio { play() {} }").toString("base64") }], targetSchema: { type: "object" } }),
+    })).json() as any;
+    const first = servers.shift()!;
+    await new Promise<void>((resolve) => first.close(() => resolve()));
+
+    const secondBase = await startAtRoot(runtimeRoot);
+    const recovered = await fetch(`${secondBase}/api/projects/${imported.data.id}`);
+    expect(recovered.status).toBe(200);
+    expect(await recovered.json()).toMatchObject({ ok: true, data: { id: imported.data.id, name: "Recovered" } });
+    const source = await (await fetch(`${secondBase}/api/projects/${imported.data.id}/source`)).json() as any;
+    expect(source.data.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ label: "play", owner: "Audio" })]));
   });
 });

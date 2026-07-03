@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import type { ProjectSummary } from "@bridge/workbench-contracts";
+import type { ProjectSummary, SourceIndex } from "@bridge/workbench-contracts";
 import type { ControlServerConfig } from "../config.js";
 import { readArtifacts } from "../artifacts/artifact-reader.js";
 import { EventBus } from "../events/event-bus.js";
@@ -57,9 +57,13 @@ export class WorkbenchRouter {
   readonly mcp = new McpSessionManager(this.policy, this.events);
   readonly projects = new Map<string, ProjectSummary>();
   readonly pipelines = new Map<string, PipelineRunner>();
+  readonly ready: Promise<void>;
 
   constructor(readonly config: ControlServerConfig) {
     this.workspaces = new WorkspaceManager(config.runtimeRoot, config.importLimits);
+    this.ready = this.workspaces.listProjects().then((projects) => {
+      for (const project of projects) this.projects.set(project.id, project);
+    });
   }
 
   async handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -67,6 +71,7 @@ export class WorkbenchRouter {
     if (request.method === "OPTIONS") { response.statusCode = 204; response.end(); return; }
     const url = new URL(request.url ?? "/", `http://${this.config.host}`);
     try {
+      await this.ready;
       if (request.method === "GET" && url.pathname === "/api/health") return send(response, 200, { host: this.config.host, version: "0.1.0" });
       if (request.method === "POST" && url.pathname === "/api/projects") {
         const input = importSchema.parse(await readJson(request, this.config.maxRequestBytes));
@@ -82,7 +87,7 @@ export class WorkbenchRouter {
       const project = this.project(decodeURIComponent(match[1]!));
       const tail = match[2] ?? "";
       if (request.method === "GET" && tail === "") return send(response, 200, project);
-      if (request.method === "GET" && tail === "source") return send(response, 200, await scanProject(join(project.root, "source")));
+      if (request.method === "GET" && tail === "source") return send(response, 200, await this.sourceIndex(project));
       if (request.method === "GET" && tail === "artifacts") return send(response, 200, await readArtifacts(project.root, safeProjectId(project.name)));
       if (request.method === "PUT" && tail === "selection") {
         const input = z.object({ selected: z.array(z.string()) }).parse(await readJson(request, this.config.maxRequestBytes));
@@ -130,6 +135,17 @@ export class WorkbenchRouter {
     const project = this.projects.get(id);
     if (!project) throw new HttpError(404, `Project not found: ${id}`);
     return project;
+  }
+
+  private async sourceIndex(project: ProjectSummary): Promise<SourceIndex> {
+    const path = join(project.root, "source-index.json");
+    try {
+      const parsed = JSON.parse(await readFile(path, "utf8")) as SourceIndex;
+      if (parsed.version === 1 && Array.isArray(parsed.nodes) && Array.isArray(parsed.edges) && Array.isArray(parsed.evidence)) return parsed;
+    } catch { /* rebuild missing or invalid indexes from the isolated source */ }
+    const index = await scanProject(join(project.root, "source"));
+    await writeFile(path, `${JSON.stringify(index, null, 2)}\n`);
+    return index;
   }
 
   private pipeline(project: ProjectSummary): PipelineRunner {

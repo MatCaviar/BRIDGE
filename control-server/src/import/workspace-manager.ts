@@ -1,9 +1,10 @@
 import type { ProjectSummary } from "@bridge/workbench-contracts";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ImportLimits } from "../config.js";
 import { assertContained, safeProjectId } from "../security/paths.js";
+import { scanProject } from "../scanner/project-scanner.js";
 
 export interface ImportFile {
   readonly path: string;
@@ -47,17 +48,37 @@ export class WorkspaceManager {
       }
       const targetSchemaPath = join(staging, "target-mcp-schema.json");
       await writeFile(targetSchemaPath, `${JSON.stringify(request.targetSchema, null, 2)}\n`, { flag: "wx" });
-      await rename(staging, finalRoot);
-      return {
+      await writeFile(join(staging, "source-index.json"), `${JSON.stringify(await scanProject(sourceRoot), null, 2)}\n`, { flag: "wx" });
+      const project: ProjectSummary = {
         id,
         name: request.projectName,
         root: finalRoot,
         importedAt: new Date().toISOString(),
         targetSchemaPath: join(finalRoot, "target-mcp-schema.json"),
       };
+      await writeFile(join(staging, "project.json"), `${JSON.stringify(project, null, 2)}\n`, { flag: "wx" });
+      await rename(staging, finalRoot);
+      return project;
     } catch (error) {
       await rm(staging, { recursive: true, force: true });
       throw error;
     }
+  }
+
+  async listProjects(): Promise<ProjectSummary[]> {
+    await mkdir(this.runtimeRoot, { recursive: true });
+    const projects: ProjectSummary[] = [];
+    for (const entry of await readdir(this.runtimeRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name.startsWith(".staging-")) continue;
+      const root = assertContained(this.runtimeRoot, entry.name);
+      try {
+        const parsed = JSON.parse(await readFile(join(root, "project.json"), "utf8")) as Partial<ProjectSummary>;
+        if (parsed.id !== entry.name || typeof parsed.name !== "string" || typeof parsed.importedAt !== "string") continue;
+        const targetSchemaPath = join(root, "target-mcp-schema.json");
+        if (!(await stat(join(root, "source"))).isDirectory() || !(await stat(targetSchemaPath)).isFile()) continue;
+        projects.push({ id: entry.name, name: parsed.name, importedAt: parsed.importedAt, root, targetSchemaPath });
+      } catch { /* ignore incomplete or invalid workspace records */ }
+    }
+    return projects.sort((a, b) => a.importedAt.localeCompare(b.importedAt));
   }
 }
