@@ -20,7 +20,7 @@ describe("readArtifacts", () => {
     await mkdir(generated, { recursive: true });
     await mkdir(join(generatedRoot, "dist"), { recursive: true });
     await writeFile(join(generatedRoot, "dist", "index.js"), "// built\n");
-    await writeFile(join(root, "target-mcp-schema.json"), JSON.stringify({ format: "mcp-tool-list", tools: [{ name: "read_status", arguments: {} }, { name: "missing_target", arguments: { state: { type: "str", options: ["on", "off"] } } }] }));
+    await writeFile(join(root, "target-mcp-schema.json"), JSON.stringify({ format: "mcp-tool-list", tools: [{ name: "reference_weather_lookup", inputSchema: { type: "object" } }] }));
     await writeFile(join(state, "analysis.json"), JSON.stringify({
       app: { name: "demo" },
       capabilities: [{
@@ -42,10 +42,9 @@ describe("readArtifacts", () => {
     expect(result.capabilities[1]).toMatchObject({ id: "preview_sound", selected: true, mockExecutable: true, realExecutable: false, blockedReason: "transport unavailable" });
     expect(result.edges.map((edge) => edge.relation)).toEqual(expect.arrayContaining(["declares", "selects", "projects", "wires"]));
     expect(result.coverage).toMatchObject({ discovered: 2, selected: 2, projected: 2, wired: 1 });
-    expect(result.targets).toHaveLength(2);
-    expect(result.targets[0]).toMatchObject({ name: "read_status", matchedCapabilityIds: ["read_status"], mockExecutable: true, realExecutable: true });
-    expect(result.targets[1]?.inputSchema).toMatchObject({ properties: { state: { type: "string", enum: ["on", "off"] } } });
-    expect(result.findings).toContain("Target tool 'missing_target' has no source-backed capability");
+    expect(result.targets).toEqual([]);
+    expect(result.coverage.targeted).toBe(0);
+    expect(result.findings.join(" ")).not.toMatch(/reference_weather_lookup|no source-backed capability/i);
     expect((result as any).stages).toContainEqual({ id: "analyze", status: "passed" });
   });
 

@@ -66,6 +66,9 @@ describe("PipelineRunner", () => {
     expect(analyze.args.join(" ")).toContain(workspace.targetSchemaPath);
     expect(analyze.args.join(" ")).toContain(join(workspace.root, "source-index.json"));
     expect(analyze.args.join(" ")).toContain(workspace.analysisPath);
+    expect(analyze.args.join(" ")).toContain("output-format reference");
+    expect(analyze.args.join(" ")).toContain("Never create a capability from a schema example");
+    expect(analyze.args.join(" ")).not.toContain("target-only APIs as gaps");
     expect(analyze.args).toEqual(expect.arrayContaining(["--skip-git-repo-check", "--ephemeral", "--color", "never"]));
 
     runner.markPassed("scaffold");

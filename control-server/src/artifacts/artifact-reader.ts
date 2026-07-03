@@ -13,20 +13,6 @@ interface ArtifactProjection {
   readonly stages: readonly PipelineStageState[];
 }
 
-function legacyInputSchema(argumentsValue: unknown): Record<string, unknown> {
-  const properties: Record<string, unknown> = {};
-  if (argumentsValue && typeof argumentsValue === "object" && !Array.isArray(argumentsValue)) {
-    for (const [name, raw] of Object.entries(argumentsValue as Record<string, any>)) {
-      const declared = String(raw?.type ?? "string");
-      const isArray = /^List\[|\[\]$|^Array</i.test(declared);
-      const scalar: Record<string, unknown> = { type: /int|float|double|number/i.test(declared) ? "number" : /bool/i.test(declared) ? "boolean" : "string" };
-      if (Array.isArray(raw?.options)) scalar.enum = raw.options;
-      properties[name] = isArray ? { type: "array", items: scalar, description: String(raw?.description ?? "") } : { ...scalar, description: String(raw?.description ?? "") };
-    }
-  }
-  return { type: "object", properties };
-}
-
 async function optionalJson(path: string, label: string, findings: string[]): Promise<any | undefined> {
   try {
     const raw = await readFile(path, "utf8");
@@ -46,7 +32,6 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   const selection = await optionalJson(join(stateRoot, "selection.json"), "selection", findings);
   const schema = await optionalJson(join(stateRoot, "tools-schema.json"), "tools schema", findings);
   const config = await optionalJson(join(projectRoot, `mcp-${appName}`, "rpc", "config.json"), "RPC config", findings);
-  const targetSchema = await optionalJson(join(projectRoot, "target-mcp-schema.json"), "target schema", findings);
   const stageState = await optionalJson(join(projectRoot, ".workbench", "stages.json"), "pipeline stages", findings);
   const selected = new Set<string>(Array.isArray(selection?.selected) ? selection.selected : []);
   const generatedRoot = join(projectRoot, `mcp-${appName}`);
@@ -104,17 +89,9 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     blockedReason: toolMap.get(String(cap.id))?.blockedReason ?? (!toolMap.has(String(cap.id)) ? "MCP tool is not generated" : undefined),
     findings: [],
   }));
-  const rawTargets = Array.isArray(targetSchema?.tools) ? targetSchema.tools : targetSchema?.name ? [targetSchema] : [];
-  const targets: TargetProjection[] = rawTargets.filter((target: any) => target && typeof target === "object" && target.name).map((target: any) => {
-    const name = String(target.name);
-    const matches = capabilities.filter((capability) => capability.id === name).map((capability) => capability.id);
-    const matched = matches.map((id) => capabilities.find((capability) => capability.id === id)).filter(Boolean) as Capability[];
-    const mockExecutable = matched.some((capability) => capability.mockExecutable);
-    const realExecutable = matched.some((capability) => capability.realExecutable);
-    const reason = matched.find((capability) => capability.blockedReason)?.blockedReason ?? (matches.length ? undefined : "No source-backed capability");
-    return { name, description: String(target.description ?? ""), inputSchema: target.inputSchema && typeof target.inputSchema === "object" ? target.inputSchema : legacyInputSchema(target.arguments), matchedCapabilityIds: matches, executable: realExecutable, mockExecutable, realExecutable, blockedReason: reason };
-  });
-  for (const target of targets) if (target.matchedCapabilityIds.length === 0) findings.push(`Target tool '${target.name}' has no source-backed capability`);
+  // Imported schemas describe output shape and may contain examples. They are
+  // never a target catalog; candidates and coverage originate only in source.
+  const targets: TargetProjection[] = [];
   const edges: ProvenanceEdge[] = [];
   for (const cap of capabilities) {
     edges.push({ from: `source:${cap.sourceRef}`, to: `capability:${cap.id}`, relation: "declares" });
@@ -129,8 +106,8 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     rpc,
     edges,
     coverage: {
-      targeted: targets.length,
-      matched: targets.filter((target) => target.matchedCapabilityIds.length > 0).length,
+      targeted: 0,
+      matched: 0,
       discovered: capabilities.length,
       selected: capabilities.filter((cap) => cap.selected).length,
       projected: capabilities.filter((cap) => toolMap.has(cap.id)).length,
