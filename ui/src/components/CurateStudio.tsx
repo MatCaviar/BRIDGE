@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { workbenchApi } from "../api/client";
+import { workbenchApi } from "../bridge/client";
 import { useWorkbench } from "../state/workbench";
 
 export function CurateStudio() {
