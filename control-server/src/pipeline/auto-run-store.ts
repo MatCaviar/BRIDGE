@@ -1,6 +1,7 @@
 import type { PipelineAutomationRun } from "@bridge/workbench-contracts";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { writeFileAtomically } from "../persistence/atomic-file.js";
 
 interface PersistedAutoRun { readonly version: 1; readonly run: PipelineAutomationRun; }
 
@@ -16,9 +17,6 @@ export class AutoRunStore {
 
   async save(workspaceRoot: string, run: PipelineAutomationRun): Promise<void> {
     const path = this.path(workspaceRoot);
-    const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(temporary, `${JSON.stringify({ version: 1, run }, null, 2)}\n`);
-    await rename(temporary, path);
+    await writeFileAtomically(path, `${JSON.stringify({ version: 1, run }, null, 2)}\n`);
   }
 }

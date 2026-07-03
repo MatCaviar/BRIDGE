@@ -1,6 +1,7 @@
 import type { PipelineStageId, PipelineStageState } from "@bridge/workbench-contracts";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { writeFileAtomically } from "../persistence/atomic-file.js";
 
 interface PersistedStages {
   readonly version: 1;
@@ -19,10 +20,7 @@ export class StageStore {
 
   async save(workspaceRoot: string, stages: ReadonlyMap<PipelineStageId, PipelineStageState["status"]>): Promise<void> {
     const path = this.path(workspaceRoot);
-    const temporary = `${path}.${process.pid}.tmp`;
     const records = Object.fromEntries([...stages].map(([id, status]) => [id, { id, status }]));
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(temporary, `${JSON.stringify({ version: 1, stages: records }, null, 2)}\n`);
-    await rename(temporary, path);
+    await writeFileAtomically(path, `${JSON.stringify({ version: 1, stages: records }, null, 2)}\n`);
   }
 }
