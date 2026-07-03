@@ -32,7 +32,7 @@ describe("readArtifacts", () => {
       }],
     }));
     await writeFile(join(state, "selection.json"), JSON.stringify({ selected: ["read_status", "preview_sound"] }));
-    await writeFile(join(state, "tools-schema.json"), JSON.stringify({ tools: [
+    await writeFile(join(root, "tools-schema.json"), JSON.stringify({ tools: [
       { name: "read_status", description: "Read status", inputSchema: { type: "object" }, executable: true },
       { name: "preview_sound", description: "Preview sound", inputSchema: { type: "object" }, executable: false },
     ] }));

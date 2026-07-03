@@ -25,7 +25,7 @@ describe("AutoPipelineCoordinator", () => {
     expect(await coordinator.startAnalysis(target, execute)).toMatchObject({ status: "awaiting_curate" });
     expect(await coordinator.continueAfterCurate(target, execute)).toMatchObject({ status: "mock_ready" });
     expect(calls).toEqual([
-      "analyze", "scaffold", "generate", "validate_config", "wire_check", "test", "build", "schema_preview", "verify",
+      "analyze", "scaffold", "generate", "validate_config", "wire_check", "build", "test", "schema_preview", "verify",
     ]);
   });
 
@@ -46,7 +46,7 @@ describe("AutoPipelineCoordinator", () => {
     failWireCheck = false;
     calls.length = 0;
     expect(await coordinator.retry(target, execute)).toMatchObject({ status: "mock_ready" });
-    expect(calls).toEqual(["wire_check", "test", "build", "schema_preview", "verify"]);
+    expect(calls).toEqual(["wire_check", "build", "test", "schema_preview", "verify"]);
   });
 
   it("recovers persisted state in a fresh coordinator", async () => {

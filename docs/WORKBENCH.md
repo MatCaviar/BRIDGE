@@ -21,15 +21,25 @@ No system browser is opened automatically. No `localhost`, `43140`, or `43141` s
 
 ## Workflow
 
-1. In the desktop window, choose a source directory and target MCP schema with native file dialogs.
-2. The Electron main process filters source files, parses standard JSON/arrays/adjacent JSON objects, and creates an isolated workspace.
+1. Choose a source directory and an MCP output-format reference schema with native file dialogs.
+2. The Electron main process filters source files, parses standard JSON, arrays, or adjacent JSON objects, and creates an isolated workspace.
 3. Import writes `project.json`, `target-mcp-schema.json`, and a semantic `source-index.json` containing declarations, dependencies, and RPC evidence.
-4. Run Analyze, review source-backed capabilities, and save a Curate selection.
-5. Run Scaffold, Generate, validation gates, tests, build, verification, and schema preview.
-6. Inspect source → capability → MCP → RPC provenance and explicit coverage gaps.
-7. Start the generated stdio server and exercise `tools/list` and `tools/call` in MCP Playground.
+4. Analyze starts automatically and discovers capabilities only from live source evidence. Tool examples inside the schema are formatting references, not requested capabilities.
+5. Review the analysis and confirm a non-empty Curate selection. This is the only normal pause.
+6. Scaffold, Generate, validation gates, tests, build, schema preview, and verification then run automatically in order.
+7. If a stage fails, the pipeline stops immediately and offers retry from that stage.
+8. Inspect source-to-capability-to-MCP-to-RPC provenance, then exercise the generated stdio server in MCP Playground.
 
-Projects and stage state survive application restart. Analyze uses `source-index.json` for navigation and verifies every promoted capability against live source.
+Projects, stage state, and automation state survive application restart. Analyze uses `source-index.json` for navigation and verifies every promoted capability against live source.
+
+## Fast mock project
+
+For quick visual testing, import:
+
+- Source: `source_code\mock-audio-android`
+- Format schema: `schema\mock-mcp-output.schema.json`
+
+The source contains three audio operations. The schema intentionally contains an unrelated `reference_weather_lookup` example; it must never appear in Analyze or coverage findings.
 
 ## Local security boundary
 
@@ -42,7 +52,7 @@ Projects and stage state survive application restart. Analyze uses `source-index
 
 ## Mock and real readiness
 
-`MOCK READY` means a built generated stdio server can be exercised safely. `REAL READY` additionally requires a valid non-deferred wire mapping and all real-execution gates. Deferred transports and missing targets remain visible with their blocking reason.
+`MOCK READY` means a built generated stdio server can be exercised safely. `REAL READY` additionally requires a valid non-deferred wire mapping and all real-execution gates. Deferred source-backed transports remain visible with their blocking reason.
 
 Android projects are indexed from Gradle, manifests, Kotlin, Java, AIDL, XML, and reference files. Android AIDL or vehicle-SDK calls remain deferred until a compatible bridge adapter exists.
 
@@ -55,17 +65,19 @@ The app creates one BrowserWindow. The Aether field is Canvas 2D, capped at 64 p
 ```powershell
 npm run workbench:test
 npm run workbench:build
+npm run workbench:smoke:mock
+npm run workbench:smoke:mock:live
 node scripts\smoke-imaudio-workbench.mjs source_code\imaudio_app_code schema\schema.json
 npm run test:smoke --prefix desktop
 ```
 
-The real-project smoke fails unless both inputs can be imported, representative audio manager/proxy declarations and `querySoundLibrary` RPC evidence are present, and the persisted project can be recovered. The Electron smoke must run in a normal interactive Windows user session; restricted CI/sandbox sessions may not permit Chromium GPU subprocesses.
+The default mock smoke uses deterministic fixture agents for the two LLM-judgment stages while exercising the real import, Curate, CLI gates, dependency build, generated tests, schema preview, verification, and persistence path. Use `workbench:smoke:mock:live` to run the same fixture through real Codex Analyze and Generate; it requires `codex` on `PATH` and available model quota. The real-project import smoke checks representative audio manager/proxy declarations, `querySoundLibrary` RPC evidence, and project recovery. The Electron smoke must run in a normal interactive Windows user session; restricted CI or sandbox sessions may not permit Chromium GPU subprocesses.
 
 ## Troubleshooting
 
 - Local bridge unavailable: start via `scripts\start-workbench.ps1`, not by opening `ui/dist/index.html` directly.
 - Analyze cannot start: ensure `codex` is on `PATH` or set `CODEX_EXECUTABLE` before launch.
 - Analyze usage limit: wait for the reset time shown in the stage error and retry.
-- Scaffold blocked: save a non-empty Curate selection.
-- Build blocked: resolve validation and wire-check findings.
-- MCP start fails: build the generated server and verify its `dist/index.js`.
+- Empty analysis: verify the source exposes callable manager, proxy, service, or AIDL methods.
+- Pipeline failure: inspect the retained stage logs, correct the source/configuration issue, and choose retry from the failed stage.
+- MCP start fails: ensure the automation reached `mock_ready` and produced `dist/index.js`.

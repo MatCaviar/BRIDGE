@@ -32,8 +32,8 @@ const GATES: readonly PipelineStageId[] = ["validate_config", "wire_check", "tes
 const ANSI_ESCAPE = /\u001B(?:[@-_]|\[[0-?]*[ -/]*[@-~])/g;
 const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
   curate: ["analyze"], scaffold: ["curate"], generate: ["scaffold"],
-  validate_config: ["generate"], wire_check: ["generate"], test: ["validate_config", "wire_check"],
-  build: ["test"], register: ["build"], verify: ["build"], schema_preview: ["generate"], deploy: ["verify"],
+  validate_config: ["generate"], wire_check: ["generate"], build: ["validate_config", "wire_check"],
+  test: ["build"], register: ["build"], verify: ["build", "test"], schema_preview: ["generate"], deploy: ["verify"],
 };
 
 export class PipelineRunner {
@@ -124,21 +124,21 @@ export class PipelineRunner {
 
   private commandFor(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">): CommandSpec {
     if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. Use the imported schema only for descriptor shape, parameter encoding, and style. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath}. Do not edit unrelated files or enable network access.`);
-    if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot} and ${workspace.analysisPath}. Write ${workspace.rpcConfigPath}. Do not edit unrelated files or enable network access.`);
+    if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ${workspace.rpcConfigPath}. Do not edit unrelated files or enable network access.`);
     if (operation === "deploy") throw new Error("Deploy adapter is not configured");
 
     const args: string[] = [this.config.pipelineCliPath];
     switch (operation) {
       case "curate": args.push("curate", workspace.analysisPath, "--output", workspace.selectionPath); break;
       case "scaffold": args.push("scaffold", workspace.analysisPath, "--output", workspace.generatedRoot, "--selection", workspace.selectionPath); break;
-      case "validate_config": args.push("validate_config", workspace.rpcConfigPath, "--analysis", workspace.analysisPath); break;
+      case "validate_config": args.push("validate_config", workspace.rpcConfigPath, "--analysis", workspace.analysisPath, "--selection", workspace.selectionPath); break;
       case "wire_check": args.push("wire_check", workspace.rpcConfigPath, ...workspace.proxyPaths.flatMap((path) => ["--proxy", path])); break;
       case "test": case "build": args.push(operation, "--dir", workspace.generatedRoot); break;
       case "register":
         if (!this.config.gatewayRoot) throw new Error("Gateway root is not configured");
         args.push("register", "--dir", workspace.generatedRoot, "--gateway", this.config.gatewayRoot); break;
       case "verify": args.push("verify", "--dir", workspace.generatedRoot, ...(this.config.gatewayRoot ? ["--gateway", this.config.gatewayRoot] : [])); break;
-      case "schema_preview": args.push("schema_preview", workspace.analysisPath, workspace.rpcConfigPath, "--output", `${workspace.root}/tools-schema.json`); break;
+      case "schema_preview": args.push("schema_preview", workspace.analysisPath, workspace.rpcConfigPath, "--selection", workspace.selectionPath, "--output", `${workspace.root}/tools-schema.json`); break;
     }
     return { executable: process.execPath, args, cwd: workspace.root, operation, projectId: workspace.projectId };
   }

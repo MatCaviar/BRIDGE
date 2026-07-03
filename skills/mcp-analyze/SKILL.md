@@ -15,6 +15,8 @@ Analyze the specified YunOS HDT or Android application and produce a structured 
 
 `analysis.json` 是后续所有步骤的唯一输入：scaffold 用它生成项目骨架，generate 用每个 capability 的 `sourceRef` 去源码抽真实 wire。**漏一个 capability = 最终 server 漏一个 tool；写错一个 sourceRef = generate 找不到 wire、被迫 defer。** `validate` 只查 schema 格式——它不查你漏没漏 capability、sourceRef 精不精确、safetyLevel 合不合理。这些是你的判断。
 
+用户提供的 MCP Schema 是**输出格式参考**，其中已有的工具只用于理解字段结构、参数编码和描述风格。**候选 capability 只能来自源码**：不得把 Schema 示例变成 capability，不得因为源码没有实现某个示例而报告缺失项，也不得为迎合示例改写源码证据。
+
 逐条自检一份好的 analysis：
 - **完整**：app 里每个调用 YunOS SDK（`@system.*`/`@yunos.*`）且对外可触发的函数，都捕成一个 capability（漏了 = 用户少一个 tool）。
 - **可追溯**：每个 capability 的 `sourceRef` 精确到 `file:method`——模糊 sourceRef 是 generate 臆造/defer 的源头。
@@ -39,7 +41,7 @@ Read these files to understand the app:
 3. **Service files**: Look in `src/services/`, `src/api/`, or equivalent for SDK interaction code.
 4. **Type definitions**: Look in `src/types/`, `src/models/`, or inline types for enums and interfaces.
 
-For Android projects, also inspect `settings.gradle(.kts)`, module `build.gradle(.kts)`, `AndroidManifest.xml`, Kotlin/Java service and repository classes, `.aidl` interfaces, and bundled SDK reference Markdown. Treat AIDL methods, exported bound-service client methods, and source-backed CarControl `IProperty` wrappers as the interface surface. SDK reference documentation alone is evidence that an API exists in a dependency, not evidence that the application has implemented a callable capability: if the target schema requests such an API but no source wrapper exists, report it as a target gap and do not fabricate a capability.
+For Android projects, also inspect `settings.gradle(.kts)`, module `build.gradle(.kts)`, `AndroidManifest.xml`, Kotlin/Java service and repository classes, `.aidl` interfaces, and bundled SDK reference Markdown. Treat AIDL methods, exported bound-service client methods, and source-backed CarControl `IProperty` wrappers as the interface surface. SDK reference documentation alone is evidence that an API exists in a dependency, not evidence that the application has implemented a callable capability. Ignore tool names found only in the imported format reference and never fabricate a capability for them.
 
 ### Step 2: Identify Capabilities
 

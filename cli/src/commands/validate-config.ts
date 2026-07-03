@@ -3,6 +3,7 @@ import { resolve } from "path";
 import { constructDbusCall, constructNativeCall } from "@im/mcp-server-framework";
 import type { AnalysisData, ParamDef } from "../types.js";
 import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
+import { readSelectedAnalysis } from "../selection.js";
 
 export interface ValidateConfigResult { readonly valid: boolean; readonly errors: readonly string[]; readonly deferred: readonly string[] }
 
@@ -136,7 +137,8 @@ export async function validateConfigCommand(args: string[]): Promise<void> {
   const analysisFlag = args.indexOf("--analysis");
   if (!configPath || analysisFlag === -1) throw new Error("Usage: mcp-pipeline validate_config <config.json> --analysis <analysis.json>");
   const config = JSON.parse(readFileSync(resolve(configPath), "utf-8"));
-  const analysis = JSON.parse(readFileSync(resolve(args[analysisFlag + 1]), "utf-8")) as AnalysisData;
+  const selectionFlag = args.indexOf("--selection");
+  const analysis = readSelectedAnalysis(resolve(args[analysisFlag + 1]), selectionFlag === -1 ? undefined : resolve(args[selectionFlag + 1]));
   const appName = analysis.app.name;
   let state = readState(appName) ?? createInitialState(appName, resolve(configPath));
   const result = validateConfig(config, analysis);

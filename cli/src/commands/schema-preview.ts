@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, dirname, basename } from "path";
 import { buildToolDefs, withExecutability } from "../generators/tool-schema.js";
 import type { AnalysisData } from "../types.js";
+import { readSelectedAnalysis } from "../selection.js";
 
 /** Read _deferred keys from rpc/config.json (capabilities with no wire → executable:false). */
 function readDeferred(configPath: string | undefined): readonly string[] {
@@ -32,7 +33,8 @@ export async function schemaPreviewCommand(args: string[]): Promise<void> {
       "  analysis required; config optional (provides _deferred to mark tools executable:false).",
     );
   }
-  const analysis = JSON.parse(readFileSync(resolve(analysisPath), "utf-8")) as AnalysisData;
+  const selectionIdx = args.indexOf("--selection");
+  const analysis = readSelectedAnalysis(resolve(analysisPath), selectionIdx === -1 ? undefined : resolve(args[selectionIdx + 1]));
   const deferred = readDeferred(configPath);
   const tools = withExecutability(buildToolDefs(analysis), deferred);
   const outPath =

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -26,9 +26,10 @@ function run(command, args, cwd) {
 }
 
 function ensurePackageReady(dir, distEntry) {
-  if (!existsSync(resolve(dir, "node_modules"))) {
-    run("npm", ["install", "--no-fund", "--no-audit"], dir);
-  }
+  const manifest = JSON.parse(readFileSync(resolve(dir, "package.json"), "utf8"));
+  const dependencies = [...Object.keys(manifest.dependencies ?? {}), ...(manifest.scripts?.build ? ["typescript"] : [])];
+  const missingDependency = dependencies.find((name) => !existsSync(resolve(dir, "node_modules", ...name.split("/"))));
+  if (!existsSync(resolve(dir, "node_modules")) || missingDependency) run("npm", ["install", "--prefer-offline", "--no-fund", "--no-audit"], dir);
   // Build unconditionally: an existing dist can be older than its source and
   // ESM reports that mismatch only when a generated server starts.
   run("npm", ["run", "build"], dir);

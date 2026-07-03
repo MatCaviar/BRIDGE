@@ -30,7 +30,7 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   const stateRoot = join(projectRoot, ".mcp-pipeline", appName);
   const analysis = await optionalJson(join(stateRoot, "analysis.json"), "analysis", findings);
   const selection = await optionalJson(join(stateRoot, "selection.json"), "selection", findings);
-  const schema = await optionalJson(join(stateRoot, "tools-schema.json"), "tools schema", findings);
+  const schema = await optionalJson(join(projectRoot, "tools-schema.json"), "tools schema", findings);
   const config = await optionalJson(join(projectRoot, `mcp-${appName}`, "rpc", "config.json"), "RPC config", findings);
   const stageState = await optionalJson(join(projectRoot, ".workbench", "stages.json"), "pipeline stages", findings);
   const selected = new Set<string>(Array.isArray(selection?.selected) ? selection.selected : []);

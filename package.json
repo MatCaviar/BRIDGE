@@ -11,6 +11,8 @@
   "scripts": {
     "workbench:build": "npm run build --workspaces --if-present",
     "workbench:test": "npm test --workspaces --if-present",
+    "workbench:smoke:mock": "node scripts/smoke-mock-workbench.mjs",
+    "workbench:smoke:mock:live": "node scripts/smoke-mock-workbench.mjs --live",
     "workbench:start": "npm run workbench:build && electron desktop/dist/main.js",
     "workbench:dev": "npm run workbench:start"
   }

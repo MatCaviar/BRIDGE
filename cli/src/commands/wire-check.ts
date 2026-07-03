@@ -27,10 +27,11 @@ export function wireCheck(config: unknown, proxySource: string): WireCheckResult
   const errors: string[] = [];
   const cfg = config as Record<string, any>;
   const wires = extractExpectedWire(proxySource);
+  const hasConcreteDbus = Object.entries(cfg).some(([opId, entry]) => opId !== "_deferred" && entry?.type === "dbus");
   // funcName-convention proxies (AudioPolicyProxy) yield wires for forward checking. method-convention
   // proxies (IMAudio/MAF: createMethodCallMessage("<methodName>") with no funcName) yield none — their
   // verification is reverse-only. Fail-closed only when there is NO dbus pattern at all.
-  if (wires.length === 0 && !/createMethodCallMessage\(\s*"/.test(proxySource)) {
+  if (hasConcreteDbus && wires.length === 0 && !/createMethodCallMessage\(\s*"/.test(proxySource)) {
     errors.push("no createMethodCallMessage(...) patterns found in proxy source — cannot verify any wire");
   }
   // Forward (proxy → config): every wire the proxy declares must be in config with matching method/funcName.
@@ -74,7 +75,8 @@ export function wireCheckProvenance(config: unknown, proxies: readonly ProxyFile
   const cfg = config as Record<string, any>;
   const allWires = proxies.flatMap((p) => extractExpectedWire(p.src));
   const hasAnyMethodCall = proxies.some((p) => /createMethodCallMessage\(\s*"/.test(p.src));
-  if (allWires.length === 0 && !hasAnyMethodCall) {
+  const hasConcreteDbus = Object.entries(cfg).some(([opId, entry]) => opId !== "_deferred" && entry?.type === "dbus");
+  if (hasConcreteDbus && allWires.length === 0 && !hasAnyMethodCall) {
     errors.push("no createMethodCallMessage(...) patterns found in any proxy source — cannot verify any wire");
   }
   // Forward (proxy → config): every declared funcName-wire must be in config with matching method/funcName.

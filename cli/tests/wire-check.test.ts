@@ -34,6 +34,11 @@ describe("wireCheck", () => {
   it("fails closed when proxy source has no recognizable wire pattern (no vacuous pass)", () => {
     expect(wireCheck(CONFIG, "const x = 1; // no proxy patterns here").valid).toBe(false);
   });
+  it("passes when every selected operation is explicitly deferred", () => {
+    const deferred = { _deferred: { get_audio_volume: "Android AIDL adapter unavailable" } };
+    expect(wireCheck(deferred, "interface IAudioControl { int getAudioVolume(); }").valid).toBe(true);
+    expect(wireCheckProvenance(deferred, [{ name: "IAudioControl.aidl", src: "interface IAudioControl { int getAudioVolume(); }" }]).valid).toBe(true);
+  });
   it("flags an invented op whose funcName is absent from proxy (reverse check — the forward blind spot)", () => {
     // The whole point of the reverse check: a config op whose funcName was never in any proxy.
     // The forward (proxy→config) loop never visits it, so without the reverse check it would pass silently.

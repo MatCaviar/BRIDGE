@@ -10,7 +10,7 @@ const schemaPath = resolve(process.argv[3] ?? "schema/schema.json");
 await access(sourceDirectory).catch(() => { throw new Error(`imaudio source directory not found: ${sourceDirectory}`); });
 await access(schemaPath).catch(() => { throw new Error(`schema file not found: ${schemaPath}`); });
 const runtimeRoot = await mkdtemp(resolve(tmpdir(), "bridge-imaudio-local-"));
-const service = new WorkbenchService(createConfig({ runtimeRoot, repositoryRoot: resolve(".") }));
+const service = new WorkbenchService(createConfig({ runtimeRoot, repositoryRoot: resolve(".") }), { autoStartAnalysis: false });
 
 try {
   const project = await service.importFromPaths({ projectName: "imaudio-local-smoke", sourceDirectory, schemaPath });
@@ -20,7 +20,7 @@ try {
   if (missingDeclarations.length) throw new Error(`Missing source declarations: ${missingDeclarations.join(", ")}`);
   if (!index.evidence.some((item) => item.operation === "querySoundLibrary")) throw new Error("Missing RPC evidence: querySoundLibrary");
   if (index.nodes.some((node) => node.symbolKind === "import")) throw new Error("Imports were incorrectly projected as interface declarations");
-  const recovered = new WorkbenchService(createConfig({ runtimeRoot, repositoryRoot: resolve(".") }));
+  const recovered = new WorkbenchService(createConfig({ runtimeRoot, repositoryRoot: resolve(".") }), { autoStartAnalysis: false });
   await recovered.ready();
   if (!(await recovered.listProjects()).some((candidate) => candidate.id === project.id)) throw new Error("Imported project was not recovered after service restart");
   process.stdout.write(`${JSON.stringify({

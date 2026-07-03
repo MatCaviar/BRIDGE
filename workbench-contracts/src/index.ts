@@ -36,8 +36,8 @@ export const pipelineStages: readonly PipelineStageDefinition[] = [
   { id: "generate", label: "Generate", kind: "agent" },
   { id: "validate_config", label: "Validate Config", kind: "deterministic" },
   { id: "wire_check", label: "Wire Check", kind: "deterministic" },
-  { id: "test", label: "Test", kind: "deterministic" },
   { id: "build", label: "Build", kind: "deterministic" },
+  { id: "test", label: "Test", kind: "deterministic" },
   { id: "register", label: "Register", kind: "deterministic" },
   { id: "verify", label: "Verify", kind: "deterministic" },
   { id: "schema_preview", label: "Schema Preview", kind: "deterministic" },
@@ -187,7 +187,7 @@ export interface PipelineAutomationRun {
 }
 
 export const automaticPostCurateStages = [
-  "scaffold", "generate", "validate_config", "wire_check", "test", "build", "schema_preview", "verify",
+  "scaffold", "generate", "validate_config", "wire_check", "build", "test", "schema_preview", "verify",
 ] as const satisfies readonly PipelineStageId[];
 
 export interface WorkbenchEvent {

@@ -28,6 +28,7 @@ class FakeProcessRunner {
         await mkdir(join(this.workspace.rpcConfigPath, ".."), { recursive: true });
         await writeFile(this.workspace.rpcConfigPath, "{}\n");
       }
+      if (spec.operation === "schema_preview") await writeFile(join(this.workspace.root, "tools-schema.json"), '{"tools":[]}\n');
     }
     return { exitCode: this.nextExitCode, signal: null, stdout: "ok", stderr: this.stderr, durationMs: 1, timedOut: false, aborted: false, truncated: false };
   }
@@ -74,6 +75,7 @@ describe("PipelineRunner", () => {
     runner.markPassed("scaffold");
     await runner.runStage(workspace, "generate", { confirmed: true });
     expect(fake.calls[1]!.args.join(" ")).toContain("$mcp-generate");
+    expect(fake.calls[1]!.args.join(" ")).toContain(workspace.selectionPath);
   });
 
   it("invokes deterministic CLI stages as structured node arguments", async () => {
@@ -82,6 +84,11 @@ describe("PipelineRunner", () => {
     await runner.runStage(workspace, "scaffold", { confirmed: true });
     expect(fake.calls[0]).toMatchObject({ executable: process.execPath, operation: "scaffold", cwd: workspace.root });
     expect(fake.calls[0]!.args).toEqual(expect.arrayContaining(["scaffold", workspace.analysisPath, "--selection", workspace.selectionPath]));
+    runner.markPassed("generate");
+    await runner.runStage(workspace, "validate_config");
+    expect(fake.calls[1]!.args).toEqual(expect.arrayContaining(["validate_config", "--selection", workspace.selectionPath]));
+    await runner.runStage(workspace, "schema_preview", { confirmed: true });
+    expect(fake.calls[2]!.args).toEqual(expect.arrayContaining(["schema_preview", "--selection", workspace.selectionPath]));
   });
 
   it("blocks downstream stages after failed gates", async () => {
@@ -133,6 +140,7 @@ describe("PipelineRunner", () => {
   it("allows local verification after build without gateway registration", async () => {
     const { fake, runner } = createRunner();
     runner.markPassed("build");
+    runner.markPassed("test");
     await runner.runStage(workspace, "verify", { confirmed: true });
     expect(fake.calls[0]).toMatchObject({ operation: "verify" });
   });
