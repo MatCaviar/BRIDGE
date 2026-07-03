@@ -5,6 +5,7 @@
   "workspaces": [
     "workbench-contracts",
     "control-server",
+    "desktop",
     "ui"
   ],
   "scripts": {

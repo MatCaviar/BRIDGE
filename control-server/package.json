@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/start.js",
+  "main": "dist/service/workbench-service.js",
+  "exports": {
+    "./service": "./dist/service/workbench-service.js",
+    "./config": "./dist/config.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/start.ts",
