@@ -1,4 +1,4 @@
-import type { ProjectSummary, SourceIndex, WorkbenchEvent } from "@bridge/workbench-contracts";
+import type { PipelineAutomationRun, ProjectSummary, SourceIndex, WorkbenchEvent } from "@bridge/workbench-contracts";
 
 export interface WorkbenchBridge {
   selectSourceDirectory(): Promise<string | undefined>;
@@ -10,6 +10,9 @@ export interface WorkbenchBridge {
   getArtifacts(id: string): Promise<unknown>;
   saveSelection(id: string, selected: readonly string[]): Promise<unknown>;
   runStage(id: string, stage: string, confirmation?: Record<string, unknown>): Promise<unknown>;
+  getPipelineRun(id: string): Promise<PipelineAutomationRun | undefined>;
+  retryPipeline(id: string): Promise<PipelineAutomationRun>;
+  cancelPipeline(id: string): Promise<PipelineAutomationRun>;
   getMcp(id: string): Promise<unknown>;
   startMcp(id: string, mode: "mock" | "real", confirmation?: Record<string, unknown>): Promise<unknown>;
   stopMcp(id: string, confirmation?: Record<string, unknown>): Promise<unknown>;

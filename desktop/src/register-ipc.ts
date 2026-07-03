@@ -4,6 +4,7 @@ export const BRIDGE_CHANNELS = [
   "bridge:select-source", "bridge:select-schema", "bridge:import", "bridge:list-projects", "bridge:get-project",
   "bridge:get-source", "bridge:get-artifacts", "bridge:save-selection", "bridge:run-stage", "bridge:get-mcp",
   "bridge:start-mcp", "bridge:stop-mcp", "bridge:call-mcp", "bridge:subscribe",
+  "bridge:get-pipeline", "bridge:retry-pipeline", "bridge:cancel-pipeline",
 ] as const;
 
 interface IpcEventLike { readonly sender?: { readonly id?: number; send?(channel: string, value: unknown): void; once?(event: string, listener: () => void): void }; }
@@ -15,6 +16,7 @@ interface ServiceLike {
   runStage(id: string, stage: any, confirmation: any): Promise<unknown>; getMcp(id: string): Promise<unknown>;
   startMcp(id: string, mode: any, confirmation: any): Promise<unknown>; stopMcp(id: string, confirmation: any): Promise<unknown>;
   callMcp(id: string, toolName: string, args: Record<string, unknown>, mode: any, confirmation: any): Promise<unknown>;
+  getPipelineRun(id: string): Promise<unknown>; retryPipeline(id: string): Promise<unknown>; cancelPipeline(id: string): Promise<unknown>;
   subscribe(projectId: string | undefined, listener: (event: WorkbenchEvent) => void): () => void;
 }
 
@@ -30,6 +32,9 @@ export function registerWorkbenchIpc({ ipcMain, dialog, service }: { ipcMain: Ip
   register("bridge:get-artifacts", (_event, id) => service.getArtifacts(String(id)));
   register("bridge:save-selection", (_event, id, selected) => service.saveSelection(String(id), Array.isArray(selected) ? selected.map(String) : []));
   register("bridge:run-stage", (_event, id, stage, confirmation = {}) => service.runStage(String(id), stage, confirmation));
+  register("bridge:get-pipeline", (_event, id) => service.getPipelineRun(String(id)));
+  register("bridge:retry-pipeline", (_event, id) => service.retryPipeline(String(id)));
+  register("bridge:cancel-pipeline", (_event, id) => service.cancelPipeline(String(id)));
   register("bridge:get-mcp", (_event, id) => service.getMcp(String(id)));
   register("bridge:start-mcp", (_event, id, mode, confirmation = {}) => service.startMcp(String(id), mode, confirmation));
   register("bridge:stop-mcp", (_event, id, confirmation = {}) => service.stopMcp(String(id), confirmation));
