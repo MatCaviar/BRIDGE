@@ -2,6 +2,9 @@ import type { OperationId, PipelineStageId, StageStatus } from "@bridge/workbenc
 import { EventBus } from "../events/event-bus.js";
 import { CommandPolicy } from "./command-policy.js";
 import type { CommandSpec, ProcessResult } from "./process-runner.js";
+import { readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
+import { StageStore } from "./stage-store.js";
 
 export interface PipelineRunnerConfig {
   readonly codexExecutable: string;
@@ -35,13 +38,24 @@ const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
 
 export class PipelineRunner {
   readonly #states = new Map<PipelineStageId, StageStatus>();
+  #hydratedRoot?: string;
 
   constructor(
     readonly config: PipelineRunnerConfig,
     readonly processRunner: ProcessExecutor,
     readonly policy: CommandPolicy,
     readonly events: EventBus,
+    readonly stageStore = new StageStore(),
   ) {}
+
+  async hydrate(workspace: PipelineWorkspace): Promise<void> {
+    if (this.#hydratedRoot === workspace.root) return;
+    const persisted = await this.stageStore.load(workspace.root);
+    for (const [id, state] of Object.entries(persisted)) {
+      if (state) this.#states.set(id as PipelineStageId, state.status);
+    }
+    this.#hydratedRoot = workspace.root;
+  }
 
   markPassed(stage: PipelineStageId): void { this.#states.set(stage, "passed"); }
   markFailed(stage: PipelineStageId, error: string): void {
@@ -60,18 +74,35 @@ export class PipelineRunner {
 
   async runStage(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">, confirmation: StageConfirmation = {}, signal?: AbortSignal): Promise<ProcessResult> {
     const stage = operation as PipelineStageId;
+    await this.hydrate(workspace);
     this.assertRunnable(stage);
     this.policy.authorize({ operation, projectId: workspace.projectId, projectName: workspace.projectName, workspaceRoot: workspace.root, cwd: workspace.root, ...confirmation });
     const release = this.policy.acquireMutation(workspace.projectId, operation);
     this.#states.set(stage, "running");
+    await this.stageStore.save(workspace.root, this.#states);
     this.events.publish(workspace.projectId, "stage", { stage, status: "running" });
     try {
       const spec = this.commandFor(workspace, operation);
       const result = await this.processRunner.run(spec, signal, (stream, text) => this.events.publish(workspace.projectId, "log", { stage, stream, text }));
       const passed = result.exitCode === 0 && !result.timedOut && !result.aborted;
-      this.#states.set(stage, passed ? "passed" : "failed");
-      this.events.publish(workspace.projectId, "stage", { stage, status: passed ? "passed" : "failed", exitCode: result.exitCode, timedOut: result.timedOut, aborted: result.aborted });
-      if (!passed) throw new Error(stageFailure(stage, result));
+      if (!passed) {
+        this.#states.set(stage, "failed");
+        await this.stageStore.save(workspace.root, this.#states);
+        this.events.publish(workspace.projectId, "stage", { stage, status: "failed", exitCode: result.exitCode, timedOut: result.timedOut, aborted: result.aborted });
+        throw new Error(stageFailure(stage, result));
+      }
+      try {
+        await assertStageOutput(stage, workspace);
+      } catch (error) {
+        this.#states.set(stage, "failed");
+        await this.stageStore.save(workspace.root, this.#states);
+        const message = error instanceof Error ? error.message : String(error);
+        this.events.publish(workspace.projectId, "stage", { stage, status: "failed", error: message });
+        throw error;
+      }
+      this.#states.set(stage, "passed");
+      await this.stageStore.save(workspace.root, this.#states);
+      this.events.publish(workspace.projectId, "stage", { stage, status: "passed", exitCode: result.exitCode, timedOut: result.timedOut, aborted: result.aborted });
       return result;
     } finally {
       release();
@@ -108,6 +139,25 @@ export class PipelineRunner {
 
   private agentCommand(workspace: PipelineWorkspace, operation: "analyze" | "generate", prompt: string): CommandSpec {
     return { executable: this.config.codexExecutable, args: ["exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ephemeral", "--color", "never", "--cd", workspace.root, prompt], cwd: workspace.root, operation, projectId: workspace.projectId };
+  }
+}
+
+async function assertStageOutput(stage: PipelineStageId, workspace: PipelineWorkspace): Promise<void> {
+  const required: Partial<Record<PipelineStageId, { path: string; json?: boolean }>> = {
+    analyze: { path: workspace.analysisPath, json: true },
+    curate: { path: workspace.selectionPath, json: true },
+    scaffold: { path: join(workspace.generatedRoot, "package.json"), json: true },
+    generate: { path: workspace.rpcConfigPath, json: true },
+    build: { path: join(workspace.generatedRoot, "dist", "index.js") },
+    schema_preview: { path: join(workspace.root, "tools-schema.json"), json: true },
+  };
+  const output = required[stage];
+  if (!output) return;
+  try {
+    if (!(await stat(output.path)).isFile()) throw new Error("not a file");
+    if (output.json) JSON.parse(await readFile(output.path, "utf8"));
+  } catch {
+    throw new Error(`Stage ${stage} output ${output.path.split(/[\\/]/).at(-1)} is missing or invalid`);
   }
 }
 
