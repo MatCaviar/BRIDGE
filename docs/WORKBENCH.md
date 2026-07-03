@@ -1,58 +1,70 @@
-# BRIDGE Visual Workbench
+# BRIDGE Local Visual Workbench
 
-BRIDGE Visual Workbench is a localhost-only control plane for source import, interface discovery, Curate, provenance, gated pipeline execution, and real MCP stdio sessions.
+BRIDGE Workbench is a single-window local Electron application for source import, interface discovery, Curate, provenance, gated pipeline execution, and MCP stdio sessions. It does not start an HTTP server or listen on a TCP port.
 
-## Start
-
-```powershell
-npm install
-npm run workbench:dev
-```
-
-On Windows, the equivalent repository script is:
+## Start on Windows
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-workbench.ps1
 ```
 
-Use `-Install` on its first run when dependencies have not been installed. Press `Ctrl+C` in that terminal to stop both services.
+Use `-Install` on the first run when dependencies are absent. The script builds the contracts, local orchestration service, React renderer, and Electron main process, then opens one desktop window. Close the window to stop Workbench and its MCP child processes.
 
-The command first builds the shared contracts, then binds the API to `127.0.0.1:43140` and Vite to `127.0.0.1:43141`. It does not open a browser. Set `CODEX_EXECUTABLE` when Codex is not on `PATH`. Use `npm run workbench:build` for production assets.
+Equivalent npm commands:
+
+```powershell
+npm run workbench:build
+npm run workbench:start
+```
+
+No system browser is opened automatically. No `localhost`, `43140`, or `43141` service is required.
 
 ## Workflow
 
-1. Import a source directory and target MCP schema into an isolated workspace. The importer accepts a normal JSON object, a JSON array of tool descriptors, or legacy files containing adjacent top-level JSON tool objects.
-2. Run Analyze, which invokes Codex with `$mcp-analyze` in workspace-write sandbox mode.
-3. Review capabilities and save a Curate selection.
-4. Run Scaffold, Generate, validation gates, tests, build, registration, verification, and schema preview.
-5. Inspect source → capability → tool → RPC provenance and coverage gaps.
-6. Start the generated server and exercise `tools/list` and `tools/call` in MCP Playground.
+1. In the desktop window, choose a source directory and target MCP schema with native file dialogs.
+2. The Electron main process filters source files, parses standard JSON/arrays/adjacent JSON objects, and creates an isolated workspace.
+3. Import writes `project.json`, `target-mcp-schema.json`, and a semantic `source-index.json` containing declarations, dependencies, and RPC evidence.
+4. Run Analyze, review source-backed capabilities, and save a Curate selection.
+5. Run Scaffold, Generate, validation gates, tests, build, verification, and schema preview.
+6. Inspect source → capability → MCP → RPC provenance and explicit coverage gaps.
+7. Start the generated stdio server and exercise `tools/list` and `tools/call` in MCP Playground.
 
-## Security
+Projects and stage state survive application restart. Analyze uses `source-index.json` for navigation and verifies every promoted capability against live source.
 
-- Imported paths reject traversal, absolute paths, drive prefixes, NUL bytes, and symlinks.
-- Defaults are 5,000 files, 5 MiB per file, and 100 MiB total.
-- Commands use an internal allowlist, `shell: false`, bounded logs, and timeouts. HTTP clients cannot provide executables.
-- Mutations require confirmation. Deploy and each real MCP call require the exact project name.
-- Failed validation, wire-check, or test gates block downstream real operations.
-- Non-loopback server configuration is rejected.
+## Local security boundary
 
-## Resource guarantees
+- Renderer Node integration is disabled; context isolation and Electron sandboxing are enabled.
+- The renderer receives only a typed `window.bridge` allowlist. It cannot submit commands, executables, flags, or arbitrary output paths.
+- Filesystem, process, and MCP access remain in the Electron main process.
+- Imported paths reject traversal and symlinks; limits are 5,000 files, 5 MiB per file, and 100 MiB total.
+- Pipeline commands use an allowlist, `shell:false`, bounded logs, timeouts, persistent postconditions, and confirmation gates.
+- Deploy and real MCP calls require the exact project name. Failed gates block real execution.
 
-The Aether field uses Canvas 2D, capped at 64 particles, about 45 FPS, and DPR 1.5. It pauses on hidden pages and becomes a CSS poster for reduced motion or unavailable canvas. The UI retains 5,000 log lines and the service retains 500 events. Scripts never launch a browser automatically.
+## Mock and real readiness
 
-## Mock and real MCP
+`MOCK READY` means a built generated stdio server can be exercised safely. `REAL READY` additionally requires a valid non-deferred wire mapping and all real-execution gates. Deferred transports and missing targets remain visible with their blocking reason.
 
-Both modes communicate with a real MCP stdio process. Mock mode targets generated mock transports. Real mode is visually distinct and requires a fresh typed project-name confirmation per call; it does not bypass generated-server safety checks.
+Android projects are indexed from Gradle, manifests, Kotlin, Java, AIDL, XML, and reference files. Android AIDL or vehicle-SDK calls remain deferred until a compatible bridge adapter exists.
 
-Android projects are scanned from Gradle, manifest, Kotlin, Java, AIDL, XML, and bundled SDK-reference files. Analyze only promotes interfaces backed by source evidence. A target schema entry that exists only in documentation is displayed as a coverage gap. The current real transport generator targets the BRIDGE/YunOS RPC runtime; an Android AIDL or vehicle-SDK capability remains deferred until the imported project supplies a compatible bridge adapter. Mock mode can still exercise the generated MCP contract without claiming that it controls a vehicle.
+## Resource limits
+
+The app creates one BrowserWindow. The Aether field is Canvas 2D, capped at 64 particles, about 45 FPS, and DPR 1.5; it pauses when hidden and honors reduced motion. DevTools and additional windows do not open automatically.
+
+## Verification
+
+```powershell
+npm run workbench:test
+npm run workbench:build
+node scripts\smoke-imaudio-workbench.mjs source_code\imaudio_app_code
+```
+
+The real-project smoke fails unless representative audio manager/proxy declarations and `querySoundLibrary` RPC evidence are present.
 
 ## Troubleshooting
 
-- API offline: check port 43140 and run `npm run workbench:api`.
-- Analyze/Generate cannot start: configure `CODEX_EXECUTABLE`.
-- Analyze reports a usage limit: the UI now includes the useful process error; wait for the stated reset time and retry the stage.
-- Android target remains unmatched: confirm that the requested method exists in Kotlin/Java/AIDL source, not only in a reference Markdown file, and provide a bridge adapter for real transport.
+- Local bridge unavailable: start via `scripts\start-workbench.ps1`, not by opening `ui/dist/index.html` directly.
+- Analyze cannot start: ensure `codex` is on `PATH` or set `CODEX_EXECUTABLE` before launch.
+- Analyze usage limit: wait for the reset time shown in the stage error and retry.
 - Scaffold blocked: save a non-empty Curate selection.
 - Build blocked: resolve validation and wire-check findings.
-- MCP start fails: build the generated server and verify `dist/index.js`.
+- MCP start fails: build the generated server and verify its `dist/index.js`.

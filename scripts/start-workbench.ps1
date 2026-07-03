@@ -17,9 +17,8 @@ if ($Install) {
 }
 
 Write-Host "BRIDGE Visual Workbench" -ForegroundColor Cyan
-Write-Host "UI:  http://127.0.0.1:43141/"
-Write-Host "API: http://127.0.0.1:43140/api/health"
-Write-Host "Press Ctrl+C to stop both services."
+Write-Host "Starting one local Electron window (no HTTP server or TCP port)."
+Write-Host "Close the window to stop Workbench and its child processes."
 
-& $npm run workbench:dev
+& $npm run workbench:start
 exit $LASTEXITCODE

@@ -7,9 +7,6 @@ export interface ImportLimits {
 }
 
 export interface ControlServerConfig {
-  readonly host: "127.0.0.1";
-  readonly port: number;
-  readonly maxRequestBytes: number;
   readonly runtimeRoot: string;
   readonly repositoryRoot: string;
   readonly codexExecutable: string;
@@ -18,9 +15,6 @@ export interface ControlServerConfig {
 
 export function createConfig(overrides: Partial<ControlServerConfig> = {}): ControlServerConfig {
   return {
-    host: "127.0.0.1",
-    port: 43140,
-    maxRequestBytes: 110 * 1024 * 1024,
     runtimeRoot: resolve(".workbench-runtime"),
     repositoryRoot: resolve("."),
     codexExecutable: process.env.CODEX_EXECUTABLE ?? "codex",

@@ -10,8 +10,6 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/start.ts",
-    "start": "node dist/start.js",
     "test": "vitest run"
   },
   "dependencies": {
@@ -23,7 +21,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.20.0",
     "vitest": "^3.2.6"
   }
 }
