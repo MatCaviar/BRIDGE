@@ -117,7 +117,11 @@ export interface Capability {
   readonly params: readonly Record<string, unknown>[];
   readonly returns?: Record<string, unknown>;
   readonly selected: boolean;
+  /** @deprecated Prefer mockExecutable and realExecutable. */
   readonly executable: boolean;
+  readonly mockExecutable: boolean;
+  readonly realExecutable: boolean;
+  readonly blockedReason?: string;
   readonly findings: readonly string[];
 }
 
@@ -125,7 +129,11 @@ export interface ToolProjection {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: Record<string, unknown>;
+  /** @deprecated Prefer mockExecutable and realExecutable. */
   readonly executable: boolean;
+  readonly mockExecutable: boolean;
+  readonly realExecutable: boolean;
+  readonly blockedReason?: string;
 }
 
 export interface TargetProjection {
@@ -133,7 +141,11 @@ export interface TargetProjection {
   readonly description: string;
   readonly inputSchema: Record<string, unknown>;
   readonly matchedCapabilityIds: readonly string[];
+  /** @deprecated Prefer mockExecutable and realExecutable. */
   readonly executable: boolean;
+  readonly mockExecutable: boolean;
+  readonly realExecutable: boolean;
+  readonly blockedReason?: string;
 }
 
 export interface RpcProjection {

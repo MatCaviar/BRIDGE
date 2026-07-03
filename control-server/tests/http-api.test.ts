@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -67,5 +67,25 @@ describe("control HTTP API", () => {
     expect(await recovered.json()).toMatchObject({ ok: true, data: { id: imported.data.id, name: "Recovered" } });
     const source = await (await fetch(`${secondBase}/api/projects/${imported.data.id}/source`)).json() as any;
     expect(source.data.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ label: "play", owner: "Audio" })]));
+  });
+
+  it("rejects Curate selections that are absent from analysis", async () => {
+    const base = await start();
+    const imported = await (await fetch(`${base}/api/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectName: "Curate", files: [{ path: "src/audio.ts", contentBase64: Buffer.from("class Audio { play() {} }").toString("base64") }], targetSchema: { type: "object" } }),
+    })).json() as any;
+    const state = join(imported.data.root, ".mcp-pipeline", "curate");
+    await mkdir(state, { recursive: true });
+    await writeFile(join(state, "analysis.json"), JSON.stringify({ capabilities: [{ id: "play_audio" }] }));
+
+    const response = await fetch(`${base}/api/projects/${imported.data.id}/selection`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ selected: ["invented_tool"] }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, error: { message: expect.stringMatching(/unknown capability.*invented_tool/i) } });
   });
 });

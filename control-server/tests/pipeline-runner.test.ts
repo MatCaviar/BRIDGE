@@ -117,4 +117,12 @@ describe("PipelineRunner", () => {
     await second.hydrate(workspace);
     expect(second.status("analyze")).toBe("passed");
   });
+
+  it("persists externally completed stages such as Curate", async () => {
+    const first = createRunner().runner as PipelineRunner & { recordPassed(workspace: PipelineWorkspace, stage: "curate"): Promise<void> };
+    await first.recordPassed(workspace, "curate");
+    const second = createRunner().runner;
+    await second.hydrate(workspace);
+    expect(second.status("curate")).toBe("passed");
+  });
 });

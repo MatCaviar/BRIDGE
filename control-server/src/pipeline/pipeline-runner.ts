@@ -62,6 +62,12 @@ export class PipelineRunner {
     this.#states.set(stage, "failed");
     this.events.publish("system", "stage", { stage, status: "failed", error });
   }
+  async recordPassed(workspace: PipelineWorkspace, stage: PipelineStageId): Promise<void> {
+    await this.hydrate(workspace);
+    this.#states.set(stage, "passed");
+    await this.stageStore.save(workspace.root, this.#states);
+    this.events.publish(workspace.projectId, "stage", { stage, status: "passed" });
+  }
   status(stage: PipelineStageId): StageStatus { return this.#states.get(stage) ?? "pending"; }
 
   assertRealMcpReady(): void {

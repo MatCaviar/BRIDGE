@@ -1,5 +1,5 @@
 import type { Capability, ProvenanceEdge, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 interface ArtifactProjection {
@@ -47,13 +47,8 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   const config = await optionalJson(join(projectRoot, `mcp-${appName}`, "rpc", "config.json"), "RPC config", findings);
   const targetSchema = await optionalJson(join(projectRoot, "target-mcp-schema.json"), "target schema", findings);
   const selected = new Set<string>(Array.isArray(selection?.selected) ? selection.selected : []);
-  const tools: ToolProjection[] = Array.isArray(schema?.tools) ? schema.tools.map((tool: any) => ({
-    name: String(tool.name),
-    description: String(tool.description ?? ""),
-    inputSchema: tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : {},
-    executable: tool.executable !== false,
-  })) : [];
-  const toolMap = new Map(tools.map((tool) => [tool.name, tool]));
+  const generatedRoot = join(projectRoot, `mcp-${appName}`);
+  const built = await fileExists(join(generatedRoot, "dist", "index.js"));
   const rpc: RpcProjection[] = config && typeof config === "object"
     ? Object.entries(config).filter(([key]) => key !== "_deferred").map(([operation, spec]: [string, any]) => ({
       operation,
@@ -62,7 +57,33 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     }))
     : [];
   const rpcSet = new Set(rpc.map((entry) => entry.operation));
-  const deferred = new Set<string>(config?._deferred && typeof config._deferred === "object" ? Object.keys(config._deferred) : []);
+  const deferredValues = config?._deferred && typeof config._deferred === "object" ? config._deferred as Record<string, unknown> : {};
+  const deferred = new Set<string>(Object.keys(deferredValues));
+  const blockedReason = (name: string): string | undefined => {
+    if (!built) return "Build output is missing";
+    if (deferred.has(name)) {
+      const value = deferredValues[name];
+      return typeof value === "string" ? value : value && typeof value === "object" && "reason" in value ? String((value as any).reason) : "RPC mapping is deferred";
+    }
+    if (!rpcSet.has(name)) return "RPC mapping is missing";
+    return undefined;
+  };
+  const tools: ToolProjection[] = Array.isArray(schema?.tools) ? schema.tools.map((tool: any) => {
+    const name = String(tool.name);
+    const mockExecutable = built;
+    const reason = blockedReason(name);
+    const realExecutable = mockExecutable && !reason;
+    return {
+      name,
+      description: String(tool.description ?? ""),
+      inputSchema: tool.inputSchema && typeof tool.inputSchema === "object" ? tool.inputSchema : {},
+      executable: realExecutable,
+      mockExecutable,
+      realExecutable,
+      blockedReason: reason,
+    };
+  }) : [];
+  const toolMap = new Map(tools.map((tool) => [tool.name, tool]));
   const rawCapabilities = Array.isArray(analysis?.capabilities) ? analysis.capabilities : [];
   const capabilities: Capability[] = rawCapabilities.map((cap: any) => ({
     id: String(cap.id),
@@ -75,15 +96,21 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     params: Array.isArray(cap.params) ? cap.params : [],
     returns: cap.returns && typeof cap.returns === "object" ? cap.returns : undefined,
     selected: selected.size === 0 ? true : selected.has(String(cap.id)),
-    executable: toolMap.get(String(cap.id))?.executable ?? (rpcSet.has(String(cap.id)) && !deferred.has(String(cap.id))),
+    executable: toolMap.get(String(cap.id))?.realExecutable ?? false,
+    mockExecutable: toolMap.get(String(cap.id))?.mockExecutable ?? false,
+    realExecutable: toolMap.get(String(cap.id))?.realExecutable ?? false,
+    blockedReason: toolMap.get(String(cap.id))?.blockedReason ?? (!toolMap.has(String(cap.id)) ? "MCP tool is not generated" : undefined),
     findings: [],
   }));
   const rawTargets = Array.isArray(targetSchema?.tools) ? targetSchema.tools : targetSchema?.name ? [targetSchema] : [];
   const targets: TargetProjection[] = rawTargets.filter((target: any) => target && typeof target === "object" && target.name).map((target: any) => {
     const name = String(target.name);
     const matches = capabilities.filter((capability) => capability.id === name).map((capability) => capability.id);
-    const executable = matches.some((id) => capabilities.find((capability) => capability.id === id)?.executable === true);
-    return { name, description: String(target.description ?? ""), inputSchema: target.inputSchema && typeof target.inputSchema === "object" ? target.inputSchema : legacyInputSchema(target.arguments), matchedCapabilityIds: matches, executable };
+    const matched = matches.map((id) => capabilities.find((capability) => capability.id === id)).filter(Boolean) as Capability[];
+    const mockExecutable = matched.some((capability) => capability.mockExecutable);
+    const realExecutable = matched.some((capability) => capability.realExecutable);
+    const reason = matched.find((capability) => capability.blockedReason)?.blockedReason ?? (matches.length ? undefined : "No source-backed capability");
+    return { name, description: String(target.description ?? ""), inputSchema: target.inputSchema && typeof target.inputSchema === "object" ? target.inputSchema : legacyInputSchema(target.arguments), matchedCapabilityIds: matches, executable: realExecutable, mockExecutable, realExecutable, blockedReason: reason };
   });
   for (const target of targets) if (target.matchedCapabilityIds.length === 0) findings.push(`Target tool '${target.name}' has no source-backed capability`);
   const edges: ProvenanceEdge[] = [];
@@ -109,4 +136,8 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     },
     findings,
   };
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try { return (await stat(path)).isFile(); } catch { return false; }
 }

@@ -92,11 +92,14 @@ export class WorkbenchRouter {
       if (request.method === "PUT" && tail === "selection") {
         const input = z.object({ selected: z.array(z.string()) }).parse(await readJson(request, this.config.maxRequestBytes));
         const stateRoot = join(project.root, ".mcp-pipeline", safeProjectId(project.name));
+        const analysis = JSON.parse(await readFile(join(stateRoot, "analysis.json"), "utf8")) as { capabilities?: { id?: unknown }[] };
+        const known = new Set((Array.isArray(analysis.capabilities) ? analysis.capabilities : []).map((capability) => String(capability.id)));
+        const unknown = [...new Set(input.selected)].filter((id) => !known.has(id));
+        if (unknown.length) throw new HttpError(400, `Unknown capability selection: ${unknown.join(", ")}`);
         await mkdir(stateRoot, { recursive: true });
         const selected = [...new Set(input.selected)].sort();
         await writeFile(join(stateRoot, "selection.json"), `${JSON.stringify({ appId: safeProjectId(project.name), selected, selectedCount: selected.length }, null, 2)}\n`);
-        this.pipeline(project).markPassed("curate");
-        this.events.publish(project.id, "stage", { stage: "curate", status: "passed" });
+        await this.pipeline(project).recordPassed(await this.pipelineWorkspace(project), "curate");
         this.events.publish(project.id, "artifact", { name: "selection.json" });
         return send(response, 200, { selected });
       }
@@ -163,7 +166,7 @@ export class WorkbenchRouter {
     const state = join(project.root, ".mcp-pipeline", app);
     const generated = join(project.root, `mcp-${app}`);
     const sourceRoot = join(project.root, "source");
-    const scan = await scanProject(sourceRoot);
+    const scan = await this.sourceIndex(project);
     const proxyPaths = scan.nodes
       .filter((node) => node.kind === "file" && /(?:proxy|service|client|controller|manager|\.aidl$)/i.test(node.path) && /\.(?:ts|tsx|js|jsx|kt|java|aidl)$/i.test(node.path))
       .slice(0, 200)
