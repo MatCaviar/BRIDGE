@@ -33,4 +33,36 @@ describe("scanProject", () => {
     expect(result.nodes.some((node) => node.label === "ILightService" && node.symbolKind === "class")).toBe(true);
     expect(result.nodes.some((node) => node.label === "setReadingLight" && node.symbolKind === "method")).toBe(true);
   });
+
+  it("indexes TypeScript declarations, methods, dependencies, and RPC evidence without comment false positives", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bridge-typescript-scan-"));
+    roots.push(root);
+    await mkdir(join(root, "manager"), { recursive: true });
+    await writeFile(join(root, "manager", "KaraokeManager.ts"), `
+      import { BaseManager } from "./BaseManager";
+      // class FakeFromComment { fakeMethod() {} }
+      export interface SoundMode { level: number }
+      export default class PublicController { setMicVol(volume: number) {} }
+      class KaraokeManager extends BaseManager {
+        public setMicVol(volume: number) {
+          return this.iface.createMethodCallMessage("setMicVol");
+        }
+        private reset() {}
+      }
+      const fake = "class FakeFromString { fakeMethod() {} }";
+    `);
+
+    const result = await scanProject(root) as any;
+    expect(result.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "SoundMode", symbolKind: "interface", line: expect.any(Number) }),
+      expect.objectContaining({ label: "PublicController", symbolKind: "class", line: expect.any(Number) }),
+      expect.objectContaining({ label: "KaraokeManager", symbolKind: "class", line: expect.any(Number) }),
+      expect.objectContaining({ label: "setMicVol", symbolKind: "method", owner: "KaraokeManager", visibility: "public" }),
+      expect.objectContaining({ label: "reset", symbolKind: "method", owner: "KaraokeManager", visibility: "private" }),
+    ]));
+    expect(result.nodes.some((node: any) => node.label === "FakeFromComment" || node.label === "FakeFromString")).toBe(false);
+    expect(result.nodes.some((node: any) => node.symbolKind === "import")).toBe(false);
+    expect(result.edges).toContainEqual(expect.objectContaining({ kind: "imports", to: "./BaseManager" }));
+    expect(result.evidence).toContainEqual(expect.objectContaining({ operation: "setMicVol", transport: "dbus" }));
+  });
 });

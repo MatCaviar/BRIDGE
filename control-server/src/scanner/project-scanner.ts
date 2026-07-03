@@ -1,15 +1,14 @@
-import type { SourceNode } from "@bridge/workbench-contracts";
+import type { SourceIndex, SourceNode } from "@bridge/workbench-contracts";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, relative, resolve } from "node:path";
+import { extractTypeScript } from "./typescript-extractor.js";
 
 const SKIP = new Set(["node_modules", ".git", ".gradle", ".idea", "build", "dist", "coverage", ".workbench-runtime"]);
 const TEXT_EXTENSIONS = new Set([".aidl", ".c", ".cc", ".cpp", ".gradle", ".h", ".hpp", ".java", ".json", ".kt", ".kts", ".md", ".properties", ".toml", ".ts", ".tsx", ".js", ".jsx", ".xml", ".yaml", ".yml"]);
 const MAX_TEXT_BYTES = 1024 * 1024;
 const MAX_NODES = 10_000;
 
-export interface ProjectScan {
-  readonly nodes: readonly SourceNode[];
-}
+export type ProjectScan = SourceIndex;
 
 function extension(path: string): string {
   const index = path.lastIndexOf(".");
@@ -19,6 +18,9 @@ function extension(path: string): string {
 export async function scanProject(projectRoot: string): Promise<ProjectScan> {
   const root = resolve(projectRoot);
   const nodes: SourceNode[] = [];
+  const edges: SourceIndex["edges"][number][] = [];
+  const evidence: SourceIndex["evidence"][number][] = [];
+  const findings: string[] = [];
 
   async function visit(directory: string, parentId?: string): Promise<void> {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -40,11 +42,12 @@ export async function scanProject(projectRoot: string): Promise<ProjectScan> {
       try { if ((await stat(full)).size > MAX_TEXT_BYTES) continue; source = await readFile(full, "utf8"); } catch { continue; }
       const ext = extension(path);
       const patterns: [RegExp, SourceNode["symbolKind"]][] = [];
-      if ([".ts", ".tsx", ".js", ".jsx"].includes(ext)) patterns.push(
-        [/\bexport\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/g, "function"],
-        [/\bexport\s+class\s+([A-Za-z_$][\w$]*)/g, "class"],
-        [/\bimport[\s\S]*?from\s+["']([^"']+)["']/g, "import"],
-      );
+      if ([".ts", ".tsx", ".js", ".jsx"].includes(ext)) {
+        const extracted = extractTypeScript(path, source, id);
+        nodes.push(...extracted.nodes);
+        edges.push(...extracted.edges);
+        evidence.push(...extracted.evidence);
+      }
       if ([".kt", ".kts"].includes(ext)) patterns.push(
         [/\b(?:data\s+|sealed\s+|open\s+|abstract\s+)?(?:class|interface|object)\s+([A-Za-z_$][\w$]*)/g, "class"],
         [/\b(?:override\s+)?(?:suspend\s+)?fun\s+([A-Za-z_$][\w$]*)\s*\(/g, "method"],
@@ -67,5 +70,5 @@ export async function scanProject(projectRoot: string): Promise<ProjectScan> {
   }
 
   await visit(root);
-  return { nodes };
+  return { version: 1, nodes, edges, evidence, findings };
 }

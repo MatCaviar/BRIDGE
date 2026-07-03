@@ -75,10 +75,35 @@ export interface ProjectSummary {
 export interface SourceNode {
   readonly id: string;
   readonly path: string;
-  readonly kind: "file" | "directory" | "symbol";
+  readonly kind: "file" | "directory" | "symbol" | "evidence";
   readonly label: string;
   readonly parentId?: string;
-  readonly symbolKind?: "function" | "method" | "class" | "import";
+  readonly symbolKind?: "function" | "method" | "class" | "interface" | "object";
+  readonly owner?: string;
+  readonly visibility?: "public" | "protected" | "private";
+  readonly line?: number;
+}
+
+export interface SourceEdge {
+  readonly from: string;
+  readonly to: string;
+  readonly kind: "contains" | "imports" | "calls";
+}
+
+export interface RpcEvidence {
+  readonly id: string;
+  readonly path: string;
+  readonly line: number;
+  readonly operation: string;
+  readonly transport: "dbus" | "native" | "aidl";
+}
+
+export interface SourceIndex {
+  readonly version: 1;
+  readonly nodes: readonly SourceNode[];
+  readonly edges: readonly SourceEdge[];
+  readonly evidence: readonly RpcEvidence[];
+  readonly findings: readonly string[];
 }
 
 export interface Capability {
