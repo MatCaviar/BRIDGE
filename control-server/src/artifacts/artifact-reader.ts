@@ -1,4 +1,4 @@
-import type { Capability, ProvenanceEdge, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
+import type { Capability, PipelineStageState, ProvenanceEdge, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -10,6 +10,7 @@ interface ArtifactProjection {
   readonly edges: readonly ProvenanceEdge[];
   readonly coverage: { readonly targeted: number; readonly matched: number; readonly discovered: number; readonly selected: number; readonly projected: number; readonly wired: number };
   readonly findings: readonly string[];
+  readonly stages: readonly PipelineStageState[];
 }
 
 function legacyInputSchema(argumentsValue: unknown): Record<string, unknown> {
@@ -46,6 +47,7 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   const schema = await optionalJson(join(stateRoot, "tools-schema.json"), "tools schema", findings);
   const config = await optionalJson(join(projectRoot, `mcp-${appName}`, "rpc", "config.json"), "RPC config", findings);
   const targetSchema = await optionalJson(join(projectRoot, "target-mcp-schema.json"), "target schema", findings);
+  const stageState = await optionalJson(join(projectRoot, ".workbench", "stages.json"), "pipeline stages", findings);
   const selected = new Set<string>(Array.isArray(selection?.selected) ? selection.selected : []);
   const generatedRoot = join(projectRoot, `mcp-${appName}`);
   const built = await fileExists(join(generatedRoot, "dist", "index.js"));
@@ -135,6 +137,7 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
       wired: capabilities.filter((cap) => rpcSet.has(cap.id)).length,
     },
     findings,
+    stages: stageState?.stages && typeof stageState.stages === "object" ? Object.values(stageState.stages) as PipelineStageState[] : [],
   };
 }
 

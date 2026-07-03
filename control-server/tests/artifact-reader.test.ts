@@ -15,6 +15,8 @@ describe("readArtifacts", () => {
     const generatedRoot = join(root, "mcp-demo");
     const generated = join(generatedRoot, "rpc");
     await mkdir(state, { recursive: true });
+    await mkdir(join(root, ".workbench"), { recursive: true });
+    await writeFile(join(root, ".workbench", "stages.json"), JSON.stringify({ version: 1, stages: { analyze: { id: "analyze", status: "passed" } } }));
     await mkdir(generated, { recursive: true });
     await mkdir(join(generatedRoot, "dist"), { recursive: true });
     await writeFile(join(generatedRoot, "dist", "index.js"), "// built\n");
@@ -44,6 +46,7 @@ describe("readArtifacts", () => {
     expect(result.targets[0]).toMatchObject({ name: "read_status", matchedCapabilityIds: ["read_status"], mockExecutable: true, realExecutable: true });
     expect(result.targets[1]?.inputSchema).toMatchObject({ properties: { state: { type: "string", enum: ["on", "off"] } } });
     expect(result.findings).toContain("Target tool 'missing_target' has no source-backed capability");
+    expect((result as any).stages).toContainEqual({ id: "analyze", status: "passed" });
   });
 
   it("turns malformed optional artifacts into findings", async () => {
