@@ -129,4 +129,11 @@ describe("PipelineRunner", () => {
     await second.hydrate(workspace);
     expect(second.status("curate")).toBe("passed");
   });
+
+  it("allows local verification after build without gateway registration", async () => {
+    const { fake, runner } = createRunner();
+    runner.markPassed("build");
+    await runner.runStage(workspace, "verify", { confirmed: true });
+    expect(fake.calls[0]).toMatchObject({ operation: "verify" });
+  });
 });

@@ -174,10 +174,26 @@ export interface PipelineRun {
   readonly stages: readonly PipelineStageState[];
 }
 
+export type PipelineAutomationStatus = "analyzing" | "awaiting_curate" | "running" | "failed" | "mock_ready" | "cancelled";
+
+export interface PipelineAutomationRun {
+  readonly projectId: string;
+  readonly status: PipelineAutomationStatus;
+  readonly activeStage?: PipelineStageId;
+  readonly failedStage?: PipelineStageId;
+  readonly error?: string;
+  readonly startedAt: string;
+  readonly updatedAt: string;
+}
+
+export const automaticPostCurateStages = [
+  "scaffold", "generate", "validate_config", "wire_check", "test", "build", "schema_preview", "verify",
+] as const satisfies readonly PipelineStageId[];
+
 export interface WorkbenchEvent {
   readonly sequence: number;
   readonly projectId: string;
-  readonly type: "stage" | "log" | "artifact" | "mcp" | "project";
+  readonly type: "stage" | "log" | "artifact" | "mcp" | "project" | "pipeline";
   readonly timestamp: string;
   readonly payload: Record<string, unknown>;
 }

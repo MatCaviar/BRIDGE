@@ -33,7 +33,7 @@ const ANSI_ESCAPE = /\u001B(?:[@-_]|\[[0-?]*[ -/]*[@-~])/g;
 const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
   curate: ["analyze"], scaffold: ["curate"], generate: ["scaffold"],
   validate_config: ["generate"], wire_check: ["generate"], test: ["validate_config", "wire_check"],
-  build: ["test"], register: ["build"], verify: ["register"], schema_preview: ["generate"], deploy: ["verify"],
+  build: ["test"], register: ["build"], verify: ["build"], schema_preview: ["generate"], deploy: ["verify"],
 };
 
 export class PipelineRunner {
