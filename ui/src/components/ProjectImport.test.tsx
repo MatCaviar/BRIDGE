@@ -21,9 +21,9 @@ describe("ProjectImport local bridge", () => {
     render(<ProjectImport />);
     fireEvent.change(screen.getByLabelText("项目名"), { target: { value: "Audio" } });
     fireEvent.click(screen.getByRole("button", { name: "选择源码目录" }));
-    fireEvent.click(screen.getByRole("button", { name: "选择 Schema" }));
+    fireEvent.click(screen.getByRole("button", { name: "选择格式参考 Schema" }));
     await screen.findByText("D:/source/audio"); await screen.findByText("D:/schema.json");
-    fireEvent.click(screen.getByRole("button", { name: "建立隔离工作区" }));
+    fireEvent.click(screen.getByRole("button", { name: "导入并自动 Analyze" }));
     await waitFor(() => expect(bridge.importProject).toHaveBeenCalledWith({ projectName: "Audio", sourceDirectory: "D:/source/audio", schemaPath: "D:/schema.json" }));
     expect(setProject).toHaveBeenCalledWith(expect.objectContaining({ id: "p1" }));
   });
