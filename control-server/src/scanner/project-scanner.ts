@@ -56,6 +56,14 @@ export async function scanProject(projectRoot: string): Promise<ProjectScan> {
         [/\b(?:class|interface|enum)\s+([A-Za-z_$][\w$]*)/g, "class"],
         [/\b(?:public\s+|protected\s+|private\s+|static\s+|abstract\s+)*(?:void|boolean|byte|short|int|long|float|double|char|String|[A-Za-z_$][\w$<>?.]*)\s+([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?:;|\{)/g, "method"],
       );
+      if ([".kt", ".kts", ".java"].includes(ext)) {
+        for (const match of source.matchAll(/\btransact\s*\(\s*"([a-z][a-z0-9_]*)"/g)) {
+          const operation = match[1];
+          if (!operation) continue;
+          const line = source.slice(0, match.index).split(/\r?\n/).length;
+          evidence.push({ id: `${id}:aidl:${operation}:${line}`, path, line, operation, transport: "aidl" });
+        }
+      }
       const seen = new Set<string>();
       for (const [pattern, symbolKind] of patterns) {
         for (const match of source.matchAll(pattern)) {
