@@ -6,7 +6,8 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run"
+    "test": "vitest run --exclude tests/local-workbench-smoke.test.ts",
+    "test:smoke": "vitest run tests/local-workbench-smoke.test.ts"
   },
   "dependencies": {
     "@bridge/control-server": "0.1.0",

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "pretest": "npm run build --prefix ../framework",
     "check-manifests": "node ../scripts/check-manifests.js",
     "test": "vitest run",
     "test:watch": "vitest",

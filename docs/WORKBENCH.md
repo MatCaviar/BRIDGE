@@ -55,10 +55,11 @@ The app creates one BrowserWindow. The Aether field is Canvas 2D, capped at 64 p
 ```powershell
 npm run workbench:test
 npm run workbench:build
-node scripts\smoke-imaudio-workbench.mjs source_code\imaudio_app_code
+node scripts\smoke-imaudio-workbench.mjs source_code\imaudio_app_code schema\schema.json
+npm run test:smoke --prefix desktop
 ```
 
-The real-project smoke fails unless representative audio manager/proxy declarations and `querySoundLibrary` RPC evidence are present.
+The real-project smoke fails unless both inputs can be imported, representative audio manager/proxy declarations and `querySoundLibrary` RPC evidence are present, and the persisted project can be recovered. The Electron smoke must run in a normal interactive Windows user session; restricted CI/sandbox sessions may not permit Chromium GPU subprocesses.
 
 ## Troubleshooting
 

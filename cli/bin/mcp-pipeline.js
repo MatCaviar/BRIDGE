@@ -29,9 +29,10 @@ function ensurePackageReady(dir, distEntry) {
   if (!existsSync(resolve(dir, "node_modules"))) {
     run("npm", ["install", "--no-fund", "--no-audit"], dir);
   }
-  if (!existsSync(resolve(dir, distEntry))) {
-    run("npx", ["tsc"], dir);
-  }
+  // Build unconditionally: an existing dist can be older than its source and
+  // ESM reports that mismatch only when a generated server starts.
+  run("npm", ["run", "build"], dir);
+  if (!existsSync(resolve(dir, distEntry))) throw new Error(`Build output is missing: ${resolve(dir, distEntry)}`);
 }
 
 function ensureBuilt() {

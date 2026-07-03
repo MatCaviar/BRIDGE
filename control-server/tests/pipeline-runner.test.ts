@@ -64,6 +64,7 @@ describe("PipelineRunner", () => {
     expect(analyze.args.join(" ")).toContain("$mcp-analyze");
     expect(analyze.args.join(" ")).toContain(workspace.sourceRoot);
     expect(analyze.args.join(" ")).toContain(workspace.targetSchemaPath);
+    expect(analyze.args.join(" ")).toContain(join(workspace.root, "source-index.json"));
     expect(analyze.args.join(" ")).toContain(workspace.analysisPath);
     expect(analyze.args).toEqual(expect.arrayContaining(["--skip-git-repo-check", "--ephemeral", "--color", "never"]));
 
