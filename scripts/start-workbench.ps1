@@ -6,6 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
+$codexResolver = Join-Path $PSScriptRoot "resolve-codex-executable.ps1"
+$env:CODEX_EXECUTABLE = & $codexResolver
 
 Set-Location $repoRoot
 
@@ -18,6 +20,7 @@ if ($Install) {
 
 Write-Host "BRIDGE Visual Workbench" -ForegroundColor Cyan
 Write-Host "Starting one local Electron window (no HTTP server or TCP port)."
+Write-Host "Codex CLI: $env:CODEX_EXECUTABLE"
 Write-Host "Close the window to stop Workbench and its child processes."
 
 & $npm run workbench:start
