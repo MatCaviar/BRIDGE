@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const SKILLS = ["mcp-analyze", "mcp-generate", "mcp-pipeline", "mcp-test"];
+const SKILLS = ["mcp-analyze", "mcp-generate", "mcp-test"];
 const SUBCMDS = "validate|scaffold|generate|test|build|register|verify|validate_config|wire_check";
 
 describe("SP-D skills use skill-base-relative CLI path", () => {

@@ -7,20 +7,22 @@ argument-hint: [app source directory]
 
 # /mcp-pipeline
 
-Launch the **BRIDGE visual workbench** — a local Electron window whose built-in auto-pipeline (analyze→scaffold→generate→gates→build→test→register→verify→schema_preview→deploy) turns the YunOS HDT app at `$ARGUMENTS` into a ready-to-run MCP suite: agent-facing function schemas, the MCP Server that exposes them, and the bridge assets needed to actually drive the app/device instead of returning throw-stub mocks. The workbench's control-server drives the pipeline itself; **this command only starts the service** — do not run the headless CLI steps in the session.
+**整个任务只有一个动作:启动可视化工作台。** 不要规划流程、不要搜索源码、不要运行任何 CLI 子命令 —— 工作台内部会自行驱动 analyze→scaffold→generate→gates→build→test→register→verify→schema_preview 全流程。带不带参数都一样:先启动,再在界面里操作。
 
-Steps to perform:
+立刻执行这一条命令(无参数时原样执行,工作台内再选目录):
 
-1. Treat `$ARGUMENTS` as an **optional** app source directory (e.g. `./aipet`). Ignore `--step` / `--from` / `--only` / `--batch` — those belong to the headless `mcp-pipeline` skill and do not apply to the visual workbench.
-2. Run the launcher from the plugin root (it detaches Electron and returns immediately, so it will not block the session):
-   ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/launch-workbench.mjs" $ARGUMENTS
-   ```
-   If `${CLAUDE_PLUGIN_ROOT}` does not expand, use the plugin root path shown when this command was loaded. The launcher builds dist on first run, resolves the agent backend (claude preferred, codex fallback), and opens an independent Electron window.
-3. **Step 2 is your only action.** Do not search the filesystem for app source, do not invoke the `mcp-pipeline` skill, and do not run `cli/bin/mcp-pipeline.js` — the workbench drives the pipeline and doing so would conflict with its state.
-4. After the window opens, tell the user:
-   - **With a path argument** → the 导入 panel's source directory is pre-filled; the user fills in the project name and reference schema, then clicks 导入并自动分析 to start the pipeline.
-   - **Without a path argument** → the panel is empty; the user selects the source directory, schema, and project name manually inside the UI. **Do not try to locate a source directory for them — just launch the workbench and let them pick inside it.**
-5. Pipeline results live inside the window: the full schema under 机器可读产物 → 工具, the MCP server under MCP 调试, and this run's artifact folder path in the 流水线 completion banner.
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/launch-workbench.mjs" $ARGUMENTS
+```
 
-The workbench does the work; this command is only the entry point. Closing the Electron window stops the workbench and its child processes.
+- `${CLAUDE_PLUGIN_ROOT}` 未展开时,改用本命令加载时显示的插件根路径。
+- 启动器会自行构建 dist、解析 agent 后端(claude 优先,codex 兜底)、打开独立 Electron 窗口,并立即返回 —— 不阻塞当前会话。
+
+窗口打开后告诉用户:
+
+- **带了路径参数** → 导入面板的源码目录已预填;用户补上项目名和参考 schema,点「导入并自动分析」即开始流水线。
+- **没带参数** → 面板为空,用户在 UI 里自行选源码目录、schema、项目名。**不要替用户找源码目录 —— 只管启动工作台,让他在里面选。**
+
+流水线产物都在窗口内:完整 schema 在「机器可读产物 → 工具」,MCP server 在「MCP 调试」,本次产物文件夹路径在流水线完成横幅里。
+
+关闭 Electron 窗口即停止工作台及其子进程。本命令只是入口,工作台干活。

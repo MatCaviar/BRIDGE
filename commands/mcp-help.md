@@ -14,8 +14,9 @@ Reference card for the **im-mcp-codeagent** plugin. Print this verbatim to the u
 |-------|---------|
 | `/mcp-analyze` | Scan a YunOS HDT app → `analysis.json` (capabilities, params, returns, safety, SDK calls) |
 | `/mcp-generate` | Author `rpc/config.json` (op→wire-spec map) from `analysis.json` + app source |
-| `/mcp-pipeline` | Orchestrate the full analyze→scaffold→generate→gates→test→build→register→verify→**schema_preview** pipeline (9 steps; `schema_preview` is the mandatory final agent-facing deliverable) |
 | `/mcp-test` | Classify test failures in a generated server and produce fixes |
+
+> 全流程编排由 `/mcp-pipeline` 命令启动的可视化工作台接管(工作台内置自动流水线,已取代无头 9 步编排);上表 skill 供单步手动调用。
 
 ## CLI subcommands (deterministic)
 
@@ -46,5 +47,5 @@ Run via `node "${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js" <subcmd>`:
 
 ## Entry points
 
-- `/mcp-pipeline <app源码目录>` — full auto pipeline.
+- `/mcp-pipeline [app源码目录]` — 启动 BRIDGE 可视化工作台(无参数也可,界面内选目录;工作台内置自动流水线)。
 - `/mcp-verify <project-dir>` — verify a generated project.
