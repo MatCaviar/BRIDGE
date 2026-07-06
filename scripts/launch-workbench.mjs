@@ -169,6 +169,18 @@ const env = { ...process.env, AGENT_BACKEND: backend };
 if (backend === "claude") env.CLAUDE_EXECUTABLE = executable;
 else env.CODEX_EXECUTABLE = executable;
 if (initialSource) env.BRIDGE_INITIAL_SOURCE = initialSource;
+// Strip ELECTRON_RUN_AS_NODE so electron.exe runs as a real Electron GUI and
+// not as plain Node. VS Code / Claude Code extension hosts set
+// ELECTRON_RUN_AS_NODE=1, which is inherited here. With it set, electron.exe
+// skips registering the `electron` built-in module, so the ESM main process
+// (`import { BrowserWindow } from "electron"`) resolves to the npm `electron`
+// stub (no named exports) and crashes:
+//   SyntaxError: The requested module 'electron' does not provide an export
+//   named 'BrowserWindow'
+// The launcher prints "已启动" + exit 0 (Electron is spawned detached with
+// stdio:"ignore"), so the crash is silent — no window appears. See
+// docs/WORKBENCH-TROUBLESHOOTING.md.
+delete env.ELECTRON_RUN_AS_NODE;
 
 const child = spawn(electronPath, [resolvePath(repoRoot, "desktop/dist/main.js")], {
   cwd: repoRoot,
