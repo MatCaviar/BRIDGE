@@ -15,8 +15,8 @@ class FakeProcessRunner {
   writeOutputs = true;
   workspace?: PipelineWorkspace;
   analysisJson = `${JSON.stringify({
-    app: { name: "demo", domain: "audio", framework: "android", entryFile: "app/src/main/kotlin/Main.kt" },
-    capabilities: [{ id: "get_audio_volume", domain: "audio", object: "audio", action: "getVolume", sourceRef: "AudioControlManager.kt:12", safetyLevel: "readonly", sdkCalls: ["IAudioControl.getAudioVolume"] }],
+    app: { name: "demo", domain: "audio", framework: "Android", entryFile: "app/src/main/kotlin/Main.kt" },
+    capabilities: [{ id: "get_audio_volume", domain: "audio", object: "audio", action: "getVolume", description: "get the current audio volume", sourceRef: "AudioControlManager.kt:12", safetyLevel: "readonly", sdkCalls: ["IAudioControl.getAudioVolume"] }],
   })}\n`;
   async run(spec: CommandSpec): Promise<ProcessResult> {
     this.calls.push(spec);
@@ -122,8 +122,8 @@ describe("PipelineRunner", () => {
   it("strips a UTF-8 BOM the agent wrote at the start of analysis.json so the gate and downstream readers see valid JSON", async () => {
     const { fake, runner } = createRunner();
     fake.analysisJson = `﻿${JSON.stringify({
-      app: { name: "demo", domain: "audio", framework: "android", entryFile: "Main.kt" },
-      capabilities: [{ id: "get_volume", domain: "audio", object: "audio", action: "getVolume", sourceRef: "AudioControl.kt:1", safetyLevel: "readonly", sdkCalls: [] }],
+      app: { name: "demo", domain: "audio", framework: "Android", entryFile: "Main.kt" },
+      capabilities: [{ id: "get_volume", domain: "audio", object: "audio", action: "getVolume", description: "get volume", sourceRef: "AudioControl.kt:1", safetyLevel: "readonly", sdkCalls: [] }],
     })}\n`;
     await runner.runStage(workspace, "analyze");
     expect(runner.status("analyze")).toBe("passed");
@@ -176,11 +176,53 @@ describe("PipelineRunner", () => {
     expect(runner.status("analyze")).toBe("failed");
   });
 
-  it("rejects an analysis that lacks the required capabilities schema", async () => {
+  it("retries once then fails when the analysis violates the schema and the correction still fails", async () => {
     const { fake, runner } = createRunner();
-    fake.analysisJson = `${JSON.stringify({ app: { name: "demo" } })}\n`; // no capabilities
-    await expect(runner.runStage(workspace, "analyze")).rejects.toThrow(/no capabilities/i);
+    fake.analysisJson = `${JSON.stringify({ app: { name: "demo" } })}\n`; // parseable but schema-invalid (no framework/entryFile/capabilities)
+    await expect(runner.runStage(workspace, "analyze")).rejects.toThrow(/self-healing retry/i);
     expect(runner.status("analyze")).toBe("failed");
+    // one initial attempt + one self-healing retry, both producing the same invalid output
+    expect(fake.calls.filter((c) => c.operation === "analyze")).toHaveLength(2);
+  });
+
+  it("self-heals: retries once with the schema violations fed back and passes when the agent corrects them", async () => {
+    // attempt 1: lowercase framework + invented safetyLevel (both enum violations)
+    const bad = { app: { name: "demo", domain: "audio", framework: "android", entryFile: "Main.kt" }, capabilities: [{ id: "get_volume", domain: "audio", object: "audio", action: "getVolume", description: "get volume", sourceRef: "AudioControl.kt:1", safetyLevel: "safe", sdkCalls: [] }] };
+    // attempt 2 (correction): the same content with the two violations fixed
+    const good = { ...bad, app: { ...bad.app, framework: "Android" }, capabilities: [{ ...bad.capabilities[0]!, safetyLevel: "readonly" }] };
+    const fake = new FakeProcessRunner();
+    fake.workspace = workspace;
+    fake.writeOutputs = false; // the override below controls what each analyze attempt writes
+    let analyzeCall = 0;
+    const originalRun = fake.run.bind(fake);
+    fake.run = async (spec: CommandSpec) => {
+      const result = await originalRun(spec);
+      if (spec.operation === "analyze") {
+        await mkdir(join(workspace.analysisPath, ".."), { recursive: true });
+        await writeFile(workspace.analysisPath, `${JSON.stringify(analyzeCall++ === 0 ? bad : good)}\n`);
+      }
+      return result;
+    };
+    const { runner } = createRunner(fake);
+    await runner.runStage(workspace, "analyze");
+    expect(runner.status("analyze")).toBe("passed");
+    const analyzeCalls = fake.calls.filter((c) => c.operation === "analyze");
+    expect(analyzeCalls).toHaveLength(2);
+    // the retry carries the concrete correction method: the violation list + the allowed enum
+    expect(analyzeCalls[1]!.args.join(" ")).toContain("$mcp-analyze-fix");
+    expect(analyzeCalls[1]!.args.join(" ")).toContain("FAILED JSON-schema validation");
+    expect(analyzeCalls[1]!.args.join(" ")).toContain("must be one of [readonly, normal, p_gear_required, p_gear_and_confirm, p_gear_and_network]");
+    // the persisted artifact is the corrected (valid) one
+    const parsed = JSON.parse(await readFile(workspace.analysisPath, "utf8"));
+    expect(parsed.app.framework).toBe("Android");
+    expect(parsed.capabilities[0].safetyLevel).toBe("readonly");
+  });
+
+  it("does not retry when the first analysis is already schema-valid", async () => {
+    const { fake, runner } = createRunner(); // default analysisJson is schema-valid
+    await runner.runStage(workspace, "analyze");
+    expect(runner.status("analyze")).toBe("passed");
+    expect(fake.calls.filter((c) => c.operation === "analyze")).toHaveLength(1);
   });
 
   it("hydrates passed stage state in a fresh runner", async () => {

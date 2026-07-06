@@ -6,6 +6,7 @@ import type { CommandSpec, ProcessResult } from "./process-runner.js";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { StageStore } from "./stage-store.js";
+import { analyzeCorrectionPrompt, validateAnalysis } from "./analysis-validator.js";
 
 export interface PipelineRunnerConfig {
   readonly agent: AgentBackend;
@@ -100,6 +101,7 @@ export class PipelineRunner {
       }
       try {
         await this.#normalizeAgentOutput(stage, workspace);
+        if (stage === "analyze") await this.#analyzeWithSelfHeal(workspace, signal);
         await assertStageOutput(stage, workspace);
       } catch (error) {
         this.#states.set(stage, "failed");
@@ -167,11 +169,37 @@ export class PipelineRunner {
       if (raw.charCodeAt(0) === 0xfeff) await writeFile(path, raw.slice(1), "utf8");
     } catch { /* file may not exist or be unwritable; assertStageOutput will report the real error */ }
   }
+
+  /** Self-healing gate for the analyze stage: validate the agent's analysis against the schema and,
+   *  if it violates the schema, retry the agent ONCE with the violation list fed back so the second
+   *  attempt carries a concrete correction (not a blind re-run). The agent is expensive (~9 min) and
+   *  has repeatedly produced schema-invalid output — flat errorCodes, snake_case param names,
+   *  invented safetyLevel values. Re-running from scratch without the errors would reproduce them;
+   *  feeding the validator's path→constraint list lets the agent patch its own output. Bounded to one
+   *  retry: a missing/unparseable file (agent produced nothing) fails immediately with no retry, and a
+   *  second schema failure surfaces the full list rather than burning more agent windows. */
+  async #analyzeWithSelfHeal(workspace: PipelineWorkspace, signal?: AbortSignal): Promise<void> {
+    let result = await validateAnalysis(workspace.analysisPath);
+    if (result.ok) return; // first attempt already schema-valid — no retry
+    if (!result.retryable) throw new Error(`Stage analyze output ${result.errors}`); // missing/unparseable: not a fixable schema mistake
+    this.events.publish(workspace.projectId, "log", { stage: "analyze" as PipelineStageId, stream: "stderr" as const, text: `analysis failed schema validation; retrying once with the violation list fed back to the agent:\n${result.errors}` });
+    const correction = analyzeCorrectionPrompt(workspace.analysisPath, result.errors);
+    const ran = await this.processRunner.run(
+      this.agentCommand(workspace, "analyze", correction),
+      signal,
+      (stream, text) => this.events.publish(workspace.projectId, "log", { stage: "analyze" as PipelineStageId, stream, text }),
+    );
+    if (ran.exitCode !== 0 || ran.timedOut || ran.aborted) throw new Error(`Stage analyze self-heal retry ${stageFailure("analyze", ran)}`);
+    await this.#normalizeAgentOutput("analyze", workspace);
+    result = await validateAnalysis(workspace.analysisPath);
+    if (!result.ok) throw new Error(`Stage analyze output still fails schema validation after 1 self-healing retry:\n${result.errors}`);
+  }
 }
 
 async function assertStageOutput(stage: PipelineStageId, workspace: PipelineWorkspace): Promise<void> {
+  // analyze is gated by #analyzeWithSelfHeal (full schema validation); the other stages get a
+  // lightweight required-artifact + JSON-parse check so a silent no-op fails fast at its own gate.
   const required: Partial<Record<PipelineStageId, { path: string; json?: boolean }>> = {
-    analyze: { path: workspace.analysisPath, json: true },
     curate: { path: workspace.selectionPath, json: true },
     scaffold: { path: join(workspace.generatedRoot, "package.json"), json: true },
     generate: { path: workspace.rpcConfigPath, json: true },
@@ -180,26 +208,11 @@ async function assertStageOutput(stage: PipelineStageId, workspace: PipelineWork
   };
   const output = required[stage];
   if (!output) return;
-  let parsed: unknown;
   try {
     if (!(await stat(output.path)).isFile()) throw new Error("not a file");
-    if (output.json) parsed = JSON.parse(await readFile(output.path, "utf8"));
+    if (output.json) JSON.parse(await readFile(output.path, "utf8"));
   } catch {
     throw new Error(`Stage ${stage} output ${output.path.split(/[\\/]/).at(-1)} is missing or invalid`);
-  }
-  if (stage === "analyze") assertAnalysisSchema(parsed);
-}
-
-/** Enforce the AnalysisData contract (app.name + non-empty capabilities with id/sourceRef) so a
- *  misshapen agent analysis fails fast at the analyze gate instead of stalling Curate silently. */
-function assertAnalysisSchema(parsed: unknown): void {
-  const data = (parsed ?? {}) as { app?: { name?: unknown }; capabilities?: unknown };
-  if (typeof data.app?.name !== "string" || !data.app.name) throw new Error("Stage analyze output is missing app.name");
-  const caps = Array.isArray(data.capabilities) ? (data.capabilities as readonly { id?: unknown; sourceRef?: unknown }[]) : [];
-  if (caps.length === 0) throw new Error("Stage analyze output has no capabilities — nothing to curate");
-  for (let index = 0; index < caps.length; index++) {
-    const cap = caps[index];
-    if (typeof cap.id !== "string" || typeof cap.sourceRef !== "string") throw new Error(`Stage analyze output capability #${index} is missing id or sourceRef`);
   }
 }
 
