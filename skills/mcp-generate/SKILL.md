@@ -42,7 +42,7 @@ NO INVENTED WIRE
 - `arg.funcName` ← 源码 `writeString` 对象里 `funcName:` 的字面值
 - `arg.data` 的 `${var}` ← 与 capability `params` 名字一一对应（单占位符、类型保留）
 - `stringify` ← 与源码 `JSON.stringify(...)` 目标路径一致
-- `reply` ← `readJSON()`→`json` / `readString()`→`string` / 类型读 → `int`/`double`/`bool`
+- `reply` ← `readJSON()`→`json` / `readString()`→`string` / 类型读 → `int`/`double`/`bool`（值用 `int`，**非 `int32`**；`int32` 只用于 `writes[].kind`/`replyParts[].kind`，放进 `reply` 会被 `validate_config` 拒绝）
 
 任一字段无法指出源码位置 → 这条不是 verified：要么继续 grep 找，要么进 `_deferred`。**两个 gate 全绿 ≠ 这些字段对**——gate 只查下限。
 
@@ -100,7 +100,7 @@ For each capability in `analysis.json`, extract how it is actually called on the
    - **Pattern A — single JSON write (most common):** proxy does `createMethodCallMessage("m")` + `writeString(JSON.stringify({ funcName, data }))` + one read. Use `arg` + optional `stringify` + `reply`.
      - `arg` — the object written: `{ funcName, data: { ... } }`. Parameterize inputs with `${var}` matching capability `params` names. A **single** `${var}` placeholder preserves the value's type (number stays number, object stays object) — so `arg: { body: "${info}" }` passes the whole `info` object through verbatim (no need to flatten).
      - `stringify` — dotted paths inside `arg` that the proxy `JSON.stringify`s before send (e.g. `["data"]` when the proxy nests a stringified blob).
-     - `reply` — `readJSON()`→`"json"` / `readString()`→`"string"` / `readInt32()`→`"int"` / `readDouble()`→`"double"` / `readBool()`→`"bool"`.
+     - `reply` — `readJSON()`→`"json"` / `readString()`→`"string"` / `readInt32()`→`"int"` / `readDouble()`→`"double"` / `readBool()`→`"bool"`. **`reply` 只能取 `json`/`string`/`int`/`double`/`bool` 这 5 个值**。易错点：`readInt32()` 的函数名带 "32"，但映射出的 `reply` 值是 **`"int"`（不带 32）**；`"int32"` 只能出现在 `writes[].kind`/`replyParts[].kind`，**放进 `reply` 会被 `validate_config` 拒绝**（`dbus.reply must be one of json,string,int,double,bool`）。按 `returns.type` 选：`integer`/`long`→`"int"`，`float`/`double`→`"double"`，`boolean`→`"bool"`，`string`→`"string"`，`object`/结构体→`"json"`。
    - **Pattern B — positional multi-write:** proxy does several `writeString(...)` / `writeInt32(...)` in order (NOT one `writeString(JSON.stringify(...))`). Use **`writes`** (an ordered array) instead of `arg`. Each item `{ kind, value }`: `kind` = `"string"`|`"int32"`|`"double"`|`"bool"`|`"json"`; `value` = literal or `${var}`. `kind:"json"` ⇒ `writeString(JSON.stringify(value))`; `kind:"string"` ⇒ bare `writeString(value)` (no JSON quotes). This is how you wire capabilities the old engine had to defer — **6 positional writes is fine, not "partial"**.
    - **Pattern C — bare-string write:** proxy does a single `writeString(cpType)` with a raw string (not JSON). Use `writes: [ { kind: "string", value: "${cpType}" } ]` — `kind:"string"` writes the value bare; `kind:"json"` would wrongly wrap it in quotes and corrupt the value.
    - **Pattern D — multi-segment read:** proxy reads several values (`readString()` then `readInt32()`, etc.). Use **`replyParts`** (ordered array of `{ kind }`); the engine returns an array of the segments in order. Omit `replyParts` for the common single-read case (then `reply` drives one read).
@@ -198,6 +198,35 @@ Note how this mirrors the proxy exactly: `method` `"request"` matches `createMet
 - `card_content_read`: **6 positional writes** (3 string + 2 int32 + 1 string) via `writes[]` — fully wireable, **never defer for "too many writes"**. `interface` is the **bare bus name** (this proxy passes `interface: "<bus>"`, not the default `bus+".interface"`) → set it explicitly, or the engine dials the wrong interface.
 - `default_cp_read`: one **bare-string** write (`kind:"string"` — NOT `kind:"json"`, which would corrupt `music` into `"\"music\""`), plus a **2-segment read** (`replyParts`: cpid string + code int32 → returns `[cpid, code]`).
 - `sound_library_query`: single JSON write (Pattern A) with `vin` as `${__device__.vin}` (resolved on-car, fail-closed; must be declared in `app.deviceSources`). `interface` **omitted** — this proxy uses the default `bus+".interface"`.
+
+**Worked example — 数值返回 → `reply: "int"` / `"double"`（reply 用 `int`，不是 `int32`）**
+
+proxy 用 `readInt32()` / `readDouble()` 读单个数值（音量、车速、油量）时，`reply` 必须是 `"int"` / `"double"`：
+
+```json
+{
+  "get_volume": {
+    "type": "dbus",
+    "bus": "com.immotors.business_service.IM_AUDIO_SERVICE",
+    "path": "/com/immotors/business_service/IImAudioService",
+    "interface": "com.immotors.business_service.IImAudioService",
+    "method": "getVolume",
+    "arg": {},
+    "reply": "int"
+  },
+  "get_fuel_level": {
+    "type": "dbus",
+    "bus": "com.immotors.business_service.VEHICLE_INFO_SERVICE",
+    "path": "/com/immotors/business_service/IVehicleInfoService",
+    "interface": "com.immotors.business_service.IVehicleInfoService",
+    "method": "getFuelLevel",
+    "arg": {},
+    "reply": "double"
+  }
+}
+```
+
+`returns.type` 为 `integer`/`long` → `reply: "int"`；`float`/`double` → `reply: "double"`。**最易错点**：`readInt32()` 函数名带 "32"，但 `reply` 值是 `"int"`（不带 32）；`"int32"` 仅用于 `writes[].kind`/`replyParts[].kind`，放进 `reply` 会被 `validate_config` 拒绝。
 
 ### Step 3: Verify via the gates
 
