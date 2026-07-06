@@ -12,7 +12,7 @@
 //   the 导入 panel opens with the source directory pre-filled.
 import { createRequire } from "node:module";
 import { execSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { resolve, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,10 +20,15 @@ const require = createRequire(import.meta.url);
 const repoRoot = resolvePath(fileURLToPath(import.meta.url), "..", "..");
 const scriptsDir = resolvePath(repoRoot, "scripts");
 
-// First non-flag positional argument is the app source directory; flags such as
-// --step/--from (headless skill mode) are ignored in visual mode.
-const sourcePath = process.argv.slice(2).find((arg) => !arg.startsWith("-"));
-const initialSource = sourcePath ? resolvePath(process.cwd(), sourcePath) : "";
+// The first positional that resolves to an EXISTING directory is the app source
+// directory. Flags (--step/--from, headless skill mode) and any non-path /
+// key=value / placeholder tokens a confused agent may pass (e.g. "app=YunOS",
+// "dir=aipet") are ignored — the workbench then opens with an empty 导入 panel so
+// the user picks inside it. Never pre-fill a garbage path into the import panel.
+const initialSource = process.argv.slice(2)
+  .filter((arg) => !arg.startsWith("-") && !arg.includes("="))
+  .map((arg) => resolvePath(process.cwd(), arg))
+  .find((p) => existsSync(p) && statSync(p).isDirectory()) ?? "";
 
 function ensureBuilt() {
   const mainJs = resolvePath(repoRoot, "desktop/dist/main.js");
