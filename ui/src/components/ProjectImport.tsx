@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { workbenchApi } from "../bridge/client";
 import { useWorkbench } from "../state/workbench";
 
 export function ProjectImport() {
-  const { setProject, setError, project, resetProject, busy: workbenchBusy } = useWorkbench();
+  const { setProject, setError, project, resetProject, busy: workbenchBusy, initialSource } = useWorkbench();
   const [name, setName] = useState("");
   const [sourceDirectory, setSourceDirectory] = useState("");
   const [schemaPath, setSchemaPath] = useState("");
   const [busy, setBusy] = useState(false);
+  // When launched via `/im-mcp-codeagent:mcp-pipeline <path>`, pre-fill the source directory.
+  useEffect(() => { if (initialSource) setSourceDirectory(initialSource); }, [initialSource]);
   const selectSource = async () => { try { const value = await workbenchApi.selectSourceDirectory(); if (value) setSourceDirectory(value); } catch (error) { setError(error instanceof Error ? error.message : String(error)); } };
   const selectSchema = async () => { try { const value = await workbenchApi.selectSchemaFile(); if (value) setSchemaPath(value); } catch (error) { setError(error instanceof Error ? error.message : String(error)); } };
   const submit = async () => {

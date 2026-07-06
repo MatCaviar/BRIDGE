@@ -15,10 +15,11 @@ describe("registerWorkbenchIpc", () => {
       getMcp: vi.fn(), startMcp: vi.fn(), stopMcp: vi.fn(), callMcp: vi.fn(), subscribe: vi.fn(() => vi.fn()),
     };
 
-    registerWorkbenchIpc({ ipcMain, dialog, service: service as any });
+    registerWorkbenchIpc({ ipcMain, dialog, service: service as any, initialSource: "D:/pre-filled" });
     expect([...handlers.keys()].sort()).toEqual([...BRIDGE_CHANNELS].sort());
     expect(await handlers.get("bridge:select-source")!({})).toBe("D:/source");
     expect(await handlers.get("bridge:select-schema")!({})).toBe("D:/schema.json");
+    expect(await handlers.get("bridge:get-launch-params")!({})).toEqual({ sourceDirectory: "D:/pre-filled" });
     await handlers.get("bridge:import")!({}, { projectName: "Audio", sourceDirectory: "D:/source", schemaPath: "D:/schema.json" });
     expect(service.importFromPaths).toHaveBeenCalledWith({ projectName: "Audio", sourceDirectory: "D:/source", schemaPath: "D:/schema.json" });
     expect(handlers.has("bridge:get-pipeline")).toBe(true);

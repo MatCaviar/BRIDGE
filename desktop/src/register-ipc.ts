@@ -5,6 +5,7 @@ export const BRIDGE_CHANNELS = [
   "bridge:get-source", "bridge:get-artifacts", "bridge:save-selection", "bridge:run-stage", "bridge:get-mcp",
   "bridge:start-mcp", "bridge:stop-mcp", "bridge:call-mcp", "bridge:subscribe",
   "bridge:get-pipeline", "bridge:retry-pipeline", "bridge:cancel-pipeline", "bridge:reset-project",
+  "bridge:get-launch-params",
 ] as const;
 
 interface IpcEventLike { readonly sender?: { readonly id?: number; send?(channel: string, value: unknown): void; once?(event: string, listener: () => void): void }; }
@@ -20,7 +21,7 @@ interface ServiceLike {
   subscribe(projectId: string | undefined, listener: (event: WorkbenchEvent) => void): () => void;
 }
 
-export function registerWorkbenchIpc({ ipcMain, dialog, service }: { ipcMain: IpcMainLike; dialog: DialogLike; service: ServiceLike }): () => void {
+export function registerWorkbenchIpc({ ipcMain, dialog, service, initialSource = "" }: { ipcMain: IpcMainLike; dialog: DialogLike; service: ServiceLike; initialSource?: string }): () => void {
   const subscriptions = new Map<number, () => void>();
   const register = (channel: typeof BRIDGE_CHANNELS[number], handler: (event: IpcEventLike, ...args: any[]) => unknown) => ipcMain.handle(channel, handler);
   register("bridge:select-source", async () => (await dialog.showOpenDialog({ properties: ["openDirectory"] })).filePaths[0]);
@@ -36,6 +37,7 @@ export function registerWorkbenchIpc({ ipcMain, dialog, service }: { ipcMain: Ip
   register("bridge:retry-pipeline", (_event, id) => service.retryPipeline(String(id)));
   register("bridge:cancel-pipeline", (_event, id) => service.cancelPipeline(String(id)));
   register("bridge:reset-project", (_event, id) => service.resetProject(String(id)));
+  register("bridge:get-launch-params", () => ({ sourceDirectory: initialSource }));
   register("bridge:get-mcp", (_event, id) => service.getMcp(String(id)));
   register("bridge:start-mcp", (_event, id, mode, confirmation = {}) => service.startMcp(String(id), mode, confirmation));
   register("bridge:stop-mcp", (_event, id, confirmation = {}) => service.stopMcp(String(id), confirmation));

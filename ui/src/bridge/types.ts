@@ -19,6 +19,7 @@ export interface WorkbenchBridge {
   stopMcp(id: string, confirmation?: Record<string, unknown>): Promise<unknown>;
   callMcp(id: string, toolName: string, args: Record<string, unknown>, mode: "mock" | "real", confirmation?: Record<string, unknown>): Promise<unknown>;
   subscribeProjectEvents(projectId: string, listener: (event: WorkbenchEvent) => void): Promise<() => void>;
+  getLaunchParams(): Promise<{ sourceDirectory: string }>;
 }
 
 declare global { interface Window { bridge?: WorkbenchBridge; } }

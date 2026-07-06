@@ -18,11 +18,12 @@ if (smokeTest) {
 }
 
 const service = new WorkbenchService(createConfig({ runtimeRoot: resolve(repositoryRoot, ".workbench-runtime"), repositoryRoot }));
+const initialSource = process.env.BRIDGE_INITIAL_SOURCE ?? "";
 let cleanupIpc: (() => void) | undefined;
 
 async function createWindow(): Promise<BrowserWindow> {
   await service.ready();
-  cleanupIpc ??= registerWorkbenchIpc({ ipcMain, dialog, service });
+  cleanupIpc ??= registerWorkbenchIpc({ ipcMain, dialog, service, initialSource });
   const window = new BrowserWindow({
     width: 1480, height: 960, minWidth: 1080, minHeight: 720, backgroundColor: "#09090b", show: false,
     webPreferences: { preload: resolve(repositoryRoot, "desktop", "preload.cjs"), nodeIntegration: false, contextIsolation: true, sandbox: true },

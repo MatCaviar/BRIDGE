@@ -29,3 +29,5 @@ export const workbenchApi = {
 export function subscribeEvents(projectId: string, listener: (event: WorkbenchEvent) => void): Promise<() => void> {
   return local((bridge) => bridge.subscribeProjectEvents(projectId, listener));
 }
+
+export const launchParams = (): Promise<{ sourceDirectory: string }> => local((bridge) => bridge.getLaunchParams());
