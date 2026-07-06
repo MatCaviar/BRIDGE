@@ -4,7 +4,9 @@ import type { AgentBackend } from "./agent-backend.js";
 import { CommandPolicy } from "./command-policy.js";
 import type { CommandSpec, ProcessResult } from "./process-runner.js";
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { StageStore } from "./stage-store.js";
 import { analyzeCorrectionPrompt, validateAnalysis } from "./analysis-validator.js";
 
@@ -41,6 +43,23 @@ const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
   validate_config: ["generate"], wire_check: ["generate"], build: ["validate_config", "wire_check"],
   test: ["build"], register: ["build"], verify: ["build", "test"], schema_preview: ["generate"], deploy: ["verify"],
 };
+
+/** The generate stage runs the agent under `claude --bare`, which skips loading globally-installed
+ *  plugins (including this one) — so the `$mcp-generate` skill trigger never resolves and the agent
+ *  receives NO op→wire-spec format guidance, producing a `{methods:[...]}` list instead of an op map.
+ *  Inject the skill's SKILL.md directly into the prompt to bypass the skill-trigger mechanism.
+ *  Cached after first read. Path mirrors analysis-validator.ts (3 dirs up from dist/pipeline = plugin root). */
+let cachedGenerateSkill: string | null = null;
+function generateSkillContext(): string {
+  if (cachedGenerateSkill !== null) return cachedGenerateSkill;
+  try {
+    const skillPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "skills", "mcp-generate", "SKILL.md");
+    cachedGenerateSkill = readFileSync(skillPath, "utf8");
+  } catch {
+    cachedGenerateSkill = ""; // skill file missing — fall back to bare prompt (no worse than before)
+  }
+  return cachedGenerateSkill;
+}
 
 export class PipelineRunner {
   readonly #states = new Map<PipelineStageId, StageStatus>();
@@ -132,7 +151,11 @@ export class PipelineRunner {
 
   private commandFor(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">): CommandSpec {
     if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. The imported schema is ONLY a descriptor shape / parameter encoding / style reference for the tools that will eventually be generated — it is NOT the analysis output format. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence and record it in app.framework. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath} as JSON with EXACTLY this top-level shape and no other top-level keys: { "app": { "name": string, "domain": string, "framework": "YunOS HDT" | "Android", "entryFile": string }, "capabilities": [ { "id": string (snake_case), "domain": string, "object": string, "action": string, "sourceRef": string, "safetyLevel": "readonly" | "normal" | "p_gear_required" | "p_gear_and_confirm" | "p_gear_and_network", "sdkCalls": string[], "params"?: [{ "name": string (camelCase), "type": string, "optional"?: boolean, "description"?: string, "enum"?: string[], "examples"?: string[], "defaultValue"?: string|number|boolean, "properties"?: ParamDef[], "items"?: { "type": string } }], "returns"?: { "type": string, "fields"?: (string | { "name": string, "type": string })[] }, "description"?: string, "status"?: "verified" | "partial" | "broken" } ], "enums"?: { [enumName: string]: { "values": string[], "type": "string" | "number", "sourceFile"?: string, "map"?: { [wireValue: string]: string } } }, "errorCodes"?: { [domain: string]: { "prefix": number (1..99), "domainName": string, "codes": { [codeName: string]: { "value": number (0..99), "message": string (zh-CN, non-empty) } } } } }. "enums" and "errorCodes" MUST follow those exact sub-shapes — the validator rejects unknown fields. In particular do NOT write "errorCodes" as a flat name→number map: each domain needs "prefix"+"domainName"+"codes", and each code needs "value"+"message". "safetyLevel" MUST be exactly one of those 5 strings — never invent values like "safe"/"medium"/"elevated"/"low"/"high": "readonly" = pure read, no state change; "normal" = ordinary side effect; "p_gear_required" = requires P-gear; "p_gear_and_confirm" = requires P-gear + user confirmation; "p_gear_and_network" = requires P-gear + network. Each param "name" MUST be camelCase matching ^[a-z][a-zA-Z0-9]*$ with NO underscores (e.g. hallMode, operateTime, tirePressure) — this differs from the snake_case capability "id", so convert any snake_case source field to camelCase when used as a param name. "capabilities" MUST be a non-empty array; each "id" is a stable snake_case tool name; each "sourceRef" MUST cite verified live source (file path + line); "sdkCalls" lists the SDK/RPC calls backing the capability. Do NOT emit "tools", "inputSchema", "inspection", "summary", "project", or "platform" as top-level keys — those are not the analysis format. Write ONLY the file ${workspace.analysisPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.analysisPath}. Output the analysis file and stop.`);
-    if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ONLY the file ${workspace.rpcConfigPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.rpcConfigPath}. Output the RPC config file and stop.`);
+    if (operation === "generate") return this.agentCommand(workspace, operation, `${generateSkillContext()}
+
+---
+
+$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ONLY the file ${workspace.rpcConfigPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.rpcConfigPath}. Output the RPC config file and stop.`);
     if (operation === "deploy") {
       // Export the generated `mcp-<app>` artifact to a sibling of the original source directory,
       // restoring the headless "product beside source" layout. The target is derived from the
