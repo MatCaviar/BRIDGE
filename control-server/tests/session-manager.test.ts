@@ -25,11 +25,23 @@ describe("McpSessionManager", () => {
     expect(manager.get("p1")?.state).toBe("stopped");
   });
 
+  // Under the full suite this spawns a real stdio server in parallel with process-runner /
+  // pipeline-runner (which also spawn subprocesses); on a loaded Windows host the MCP initialize
+  // handshake can exceed the default 10s init ceiling and fail with -32001 before this case ever
+  // reaches its own 20ms call-timeout assertion. Give start() generous headroom, and give the
+  // case a per-test timeout above it (the suite default in vitest.config.ts is 15s, below 30s).
   it("validates arguments, times out, and requires typed confirmation for real calls", async () => {
-    manager = new McpSessionManager(new CommandPolicy(), new EventBus(), { requestTimeoutMs: 20 });
+    manager = new McpSessionManager(new CommandPolicy(), new EventBus(), { requestTimeoutMs: 20, initializationTimeoutMs: 30_000 });
     await manager.start(workspace, { executable: process.execPath, args: [fixture], cwd: root }, "real", { confirmed: true });
     await expect(manager.call(workspace, "echo", {}, "real", { typedConfirmation: "demo" })).rejects.toThrow(/required/i);
     await expect(manager.call(workspace, "echo", { text: "hello" }, "real", { typedConfirmation: "wrong" })).rejects.toThrow(/project name/i);
     await expect(manager.call(workspace, "wait", { milliseconds: 200 }, "real", { typedConfirmation: "demo" })).rejects.toThrow(/timeout|timed out/i);
+  }, 60_000);
+
+  it("launches the server with ELECTRON_RUN_AS_NODE=1 so electron.exe answers the handshake", async () => {
+    manager = new McpSessionManager(new CommandPolicy(), new EventBus());
+    await manager.start(workspace, { executable: process.execPath, args: [fixture], cwd: root }, "mock", { confirmed: true });
+    const call = await manager.call(workspace, "env", { name: "ELECTRON_RUN_AS_NODE" }, "mock", { confirmed: true });
+    expect(JSON.stringify(call.response)).toContain("1");
   });
 });

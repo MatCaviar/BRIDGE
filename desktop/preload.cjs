@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("bridge", {
   getPipelineRun: (id) => invoke("bridge:get-pipeline", id),
   retryPipeline: (id) => invoke("bridge:retry-pipeline", id),
   cancelPipeline: (id) => invoke("bridge:cancel-pipeline", id),
+  resetProject: (id) => invoke("bridge:reset-project", id),
   getMcp: (id) => invoke("bridge:get-mcp", id),
   startMcp: (id, mode, confirmation) => invoke("bridge:start-mcp", id, mode, confirmation),
   stopMcp: (id, confirmation) => invoke("bridge:stop-mcp", id, confirmation),

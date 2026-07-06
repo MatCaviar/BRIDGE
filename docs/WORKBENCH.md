@@ -19,6 +19,57 @@ npm run workbench:start
 
 No system browser is opened automatically. No `localhost`, `43140`, or `43141` service is required.
 
+## Agent backend (Codex / Claude Code)
+
+The `analyze` and `generate` stages are driven by an agent CLI. Two backends are supported and selected at startup from the `AGENT_BACKEND` environment variable:
+
+| `AGENT_BACKEND` | CLI resolved by | Default executable |
+| --- | --- | --- |
+| `codex` (default) | `CODEX_EXECUTABLE` env, else `scripts\resolve-codex-executable.ps1` | `codex` |
+| `claude` | `CLAUDE_EXECUTABLE` env, else `scripts\resolve-claude-executable.ps1` | `claude` |
+
+### How to switch
+
+Switching means: set `AGENT_BACKEND`, then (re)start Workbench. The choice is read once at startup.
+
+**Windows (PowerShell) → Claude Code:**
+
+```powershell
+$env:AGENT_BACKEND = "claude"
+powershell -ExecutionPolicy Bypass -File scripts\start-workbench.ps1
+```
+
+**Windows (cmd.exe) → Claude Code:**
+
+```cmd
+set AGENT_BACKEND=claude
+powershell -ExecutionPolicy Bypass -File scripts\start-workbench.ps1
+```
+
+In cmd, use `set` with **no spaces around `=`**; the variable stays set for that cmd session and is inherited by the launcher. Clear it with `set AGENT_BACKEND=` (or `set AGENT_BACKEND=codex`) to go back to Codex.
+
+**Windows (PowerShell) → back to Codex (default):**
+
+```powershell
+Remove-Item Env:\AGENT_BACKEND   # or: $env:AGENT_BACKEND = "codex"
+powershell -ExecutionPolicy Bypass -File scripts\start-workbench.ps1
+```
+
+**Non-Windows / plain npm:**
+
+```bash
+AGENT_BACKEND=claude CLAUDE_EXECUTABLE="$(which claude)" npm run workbench:start
+```
+
+The startup log prints the active backend, e.g. `Agent backend: claude (C:\...\claude.cmd)`, so you can confirm the switch took effect.
+
+### Notes
+
+- Only `analyze` / `generate` use the selected backend. The deterministic stages (`curate`, `scaffold`, `validate_config`, `wire_check`, `build`, `test`, `schema_preview`, `verify`) always run through `cli/bin/mcp-pipeline.js` regardless of backend.
+- The choice is read once at startup; restart Workbench to change it. An in-flight `analyze` keeps its original backend until it finishes.
+- If the CLI is not on `PATH`, point the matching env var at an absolute path: `CODEX_EXECUTABLE` or `CLAUDE_EXECUTABLE`.
+- Claude runs headless: `claude -p "<prompt>" --dangerously-skip-permissions --output-format text` with `cwd` = the project workspace root. Codex runs `codex exec --sandbox workspace-write --skip-git-repo-check --ephemeral --color never --cd <root> <prompt>`.
+
 ## Workflow
 
 1. Choose a source directory and an MCP output-format reference schema with native file dialogs.
@@ -76,8 +127,20 @@ The default mock smoke uses deterministic fixture agents for the two LLM-judgmen
 ## Troubleshooting
 
 - Local bridge unavailable: start via `scripts\start-workbench.ps1`, not by opening `ui/dist/index.html` directly.
-- Analyze cannot start: ensure `codex` is on `PATH` or set `CODEX_EXECUTABLE` before launch.
+- Analyze cannot start: ensure the active agent backend CLI is on `PATH` or set `CODEX_EXECUTABLE` (`AGENT_BACKEND=codex`) / `CLAUDE_EXECUTABLE` (`AGENT_BACKEND=claude`) before launch.
 - Analyze usage limit: wait for the reset time shown in the stage error and retry.
 - Empty analysis: verify the source exposes callable manager, proxy, service, or AIDL methods.
 - Pipeline failure: inspect the retained stage logs, correct the source/configuration issue, and choose retry from the failed stage.
+- Stage hangs / `timed out`: a stage that does not finish within its deadline (10 min for agent stages) is treated as a hung subprocess — the runner kills the whole process tree (Windows `taskkill /T /F`, so `cmd.exe → npm → tsc` grandchildren can't keep the pipes open) and automatically retries once before failing. Watch for `[bridge] Stage <op> did not finish … retrying (attempt 2 of 2)…` lines in the log box / `run.log`; a final `timed out after N attempts` means both tries hung (usually a file lock, a hung agent, or a blocked network call). Set `retryOnTimeout: false` on a `CommandSpec` to opt a stage out.
+- No console windows: every spawned process (pipeline stages, the generated MCP server, and the `npm`/`tsc`/`vitest` runs inside `build`/`test`/`verify`) passes `windowsHide`, so no `cmd.exe` box flashes during a run.
 - MCP start fails: ensure the automation reached `mock_ready` and produced `dist/index.js`.
+
+### Persisted run logs
+
+Everything shown in the bottom log box is also appended to disk so it survives restarts:
+
+```
+.workbench-runtime\<project-id>\.workbench\logs\run.log
+```
+
+`log` events are written raw (exactly what the box shows); `stage` / `pipeline` / `mcp` / `artifact` / `project` events are written as `== [timestamp] type · detail ==` marker lines between them, so the file reads as a trace of the whole run. It is append-only across retries on the same project. Open it in any editor, or tail it while a run is in progress.

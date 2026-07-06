@@ -1,5 +1,6 @@
 import type { OperationId, PipelineStageId, StageStatus } from "@bridge/workbench-contracts";
 import { EventBus } from "../events/event-bus.js";
+import type { AgentBackend } from "./agent-backend.js";
 import { CommandPolicy } from "./command-policy.js";
 import type { CommandSpec, ProcessResult } from "./process-runner.js";
 import { readFile, stat } from "node:fs/promises";
@@ -7,7 +8,7 @@ import { join } from "node:path";
 import { StageStore } from "./stage-store.js";
 
 export interface PipelineRunnerConfig {
-  readonly codexExecutable: string;
+  readonly agent: AgentBackend;
   readonly pipelineCliPath: string;
   readonly gatewayRoot?: string;
 }
@@ -123,8 +124,8 @@ export class PipelineRunner {
   }
 
   private commandFor(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">): CommandSpec {
-    if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. Use the imported schema only for descriptor shape, parameter encoding, and style. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath}. Do not edit unrelated files or enable network access.`);
-    if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ${workspace.rpcConfigPath}. Do not edit unrelated files or enable network access.`);
+    if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. The imported schema is ONLY a descriptor shape / parameter encoding / style reference for the tools that will eventually be generated — it is NOT the analysis output format. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence and record it in app.framework. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath} as JSON with EXACTLY this top-level shape and no other top-level keys: { "app": { "name": string, "domain": string, "framework": string, "entryFile": string }, "capabilities": [ { "id": string, "domain": string, "object": string, "action": string, "sourceRef": string, "safetyLevel": string, "sdkCalls": string[], "params"?: [{ "name": string, "type": string, "optional"?: boolean, "description"?: string, "enum"?: string[], "examples"?: string[], "defaultValue"?: string|number|boolean, "properties"?: ParamDef[], "items"?: { "type": string } }], "returns"?: { "type": string, "fields"?: (string | { "name": string, "type": string })[] }, "description"?: string, "status"?: "verified" | "partial" | "broken" } ], "enums"?: object, "errorCodes"?: object }. "capabilities" MUST be a non-empty array; each "id" is a stable snake_case tool name; each "sourceRef" MUST cite verified live source (file path + line); "sdkCalls" lists the SDK/RPC calls backing the capability. Do NOT emit "tools", "inputSchema", "inspection", "summary", "project", or "platform" as top-level keys — those are not the analysis format. Write ONLY the file ${workspace.analysisPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.analysisPath}. Output the analysis file and stop.`);
+    if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ONLY the file ${workspace.rpcConfigPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.rpcConfigPath}. Output the RPC config file and stop.`);
     if (operation === "deploy") throw new Error("Deploy adapter is not configured");
 
     const args: string[] = [this.config.pipelineCliPath];
@@ -144,7 +145,7 @@ export class PipelineRunner {
   }
 
   private agentCommand(workspace: PipelineWorkspace, operation: "analyze" | "generate", prompt: string): CommandSpec {
-    return { executable: this.config.codexExecutable, args: ["exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "--ephemeral", "--color", "never", "--cd", workspace.root, prompt], cwd: workspace.root, operation, projectId: workspace.projectId };
+    return this.config.agent.buildAgentCommand(workspace, operation, prompt);
   }
 }
 
@@ -159,11 +160,26 @@ async function assertStageOutput(stage: PipelineStageId, workspace: PipelineWork
   };
   const output = required[stage];
   if (!output) return;
+  let parsed: unknown;
   try {
     if (!(await stat(output.path)).isFile()) throw new Error("not a file");
-    if (output.json) JSON.parse(await readFile(output.path, "utf8"));
+    if (output.json) parsed = JSON.parse(await readFile(output.path, "utf8"));
   } catch {
     throw new Error(`Stage ${stage} output ${output.path.split(/[\\/]/).at(-1)} is missing or invalid`);
+  }
+  if (stage === "analyze") assertAnalysisSchema(parsed);
+}
+
+/** Enforce the AnalysisData contract (app.name + non-empty capabilities with id/sourceRef) so a
+ *  misshapen agent analysis fails fast at the analyze gate instead of stalling Curate silently. */
+function assertAnalysisSchema(parsed: unknown): void {
+  const data = (parsed ?? {}) as { app?: { name?: unknown }; capabilities?: unknown };
+  if (typeof data.app?.name !== "string" || !data.app.name) throw new Error("Stage analyze output is missing app.name");
+  const caps = Array.isArray(data.capabilities) ? (data.capabilities as readonly { id?: unknown; sourceRef?: unknown }[]) : [];
+  if (caps.length === 0) throw new Error("Stage analyze output has no capabilities — nothing to curate");
+  for (let index = 0; index < caps.length; index++) {
+    const cap = caps[index];
+    if (typeof cap.id !== "string" || typeof cap.sourceRef !== "string") throw new Error(`Stage analyze output capability #${index} is missing id or sourceRef`);
   }
 }
 

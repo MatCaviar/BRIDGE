@@ -6,8 +6,16 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
-$codexResolver = Join-Path $PSScriptRoot "resolve-codex-executable.ps1"
-$env:CODEX_EXECUTABLE = & $codexResolver
+
+$backend = if ($env:AGENT_BACKEND) { $env:AGENT_BACKEND.ToLower() } else { "codex" }
+if ($backend -eq "claude") {
+  $claudeResolver = Join-Path $PSScriptRoot "resolve-claude-executable.ps1"
+  $env:CLAUDE_EXECUTABLE = & $claudeResolver
+} else {
+  $backend = "codex"
+  $codexResolver = Join-Path $PSScriptRoot "resolve-codex-executable.ps1"
+  $env:CODEX_EXECUTABLE = & $codexResolver
+}
 
 Set-Location $repoRoot
 
@@ -20,7 +28,11 @@ if ($Install) {
 
 Write-Host "BRIDGE Visual Workbench" -ForegroundColor Cyan
 Write-Host "Starting one local Electron window (no HTTP server or TCP port)."
-Write-Host "Codex CLI: $env:CODEX_EXECUTABLE"
+if ($backend -eq "claude") {
+  Write-Host "Agent backend: claude ($env:CLAUDE_EXECUTABLE)"
+} else {
+  Write-Host "Agent backend: codex ($env:CODEX_EXECUTABLE)"
+}
 Write-Host "Close the window to stop Workbench and its child processes."
 
 & $npm run workbench:start

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -79,5 +79,38 @@ describe("WorkbenchService", () => {
     await expect(service.saveSelection(project.id, [])).rejects.toThrow(/at least one/i);
     await service.saveSelection(project.id, ["get_audio_volume"]);
     expect(calls).toEqual(["analyze", "continue"]);
+  });
+
+  it("resetProject clears derived state and re-runs Analyze from scratch", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bridge-local-reset-"));
+    roots.push(root);
+    const sourceDirectory = join(root, "source");
+    await mkdir(sourceDirectory, { recursive: true });
+    await writeFile(join(sourceDirectory, "Audio.ts"), "class Audio { getVolume() {} }");
+    const schemaPath = join(root, "schema.json");
+    await writeFile(schemaPath, '{"type":"object"}');
+    const calls: string[] = [];
+    const automation = {
+      async startAnalysis(context: { projectId: string }) { calls.push("analyze"); return { projectId: context.projectId, status: "awaiting_curate", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; },
+      async continueAfterCurate(context: { projectId: string }) { calls.push("continue"); return { projectId: context.projectId, status: "mock_ready", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; },
+      async get() { return undefined; }, async retry() { return { projectId: "p", status: "mock_ready", startedAt: "", updatedAt: "" }; }, async cancel() { return { projectId: "p", status: "cancelled", startedAt: "", updatedAt: "" }; },
+    };
+    const service = new WorkbenchService(createConfig({ runtimeRoot: join(root, "runtime") }), { automation: automation as any });
+    const project = await service.importFromPaths({ projectName: "Reset", sourceDirectory, schemaPath });
+    expect(calls).toEqual(["analyze"]);
+    const stateDir = join(project.root, ".mcp-pipeline", "reset");
+    await mkdir(stateDir, { recursive: true });
+    await writeFile(join(stateDir, "analysis.json"), JSON.stringify({ capabilities: [{ id: "get_audio_volume" }] }));
+    await writeFile(join(stateDir, "selection.json"), JSON.stringify({ selected: ["get_audio_volume"] }));
+    await mkdir(join(project.root, ".workbench"), { recursive: true });
+    await writeFile(join(project.root, ".workbench", "stages.json"), JSON.stringify({ version: 1, stages: { analyze: { id: "analyze", status: "passed" } } }));
+    await writeFile(join(project.root, "tools-schema.json"), JSON.stringify({ tools: [] }));
+
+    await service.resetProject(project.id);
+
+    await expect(stat(join(stateDir, "analysis.json"))).rejects.toThrow();
+    await expect(stat(join(project.root, ".workbench", "stages.json"))).rejects.toThrow();
+    await expect(stat(join(project.root, "tools-schema.json"))).rejects.toThrow();
+    expect(calls).toEqual(["analyze", "analyze"]);
   });
 });

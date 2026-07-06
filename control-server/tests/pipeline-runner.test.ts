@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EventBus } from "../src/events/event-bus.js";
+import { ClaudeBackend, CodexBackend, type AgentBackend } from "../src/pipeline/agent-backend.js";
 import { CommandPolicy } from "../src/pipeline/command-policy.js";
 import { PipelineRunner, type PipelineWorkspace } from "../src/pipeline/pipeline-runner.js";
 import type { CommandSpec, ProcessResult } from "../src/pipeline/process-runner.js";
@@ -13,12 +14,16 @@ class FakeProcessRunner {
   stderr = "";
   writeOutputs = true;
   workspace?: PipelineWorkspace;
+  analysisJson = `${JSON.stringify({
+    app: { name: "demo", domain: "audio", framework: "android", entryFile: "app/src/main/kotlin/Main.kt" },
+    capabilities: [{ id: "get_audio_volume", domain: "audio", object: "audio", action: "getVolume", sourceRef: "AudioControlManager.kt:12", safetyLevel: "readonly", sdkCalls: ["IAudioControl.getAudioVolume"] }],
+  })}\n`;
   async run(spec: CommandSpec): Promise<ProcessResult> {
     this.calls.push(spec);
     if (this.writeOutputs && this.workspace && this.nextExitCode === 0) {
       if (spec.operation === "analyze") {
         await mkdir(join(this.workspace.analysisPath, ".."), { recursive: true });
-        await writeFile(this.workspace.analysisPath, "{}\n");
+        await writeFile(this.workspace.analysisPath, this.analysisJson);
       }
       if (spec.operation === "scaffold") {
         await mkdir(this.workspace.generatedRoot, { recursive: true });
@@ -51,9 +56,9 @@ beforeEach(async () => {
 });
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-function createRunner(fake = new FakeProcessRunner()) {
+function createRunner(fake = new FakeProcessRunner(), agent: AgentBackend = new CodexBackend("codex")) {
   fake.workspace = workspace;
-  return { fake, runner: new PipelineRunner({ codexExecutable: "codex", pipelineCliPath: join(repositoryRoot, "cli", "bin", "mcp-pipeline.js") }, fake, new CommandPolicy(), new EventBus()) };
+  return { fake, runner: new PipelineRunner({ agent, pipelineCliPath: join(repositoryRoot, "cli", "bin", "mcp-pipeline.js") }, fake, new CommandPolicy(), new EventBus()) };
 }
 
 describe("PipelineRunner", () => {
@@ -69,6 +74,7 @@ describe("PipelineRunner", () => {
     expect(analyze.args.join(" ")).toContain(workspace.analysisPath);
     expect(analyze.args.join(" ")).toContain("output-format reference");
     expect(analyze.args.join(" ")).toContain("Never create a capability from a schema example");
+    expect(analyze.args.join(" ")).toContain("Do NOT run shell, bash, or PowerShell");
     expect(analyze.args.join(" ")).not.toContain("target-only APIs as gaps");
     expect(analyze.args).toEqual(expect.arrayContaining(["--skip-git-repo-check", "--ephemeral", "--color", "never"]));
 
@@ -76,6 +82,18 @@ describe("PipelineRunner", () => {
     await runner.runStage(workspace, "generate", { confirmed: true });
     expect(fake.calls[1]!.args.join(" ")).toContain("$mcp-generate");
     expect(fake.calls[1]!.args.join(" ")).toContain(workspace.selectionPath);
+    expect(fake.calls[1]!.args.join(" ")).toContain("Do NOT run shell, bash, or PowerShell");
+  });
+
+  it("builds a Claude headless analyze command when the Claude backend is selected", async () => {
+    const { fake, runner } = createRunner(new FakeProcessRunner(), new ClaudeBackend("claude"));
+    await runner.runStage(workspace, "analyze");
+    const analyze = fake.calls[0]!;
+    expect(analyze.executable).toBe("claude");
+    expect(analyze.cwd).toBe(workspace.root);
+    expect(analyze.args).toEqual(expect.arrayContaining(["-p", "--dangerously-skip-permissions", "--output-format", "text"]));
+    expect(analyze.args.join(" ")).toContain("$mcp-analyze");
+    expect(analyze.args).not.toContain("--skip-git-repo-check");
   });
 
   it("invokes deterministic CLI stages as structured node arguments", async () => {
@@ -117,6 +135,13 @@ describe("PipelineRunner", () => {
     const { fake, runner } = createRunner();
     fake.writeOutputs = false;
     await expect(runner.runStage(workspace, "analyze")).rejects.toThrow(/analysis\.json.*missing/i);
+    expect(runner.status("analyze")).toBe("failed");
+  });
+
+  it("rejects an analysis that lacks the required capabilities schema", async () => {
+    const { fake, runner } = createRunner();
+    fake.analysisJson = `${JSON.stringify({ app: { name: "demo" } })}\n`; // no capabilities
+    await expect(runner.runStage(workspace, "analyze")).rejects.toThrow(/no capabilities/i);
     expect(runner.status("analyze")).toBe("failed");
   });
 

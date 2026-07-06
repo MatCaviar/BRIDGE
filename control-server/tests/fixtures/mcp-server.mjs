@@ -8,4 +8,7 @@ server.registerTool("wait", { description: "Wait", inputSchema: { milliseconds: 
   await new Promise((resolve) => setTimeout(resolve, milliseconds));
   return { content: [{ type: "text", text: "done" }] };
 });
+// Exposes the spawned server's env so tests can assert the launcher set ELECTRON_RUN_AS_NODE=1
+// (without it, electron.exe never answers the MCP initialize handshake and start times out).
+server.registerTool("env", { description: "Echo an env var", inputSchema: { name: z.string() } }, async ({ name }) => ({ content: [{ type: "text", text: process.env[name] ?? "" }] }));
 await server.connect(new StdioServerTransport());

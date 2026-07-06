@@ -13,6 +13,7 @@ export interface WorkbenchBridge {
   getPipelineRun(id: string): Promise<PipelineAutomationRun | undefined>;
   retryPipeline(id: string): Promise<PipelineAutomationRun>;
   cancelPipeline(id: string): Promise<PipelineAutomationRun>;
+  resetProject(id: string): Promise<void>;
   getMcp(id: string): Promise<unknown>;
   startMcp(id: string, mode: "mock" | "real", confirmation?: Record<string, unknown>): Promise<unknown>;
   stopMcp(id: string, confirmation?: Record<string, unknown>): Promise<unknown>;

@@ -22,6 +22,7 @@ export function runInstallAndTypecheck(projectDir: string): string[] {
     cwd: projectDir,
     encoding: "utf-8",
     maxBuffer: 10 * 1024 * 1024,
+    windowsHide: true,
   });
   if (install.status !== 0) {
     errors.push(
@@ -34,6 +35,7 @@ export function runInstallAndTypecheck(projectDir: string): string[] {
     cwd: projectDir,
     encoding: "utf-8",
     maxBuffer: 10 * 1024 * 1024,
+    windowsHide: true,
   });
   if (tsc.status !== 0) {
     errors.push(

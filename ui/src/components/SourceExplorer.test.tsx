@@ -31,9 +31,9 @@ describe("semantic source and execution truth", () => {
     } as any);
 
     render(<SourceExplorer />);
-    expect(screen.getByText("2 declarations")).toBeInTheDocument();
+    expect(screen.getByText("2 个声明")).toBeInTheDocument();
     expect(screen.getByText(/setMicVol · DBUS RPC/)).toBeInTheDocument();
-    expect(screen.getByText("1 dependencies")).toBeInTheDocument();
+    expect(screen.getByText("1 个依赖")).toBeInTheDocument();
     expect(screen.queryByText("./BaseManager", { selector: "b" })).not.toBeInTheDocument();
   });
 
@@ -49,9 +49,9 @@ describe("semantic source and execution truth", () => {
     } as any);
 
     render(<CurateStudio />);
-    expect(screen.getByText("MOCK READY · REAL BLOCKED")).toBeInTheDocument();
+    expect(screen.getByText("Mock 就绪 · 实车受阻")).toBeInTheDocument();
     expect(screen.getByText("transport unavailable")).toBeInTheDocument();
-    expect(screen.getByText("REAL READY")).toBeInTheDocument();
+    expect(screen.getByText("实车就绪")).toBeInTheDocument();
   });
 
   it("shows mock and real readiness in the provenance chain", () => {
@@ -62,7 +62,7 @@ describe("semantic source and execution truth", () => {
       edges: [],
     } } as any);
     render(<TransformationMap />);
-    expect(screen.getByText("MOCK READY")).toBeInTheDocument();
+    expect(screen.getByText("Mock 就绪")).toBeInTheDocument();
     expect(screen.getByText("transport unavailable")).toBeInTheDocument();
   });
 });

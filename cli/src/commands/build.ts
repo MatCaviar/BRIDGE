@@ -31,7 +31,7 @@ async function npmInstallIfNeeded(dir: string): Promise<void> {
       execFile(
         commandFile("npm"),
         commandArgs("npm", ["install"]),
-        { cwd: dir, maxBuffer: 10 * 1024 * 1024 },
+        { cwd: dir, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
         (error) => {
           if (error) {
             reject(new Error(`npm install failed: ${error.message}`));
@@ -49,7 +49,7 @@ async function tscBuild(dir: string): Promise<void> {
     execFile(
       commandFile("npx"),
       commandArgs("npx", ["tsc"]),
-      { cwd: dir, maxBuffer: 10 * 1024 * 1024 },
+      { cwd: dir, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
       (error, _stdout, stderr) => {
         if (error) {
           reject(new Error(`TypeScript build failed:\n${stderr}`));

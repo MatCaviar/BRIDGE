@@ -19,6 +19,7 @@ export const workbenchApi = {
   pipeline: (id: string) => local((bridge) => bridge.getPipelineRun(id)),
   pipelineRetry: (id: string) => local((bridge) => bridge.retryPipeline(id)),
   pipelineCancel: (id: string) => local((bridge) => bridge.cancelPipeline(id)),
+  resetProject: (id: string) => local((bridge) => bridge.resetProject(id)),
   mcp: <T>(id: string) => local((bridge) => bridge.getMcp(id) as Promise<T>),
   mcpStart: <T>(id: string, body: any) => local((bridge) => bridge.startMcp(id, body.mode, body) as Promise<T>),
   mcpStop: <T>(id: string, body: any) => local((bridge) => bridge.stopMcp(id, body) as Promise<T>),

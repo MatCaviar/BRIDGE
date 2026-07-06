@@ -30,7 +30,7 @@ export async function runTests(dir: string): Promise<TestResults> {
     execFile(
       commandFile("npx"),
       commandArgs("npx", ["vitest", "run", "--reporter=json"]),
-      { cwd: resolvedDir, maxBuffer: 10 * 1024 * 1024 },
+      { cwd: resolvedDir, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
       (error, stdout, stderr) => {
         const output = stdout || stderr;
         if (!output) {

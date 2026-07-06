@@ -1,2 +1,2 @@
 import { useWorkbench } from "../state/workbench";
-export function LogTerminal(){const {logs}=useWorkbench();return <section className="panel glass wide"><div className="panel-title"><div><p className="eyebrow">LIVE EVENT STREAM</p><h2>执行日志</h2></div><span className="metric">{logs.length}/5000 lines</span></div><pre className="terminal" aria-label="执行日志">{logs.length?logs.join(""):"$ 等待本地流水线事件…"}</pre></section>}
+export function LogTerminal(){const {logs}=useWorkbench();return <section className="panel glass wide"><div className="panel-title"><div><p className="eyebrow">实时事件流</p><h2>执行日志</h2></div><span className="metric">{logs.length}/5000 行</span></div><pre className="terminal" aria-label="执行日志">{logs.length?logs.join(""):"$ 等待本地流水线事件…"}</pre></section>}

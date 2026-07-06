@@ -29,19 +29,19 @@ export interface PipelineStageDefinition {
 }
 
 export const pipelineStages: readonly PipelineStageDefinition[] = [
-  { id: "import", label: "Import", kind: "input" },
-  { id: "analyze", label: "Analyze", kind: "agent" },
-  { id: "curate", label: "Curate", kind: "input" },
-  { id: "scaffold", label: "Scaffold", kind: "deterministic" },
-  { id: "generate", label: "Generate", kind: "agent" },
-  { id: "validate_config", label: "Validate Config", kind: "deterministic" },
-  { id: "wire_check", label: "Wire Check", kind: "deterministic" },
-  { id: "build", label: "Build", kind: "deterministic" },
-  { id: "test", label: "Test", kind: "deterministic" },
-  { id: "register", label: "Register", kind: "deterministic" },
-  { id: "verify", label: "Verify", kind: "deterministic" },
-  { id: "schema_preview", label: "Schema Preview", kind: "deterministic" },
-  { id: "deploy", label: "Deploy", kind: "deployment" },
+  { id: "import", label: "导入", kind: "input" },
+  { id: "analyze", label: "分析", kind: "agent" },
+  { id: "curate", label: "筛选", kind: "input" },
+  { id: "scaffold", label: "脚手架", kind: "deterministic" },
+  { id: "generate", label: "生成", kind: "agent" },
+  { id: "validate_config", label: "校验配置", kind: "deterministic" },
+  { id: "wire_check", label: "接线检查", kind: "deterministic" },
+  { id: "build", label: "构建", kind: "deterministic" },
+  { id: "test", label: "测试", kind: "deterministic" },
+  { id: "register", label: "注册", kind: "deterministic" },
+  { id: "verify", label: "验证", kind: "deterministic" },
+  { id: "schema_preview", label: "Schema 预览", kind: "deterministic" },
+  { id: "deploy", label: "部署", kind: "deployment" },
 ] as const;
 
 const CONFIRM_OPERATIONS = new Set<OperationId>([

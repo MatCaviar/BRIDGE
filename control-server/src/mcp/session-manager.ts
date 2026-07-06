@@ -63,7 +63,15 @@ export class McpSessionManager {
   async start(workspace: McpWorkspace, launch: McpLaunchSpec, mode: McpMode, confirmation: McpConfirmation): Promise<McpSessionSnapshot> {
     if (this.#sessions.get(workspace.projectId)?.snapshot.state === "running") throw new Error("MCP session is already running");
     this.policy.authorize({ operation: "mcp_start", projectId: workspace.projectId, projectName: workspace.projectName, workspaceRoot: workspace.root, cwd: launch.cwd, ...confirmation });
-    const transport = new StdioClientTransport({ command: launch.executable, args: [...launch.args], cwd: launch.cwd, env: { ...getDefaultEnvironment(), ...launch.env }, stderr: "pipe" });
+    // The workbench runs in-process under Electron, so `launch.executable` (process.execPath) is
+    // electron.exe. Spawning `electron.exe dist/index.js` WITHOUT ELECTRON_RUN_AS_NODE does not run
+    // it as a plain node stdio server — it never answers the MCP `initialize` handshake and the
+    // client times out at the 10s initialization ceiling (-32001). ELECTRON_RUN_AS_NODE makes
+    // electron.exe behave as node (the StdioServerTransport keeps the event loop alive until stop);
+    // a harmless no-op when `launch.executable` is already node. `getDefaultEnvironment()` uses an
+    // allowlist that drops it, so it must be set explicitly. Put it before `...launch.env` so a
+    // caller can still override.
+    const transport = new StdioClientTransport({ command: launch.executable, args: [...launch.args], cwd: launch.cwd, env: { ...getDefaultEnvironment(), ELECTRON_RUN_AS_NODE: "1", ...launch.env }, stderr: "pipe" });
     const client = new Client({ name: "bridge-visual-workbench", version: "0.1.0" }, { capabilities: {} });
     const session: ManagedSession = {
       client, transport, workspace,
