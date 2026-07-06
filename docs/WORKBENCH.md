@@ -87,7 +87,7 @@ Projects, stage state, and automation state survive application restart. Analyze
 
 For quick visual testing, import:
 
-- Source: `source_code\mock-audio-android`
+- Source: `control-server\tests\fixtures\mock-audio-android`
 - Format schema: `schema\mock-mcp-output.schema.json`
 
 The source contains three audio operations. The schema intentionally contains an unrelated `reference_weather_lookup` example; it must never appear in Analyze or coverage findings.

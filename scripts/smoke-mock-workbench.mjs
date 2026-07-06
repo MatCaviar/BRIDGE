@@ -9,7 +9,7 @@ import { ProcessRunner } from "../control-server/dist/pipeline/process-runner.js
 const repositoryRoot = resolve(".");
 const live = process.argv.includes("--live");
 const positional = process.argv.slice(2).filter((value) => !value.startsWith("--"));
-const sourceDirectory = resolve(positional[0] ?? "source_code/mock-audio-android");
+const sourceDirectory = resolve(positional[0] ?? "control-server/tests/fixtures/mock-audio-android");
 const schemaPath = resolve(positional[1] ?? "schema/mock-mcp-output.schema.json");
 await access(sourceDirectory);
 await access(schemaPath);

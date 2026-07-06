@@ -8,7 +8,7 @@ const repositoryRoot = resolve(import.meta.dirname, "../..");
 
 describe("mock Android fixture", () => {
   it("indexes source operations without treating the schema example as source", async () => {
-    const source = resolve(repositoryRoot, "source_code/mock-audio-android");
+    const source = resolve(repositoryRoot, "control-server/tests/fixtures/mock-audio-android");
     const schema = parseTargetSchema(await readFile(resolve(repositoryRoot, "schema/mock-mcp-output.schema.json"), "utf8"));
     const index = await scanProject(source);
 
