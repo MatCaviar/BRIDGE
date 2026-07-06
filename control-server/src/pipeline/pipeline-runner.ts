@@ -3,7 +3,7 @@ import { EventBus } from "../events/event-bus.js";
 import type { AgentBackend } from "./agent-backend.js";
 import { CommandPolicy } from "./command-policy.js";
 import type { CommandSpec, ProcessResult } from "./process-runner.js";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { StageStore } from "./stage-store.js";
 
@@ -99,6 +99,7 @@ export class PipelineRunner {
         throw new Error(stageFailure(stage, result));
       }
       try {
+        await this.#normalizeAgentOutput(stage, workspace);
         await assertStageOutput(stage, workspace);
       } catch (error) {
         this.#states.set(stage, "failed");
@@ -124,7 +125,7 @@ export class PipelineRunner {
   }
 
   private commandFor(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">): CommandSpec {
-    if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. The imported schema is ONLY a descriptor shape / parameter encoding / style reference for the tools that will eventually be generated — it is NOT the analysis output format. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence and record it in app.framework. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath} as JSON with EXACTLY this top-level shape and no other top-level keys: { "app": { "name": string, "domain": string, "framework": string, "entryFile": string }, "capabilities": [ { "id": string, "domain": string, "object": string, "action": string, "sourceRef": string, "safetyLevel": string, "sdkCalls": string[], "params"?: [{ "name": string, "type": string, "optional"?: boolean, "description"?: string, "enum"?: string[], "examples"?: string[], "defaultValue"?: string|number|boolean, "properties"?: ParamDef[], "items"?: { "type": string } }], "returns"?: { "type": string, "fields"?: (string | { "name": string, "type": string })[] }, "description"?: string, "status"?: "verified" | "partial" | "broken" } ], "enums"?: object, "errorCodes"?: object }. "capabilities" MUST be a non-empty array; each "id" is a stable snake_case tool name; each "sourceRef" MUST cite verified live source (file path + line); "sdkCalls" lists the SDK/RPC calls backing the capability. Do NOT emit "tools", "inputSchema", "inspection", "summary", "project", or "platform" as top-level keys — those are not the analysis format. Write ONLY the file ${workspace.analysisPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.analysisPath}. Output the analysis file and stop.`);
+    if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. The imported schema is ONLY a descriptor shape / parameter encoding / style reference for the tools that will eventually be generated — it is NOT the analysis output format. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence and record it in app.framework. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath} as JSON with EXACTLY this top-level shape and no other top-level keys: { "app": { "name": string, "domain": string, "framework": "YunOS HDT" | "Android", "entryFile": string }, "capabilities": [ { "id": string (snake_case), "domain": string, "object": string, "action": string, "sourceRef": string, "safetyLevel": "readonly" | "normal" | "p_gear_required" | "p_gear_and_confirm" | "p_gear_and_network", "sdkCalls": string[], "params"?: [{ "name": string (camelCase), "type": string, "optional"?: boolean, "description"?: string, "enum"?: string[], "examples"?: string[], "defaultValue"?: string|number|boolean, "properties"?: ParamDef[], "items"?: { "type": string } }], "returns"?: { "type": string, "fields"?: (string | { "name": string, "type": string })[] }, "description"?: string, "status"?: "verified" | "partial" | "broken" } ], "enums"?: { [enumName: string]: { "values": string[], "type": "string" | "number", "sourceFile"?: string, "map"?: { [wireValue: string]: string } } }, "errorCodes"?: { [domain: string]: { "prefix": number (1..99), "domainName": string, "codes": { [codeName: string]: { "value": number (0..99), "message": string (zh-CN, non-empty) } } } } }. "enums" and "errorCodes" MUST follow those exact sub-shapes — the validator rejects unknown fields. In particular do NOT write "errorCodes" as a flat name→number map: each domain needs "prefix"+"domainName"+"codes", and each code needs "value"+"message". "safetyLevel" MUST be exactly one of those 5 strings — never invent values like "safe"/"medium"/"elevated"/"low"/"high": "readonly" = pure read, no state change; "normal" = ordinary side effect; "p_gear_required" = requires P-gear; "p_gear_and_confirm" = requires P-gear + user confirmation; "p_gear_and_network" = requires P-gear + network. Each param "name" MUST be camelCase matching ^[a-z][a-zA-Z0-9]*$ with NO underscores (e.g. hallMode, operateTime, tirePressure) — this differs from the snake_case capability "id", so convert any snake_case source field to camelCase when used as a param name. "capabilities" MUST be a non-empty array; each "id" is a stable snake_case tool name; each "sourceRef" MUST cite verified live source (file path + line); "sdkCalls" lists the SDK/RPC calls backing the capability. Do NOT emit "tools", "inputSchema", "inspection", "summary", "project", or "platform" as top-level keys — those are not the analysis format. Write ONLY the file ${workspace.analysisPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.analysisPath}. Output the analysis file and stop.`);
     if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ONLY the file ${workspace.rpcConfigPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.rpcConfigPath}. Output the RPC config file and stop.`);
     if (operation === "deploy") throw new Error("Deploy adapter is not configured");
 
@@ -145,7 +146,26 @@ export class PipelineRunner {
   }
 
   private agentCommand(workspace: PipelineWorkspace, operation: "analyze" | "generate", prompt: string): CommandSpec {
-    return this.config.agent.buildAgentCommand(workspace, operation, prompt);
+    const spec = this.config.agent.buildAgentCommand(workspace, operation, prompt);
+    // Agent stages read many source files and emit a large analysis/generation, which routinely
+    // exceeds the ProcessRunner's 10-minute default on hosted models. A timed-out agent must NOT
+    // be retried — restarting from scratch just burns another full window and times out again at
+    // the same point, so disable the default timeout-retry and raise the ceiling for agent stages.
+    return { ...spec, timeoutMs: 20 * 60_000, retryOnTimeout: false };
+  }
+
+  /** The agent (claude/codex) may emit a UTF-8 BOM at the start of the JSON it writes — model/tool
+   *  dependent, and observed with claude on Windows. Node's `JSON.parse` rejects a leading BOM,
+   *  which would fail this stage's gate AND every downstream CLI reader (curate/scaffold/validate/
+   *  wire_check) that re-reads the file. Strip it once on disk, right after the agent finishes, so
+   *  the persisted artifact is plain valid JSON. A no-op when no BOM is present. */
+  async #normalizeAgentOutput(stage: PipelineStageId, workspace: PipelineWorkspace): Promise<void> {
+    const path = stage === "analyze" ? workspace.analysisPath : stage === "generate" ? workspace.rpcConfigPath : undefined;
+    if (!path) return;
+    try {
+      const raw = await readFile(path, "utf8");
+      if (raw.charCodeAt(0) === 0xfeff) await writeFile(path, raw.slice(1), "utf8");
+    } catch { /* file may not exist or be unwritable; assertStageOutput will report the real error */ }
   }
 }
 

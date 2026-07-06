@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -76,7 +76,26 @@ describe("PipelineRunner", () => {
     expect(analyze.args.join(" ")).toContain("Never create a capability from a schema example");
     expect(analyze.args.join(" ")).toContain("Do NOT run shell, bash, or PowerShell");
     expect(analyze.args.join(" ")).not.toContain("target-only APIs as gaps");
+    // The analyze prompt must specify the exact enums/errorCodes sub-shapes — the schema rejects
+    // unknown fields, so a vague "object" leaves the agent to guess (it wrote a flat name→number
+    // map for errorCodes, which scaffold then rejected).
+    expect(analyze.args.join(" ")).toContain('"prefix"');
+    expect(analyze.args.join(" ")).toContain('"domainName"');
+    expect(analyze.args.join(" ")).toContain('"codes"');
+    expect(analyze.args.join(" ")).toContain('"sourceFile"');
+    expect(analyze.args.join(" ")).toContain("flat name");
+    // The schema constrains safetyLevel to a 5-value enum and param names to camelCase
+    // (^[a-z][a-zA-Z0-9]*$, no underscores) — distinct from the snake_case capability id. The agent
+    // wrote "safe"/"medium"/"elevated" and snake_case param names (hall_mode, operate_time), both
+    // rejected by scaffold. The prompt must name the exact enum + camelCase rule to prevent that.
+    expect(analyze.args.join(" ")).toContain('"p_gear_and_network"');
+    expect(analyze.args.join(" ")).toContain("never invent values like");
+    expect(analyze.args.join(" ")).toContain("camelCase matching ^[a-z][a-zA-Z0-9]*$");
+    expect(analyze.args.join(" ")).toContain("hallMode, operateTime, tirePressure");
     expect(analyze.args).toEqual(expect.arrayContaining(["--skip-git-repo-check", "--ephemeral", "--color", "never"]));
+    // Agent stages get a generous ceiling and opt out of retry-from-scratch (see agentCommand).
+    expect(analyze.timeoutMs).toBe(20 * 60_000);
+    expect(analyze.retryOnTimeout).toBe(false);
 
     runner.markPassed("scaffold");
     await runner.runStage(workspace, "generate", { confirmed: true });
@@ -91,9 +110,28 @@ describe("PipelineRunner", () => {
     const analyze = fake.calls[0]!;
     expect(analyze.executable).toBe("claude");
     expect(analyze.cwd).toBe(workspace.root);
-    expect(analyze.args).toEqual(expect.arrayContaining(["-p", "--dangerously-skip-permissions", "--output-format", "text"]));
+    // --bare isolates the automated run from the user's installed plugins/hooks (see ClaudeBackend).
+    expect(analyze.args).toEqual(expect.arrayContaining(["-p", "--dangerously-skip-permissions", "--output-format", "text", "--bare"]));
     expect(analyze.args.join(" ")).toContain("$mcp-analyze");
     expect(analyze.args).not.toContain("--skip-git-repo-check");
+    // Agent stages get a generous ceiling and opt out of retry-from-scratch (see agentCommand).
+    expect(analyze.timeoutMs).toBe(20 * 60_000);
+    expect(analyze.retryOnTimeout).toBe(false);
+  });
+
+  it("strips a UTF-8 BOM the agent wrote at the start of analysis.json so the gate and downstream readers see valid JSON", async () => {
+    const { fake, runner } = createRunner();
+    fake.analysisJson = `﻿${JSON.stringify({
+      app: { name: "demo", domain: "audio", framework: "android", entryFile: "Main.kt" },
+      capabilities: [{ id: "get_volume", domain: "audio", object: "audio", action: "getVolume", sourceRef: "AudioControl.kt:1", safetyLevel: "readonly", sdkCalls: [] }],
+    })}\n`;
+    await runner.runStage(workspace, "analyze");
+    expect(runner.status("analyze")).toBe("passed");
+    const raw = await readFile(workspace.analysisPath, "utf8");
+    expect(raw.charCodeAt(0)).not.toBe(0xfeff);
+    const parsed = JSON.parse(raw);
+    expect(parsed.app.name).toBe("demo");
+    expect(parsed.capabilities).toHaveLength(1);
   });
 
   it("invokes deterministic CLI stages as structured node arguments", async () => {
