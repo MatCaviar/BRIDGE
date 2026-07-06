@@ -16,7 +16,9 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/launch-workbench.mjs" $ARGUMENTS
 ```
 
 - `${CLAUDE_PLUGIN_ROOT}` 未展开时,改用本命令加载时显示的插件根路径。
-- 启动器会自行构建 dist、解析 agent 后端(claude 优先,codex 兜底)、打开独立 Electron 窗口,并立即返回 —— 不阻塞当前会话。
+- 启动器会解析 agent 后端(claude 优先,codex 兜底)、打开独立 Electron 窗口;窗口打开后即返回,不阻塞会话。首次启动若 dist 缺失会先构建(见下一条)。
+- **首次启动会触发构建**(4 个 workspace,约 2-5 分钟;之后启动跳过构建、秒开)。运行前先告诉用户「首次启动需构建,请耐心等几分钟」;并给该命令**足够长的超时(至少 600000ms / 10 分钟),不要中途杀掉** —— 构建期间 launcher 会实时打印进度。
+- 若 launcher 报告构建失败或卡死(它会在 3 分钟无输出或 8 分钟超时后自动终止并打印明确原因),**不要原样重试**:按提示在插件根目录手动跑 `npm run workbench:build` 查看完整错误(常见:某 workspace tsc 报错、依赖未安装),修复后重跑 `/mcp-pipeline`(此后跳过构建)。
 
 窗口打开后告诉用户:
 

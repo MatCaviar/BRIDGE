@@ -5,7 +5,9 @@
 //
 // - Resolves the agent backend (claude preferred, codex fallback) and its real
 //   executable path so the in-process control-server can spawn it with shell:false.
-// - Builds dist on first run; later launches skip the build for a fast start.
+// - Builds dist on first run with an idle + hard timeout so a stalled build fails
+//   fast with a diagnosable message instead of blocking forever; later launches
+//   skip the build for a fast start.
 // - Detaches the Electron window and returns immediately; closing the window
 //   stops the workbench and its child processes.
 // - When a source path is supplied it is forwarded as BRIDGE_INITIAL_SOURCE so
@@ -30,12 +32,100 @@ const initialSource = process.argv.slice(2)
   .map((arg) => resolvePath(process.cwd(), arg))
   .find((p) => existsSync(p) && statSync(p).isDirectory()) ?? "";
 
-function ensureBuilt() {
+const BUILD_IDLE_TIMEOUT_MS = 180_000; // no build output for 3 min => likely hung
+const BUILD_HARD_TIMEOUT_MS = 8 * 60_000; // 8 min hard cap (agent should allow ≥10 min)
+
+async function ensureBuilt() {
   const mainJs = resolvePath(repoRoot, "desktop/dist/main.js");
   const indexHtml = resolvePath(repoRoot, "ui/dist/index.html");
   if (existsSync(mainJs) && existsSync(indexHtml)) return;
-  console.log("[workbench] dist 缺失,正在构建…");
-  execSync("npm run workbench:build", { cwd: repoRoot, stdio: "inherit" });
+  console.log("");
+  console.log("⏳ 首次启动:工作台尚未构建,正在构建 4 个 workspace(workbench-contracts / control-server / desktop / ui)。");
+  console.log("   通常需要 2-5 分钟,期间请勿中断;构建完成后会自动打开窗口。");
+  console.log("");
+  const result = await runBuild();
+  if (!result.ok) {
+    console.error("");
+    console.error(buildFailureMessage(result));
+    process.exit(1);
+  }
+  console.log("");
+  console.log("✅ 构建完成,正在解析 agent 后端并启动工作台…");
+  console.log("");
+}
+
+/** Runs `npm run workbench:build` as a child process, forwarding output in real time,
+ *  with an idle timer (no output => likely hung) and a hard cap. npm's `--workspaces`
+ *  orchestration can stall silently on some Windows setups; the idle timer turns that
+ *  indefinite stall into a clean, diagnosable failure instead of blocking forever. */
+function runBuild() {
+  return new Promise((resolve) => {
+    const cmd = process.platform === "win32" ? "npm.cmd" : "npm";
+    const child = spawn(cmd, ["run", "workbench:build"], {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
+    });
+    let settled = false;
+    let idleTimer;
+    let hardTimer;
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(idleTimer);
+      clearTimeout(hardTimer);
+      resolve(result);
+    };
+    hardTimer = setTimeout(() => {
+      console.error("\n❌ 构建超过 8 分钟,强制终止。");
+      killTree(child);
+      settle({ ok: false, reason: "hard-timeout" });
+    }, BUILD_HARD_TIMEOUT_MS);
+    const armIdle = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        console.error("\n❌ 构建超过 3 分钟无输出,疑似卡死(npm --workspaces 在个别环境下会静默停滞)。正在终止…");
+        killTree(child);
+        settle({ ok: false, reason: "idle" });
+      }, BUILD_IDLE_TIMEOUT_MS);
+    };
+    child.stdout.on("data", (chunk) => { process.stdout.write(chunk); armIdle(); });
+    child.stderr.on("data", (chunk) => { process.stderr.write(chunk); armIdle(); });
+    child.on("error", (err) => {
+      console.error(`\n❌ 无法启动构建进程: ${err.message}`);
+      settle({ ok: false, reason: "spawn-error", error: err.message });
+    });
+    child.on("exit", (code, signal) => {
+      if (code === 0) settle({ ok: true });
+      else settle({ ok: false, reason: "nonzero", code, signal });
+    });
+    armIdle();
+  });
+}
+
+/** Kill the build child and its descendants. On Windows `taskkill /T /F` walks the
+ *  tree; on Unix the child runs in its own process group (detached) so -pid kills it. */
+function killTree(child) {
+  if (!child.pid) return;
+  try {
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    } else {
+      process.kill(-child.pid, "SIGKILL");
+    }
+  } catch {
+    try { child.kill("SIGKILL"); } catch { /* already dead */ }
+  }
+}
+
+function buildFailureMessage(result) {
+  const hint = "请手动在插件根目录运行 `npm run workbench:build` 查看完整错误;常见原因:某 workspace 的 tsc 报错、依赖未安装(先 `npm install`)。修复后重新运行 /mcp-pipeline 即可(此后启动会跳过构建)。";
+  const reason = result.reason === "idle" ? "超过 3 分钟无输出,疑似卡死"
+    : result.reason === "hard-timeout" ? "超过 8 分钟"
+    : result.reason === "nonzero" ? `构建进程退出码 ${result.code ?? "?"}`
+    : result.reason === "spawn-error" ? `无法启动构建进程 — ${result.error}`
+    : "未知原因";
+  return `❌ 工作台构建失败,无法启动可视化(原因:${reason})。\n${hint}`;
 }
 
 function resolveExecutable(backend) {
@@ -65,7 +155,7 @@ function resolveBackend() {
   throw new Error(`未找到可用的 agent 后端 (尝试过 ${order.join(" / ")}): ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
-ensureBuilt();
+await ensureBuilt();
 
 let electronPath;
 try {
