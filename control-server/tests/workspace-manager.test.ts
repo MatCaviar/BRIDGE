@@ -71,4 +71,35 @@ describe("WorkspaceManager", () => {
       expect.objectContaining({ id: project.id, name: "audio app", root: project.root }),
     ]);
   });
+
+  it("persists and recovers the original source path so deploy can target its sibling", async () => {
+    const workspaces = await manager();
+    const project = await workspaces.importProject({
+      projectName: "audio app",
+      files: [{ path: "src/audio.ts", contentBase64: Buffer.from("class Audio { play() {} }").toString("base64") }],
+      targetSchema: { type: "object" },
+      originalSourcePath: "/home/user/src/audio-app",
+    });
+    expect(project.originalSourcePath).toBe("/home/user/src/audio-app");
+    // project.json on disk carries the field...
+    const persisted = JSON.parse(await readFile(join(project.root, "project.json"), "utf8"));
+    expect(persisted.originalSourcePath).toBe("/home/user/src/audio-app");
+    // ...and a fresh manager recovers it via listProjects.
+    const restarted = new WorkspaceManager(workspaces.runtimeRoot, { maxFiles: 3, maxFileBytes: 32, maxTotalBytes: 64 });
+    const [recovered] = await restarted.listProjects();
+    expect(recovered.originalSourcePath).toBe("/home/user/src/audio-app");
+  });
+
+  it("omits originalSourcePath when not provided (upload imports)", async () => {
+    const workspaces = await manager();
+    const project = await workspaces.importProject({
+      projectName: "upload app",
+      files: [{ path: "src/x.ts", contentBase64: Buffer.from("x").toString("base64") }],
+      targetSchema: {},
+    });
+    expect(project.originalSourcePath).toBeUndefined();
+    const restarted = new WorkspaceManager(workspaces.runtimeRoot, { maxFiles: 3, maxFileBytes: 32, maxTotalBytes: 64 });
+    const [recovered] = await restarted.listProjects();
+    expect(recovered.originalSourcePath).toBeUndefined();
+  });
 });

@@ -1,5 +1,10 @@
 import { isAbsolute, relative, resolve } from "node:path";
 
+// `safeProjectId` lives in workbench-contracts so the UI and control-server share one definition
+// and always compute the identical `mcp-<app>` / deploy-target path. Re-exported here so existing
+// `from "../security/paths.js"` imports keep working.
+export { safeProjectId } from "@bridge/workbench-contracts";
+
 export function assertContained(root: string, relativePath: string): string {
   if (
     !relativePath
@@ -15,9 +20,4 @@ export function assertContained(root: string, relativePath: string): string {
     throw new Error(`Unsafe import path: ${relativePath}`);
   }
   return candidate;
-}
-
-export function safeProjectId(name: string): string {
-  const slug = name.normalize("NFKC").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return (slug || "project").slice(0, 48);
 }

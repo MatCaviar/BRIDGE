@@ -1,6 +1,6 @@
 {
   "name": "im-mcp-codeagent",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Generate auditable MCP Servers from YunOS HDT and supported Android apps (Claude Code + Codex).",
   "author": {
     "name": "Tongji University & IM"

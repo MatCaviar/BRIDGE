@@ -1,6 +1,6 @@
 import type { OperationId, PipelineAutomationRun, PipelineStageId, ProjectSummary, SourceIndex, WorkbenchEvent } from "@bridge/workbench-contracts";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { ControlServerConfig } from "../config.js";
 import { readArtifacts } from "../artifacts/artifact-reader.js";
 import { EventBus } from "../events/event-bus.js";
@@ -65,7 +65,9 @@ export class WorkbenchService {
   async importFromPaths(request: LocalImportRequest): Promise<ProjectSummary> {
     await this.ready();
     const [files, schemaRaw] = await Promise.all([readLocalSource(request.sourceDirectory), readFile(request.schemaPath, "utf8")]);
-    const project = await this.workspaces.importProject({ projectName: request.projectName, files, targetSchema: parseTargetSchema(schemaRaw) });
+    // Persist the resolved absolute source path so the `deploy` stage can export the generated
+    // artifact to its sibling later. resolve() is idempotent on an already-absolute path.
+    const project = await this.workspaces.importProject({ projectName: request.projectName, files, targetSchema: parseTargetSchema(schemaRaw), originalSourcePath: resolve(request.sourceDirectory) });
     this.projects.set(project.id, project);
     this.events.publish(project.id, "project", { action: "imported", name: project.name });
     if (this.autoStartAnalysis) void this.automation.startAnalysis(this.autoContext(project), this.autoExecutor(project));
@@ -152,5 +154,5 @@ export class WorkbenchService {
       return this.runStage(project.id, stage as Exclude<OperationId, `mcp_${string}` | "scan">, confirmation, signal);
     };
   }
-  private async pipelineWorkspace(project: ProjectSummary): Promise<PipelineWorkspace> { const app = safeProjectId(project.name); const state = join(project.root, ".mcp-pipeline", app); const generated = join(project.root, `mcp-${app}`); const sourceRoot = join(project.root, "source"); const scan = await this.getSourceIndex(project.id); const proxyPaths = scan.nodes.filter((node) => node.kind === "file" && /(?:proxy|service|client|controller|manager|\.aidl$)/i.test(node.path) && /\.(?:ts|tsx|js|jsx|kt|java|aidl)$/i.test(node.path)).slice(0, 200).map((node) => join(sourceRoot, node.path)); return { projectId: project.id, projectName: project.name, root: project.root, sourceRoot, targetSchemaPath: project.targetSchemaPath, analysisPath: join(state, "analysis.json"), selectionPath: join(state, "selection.json"), generatedRoot: generated, rpcConfigPath: join(generated, "rpc", "config.json"), proxyPaths }; }
+  private async pipelineWorkspace(project: ProjectSummary): Promise<PipelineWorkspace> { const app = safeProjectId(project.name); const state = join(project.root, ".mcp-pipeline", app); const generated = join(project.root, `mcp-${app}`); const sourceRoot = join(project.root, "source"); const scan = await this.getSourceIndex(project.id); const proxyPaths = scan.nodes.filter((node) => node.kind === "file" && /(?:proxy|service|client|controller|manager|\.aidl$)/i.test(node.path) && /\.(?:ts|tsx|js|jsx|kt|java|aidl)$/i.test(node.path)).slice(0, 200).map((node) => join(sourceRoot, node.path)); return { projectId: project.id, projectName: project.name, root: project.root, sourceRoot, targetSchemaPath: project.targetSchemaPath, analysisPath: join(state, "analysis.json"), selectionPath: join(state, "selection.json"), generatedRoot: generated, rpcConfigPath: join(generated, "rpc", "config.json"), proxyPaths, deployTarget: project.originalSourcePath ? join(dirname(project.originalSourcePath), `mcp-${app}`) : undefined }; }
 }

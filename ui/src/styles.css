@@ -183,6 +183,15 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .pipeline-done-title { font-size: 15px; font-weight: 700; }
 .pipeline-done code { font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; color: #047857; background: #d1fae5; padding: 2px 6px; border-radius: 6px; word-break: break-all; }
 
+/* deploy-as-export panel: copy the generated mcp-<app> to a sibling of the original source */
+.deploy-panel { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); display: grid; gap: 8px; }
+.deploy-panel .muted { margin: 0; }
+.deploy-panel code { font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--accent); background: var(--accent-soft); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+.deploy-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.deploy-controls small { grid-column: 1 / -1; }
+.deploy-ok { margin: 0; color: #065f46; font-size: 13px; }
+.deploy-ok code { color: #047857; background: #d1fae5; }
+
 .rpc-browser { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 12px; }
 .rpc-files { list-style: none; margin: 0; padding: 6px; max-height: 330px; overflow: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); display: grid; gap: 2px; align-content: start; }
 .rpc-files button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-soft); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; text-align: left; cursor: pointer; }

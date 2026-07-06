@@ -25,6 +25,10 @@ export interface PipelineWorkspace {
   readonly generatedRoot: string;
   readonly rpcConfigPath: string;
   readonly proxyPaths: readonly string[];
+  /** Where the `deploy` stage exports the generated artifact: a sibling of the original source
+   *  directory. `undefined` when the project was uploaded (no original path) — deploy then refuses
+   *  with a clear error rather than writing to an unknown location. */
+  readonly deployTarget?: string;
 }
 
 export interface StageConfirmation { readonly confirmed?: boolean; readonly typedConfirmation?: string; }
@@ -129,7 +133,15 @@ export class PipelineRunner {
   private commandFor(workspace: PipelineWorkspace, operation: Exclude<OperationId, `mcp_${string}` | "scan">): CommandSpec {
     if (operation === "analyze") return this.agentCommand(workspace, operation, `$mcp-analyze Analyze only ${workspace.sourceRoot} using deterministic source index ${join(workspace.root, "source-index.json")} and imported MCP output-format reference ${workspace.targetSchemaPath}. The imported schema is ONLY a descriptor shape / parameter encoding / style reference for the tools that will eventually be generated — it is NOT the analysis output format. Never create a capability from a schema example or report an example as missing. Discover candidates exclusively from verified live source evidence. Treat declarations and RPC evidence in the index as navigation evidence, then verify every promoted capability against live source. Detect YunOS versus Android from source evidence and record it in app.framework. For Android, inspect Kotlin, Java, AIDL, manifests, and bundled SDK reference Markdown. Write machine-readable analysis to ${workspace.analysisPath} as JSON with EXACTLY this top-level shape and no other top-level keys: { "app": { "name": string, "domain": string, "framework": "YunOS HDT" | "Android", "entryFile": string }, "capabilities": [ { "id": string (snake_case), "domain": string, "object": string, "action": string, "sourceRef": string, "safetyLevel": "readonly" | "normal" | "p_gear_required" | "p_gear_and_confirm" | "p_gear_and_network", "sdkCalls": string[], "params"?: [{ "name": string (camelCase), "type": string, "optional"?: boolean, "description"?: string, "enum"?: string[], "examples"?: string[], "defaultValue"?: string|number|boolean, "properties"?: ParamDef[], "items"?: { "type": string } }], "returns"?: { "type": string, "fields"?: (string | { "name": string, "type": string })[] }, "description"?: string, "status"?: "verified" | "partial" | "broken" } ], "enums"?: { [enumName: string]: { "values": string[], "type": "string" | "number", "sourceFile"?: string, "map"?: { [wireValue: string]: string } } }, "errorCodes"?: { [domain: string]: { "prefix": number (1..99), "domainName": string, "codes": { [codeName: string]: { "value": number (0..99), "message": string (zh-CN, non-empty) } } } } }. "enums" and "errorCodes" MUST follow those exact sub-shapes — the validator rejects unknown fields. In particular do NOT write "errorCodes" as a flat name→number map: each domain needs "prefix"+"domainName"+"codes", and each code needs "value"+"message". "safetyLevel" MUST be exactly one of those 5 strings — never invent values like "safe"/"medium"/"elevated"/"low"/"high": "readonly" = pure read, no state change; "normal" = ordinary side effect; "p_gear_required" = requires P-gear; "p_gear_and_confirm" = requires P-gear + user confirmation; "p_gear_and_network" = requires P-gear + network. Each param "name" MUST be camelCase matching ^[a-z][a-zA-Z0-9]*$ with NO underscores (e.g. hallMode, operateTime, tirePressure) — this differs from the snake_case capability "id", so convert any snake_case source field to camelCase when used as a param name. "capabilities" MUST be a non-empty array; each "id" is a stable snake_case tool name; each "sourceRef" MUST cite verified live source (file path + line); "sdkCalls" lists the SDK/RPC calls backing the capability. Do NOT emit "tools", "inputSchema", "inspection", "summary", "project", or "platform" as top-level keys — those are not the analysis format. Write ONLY the file ${workspace.analysisPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.analysisPath}. Output the analysis file and stop.`);
     if (operation === "generate") return this.agentCommand(workspace, operation, `$mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} using ${workspace.sourceRoot}, ${workspace.analysisPath}, and Curate selection ${workspace.selectionPath}. Generate entries only for capability ids in selection.json. Write ONLY the file ${workspace.rpcConfigPath} by creating or overwriting that single file. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${workspace.rpcConfigPath}. Output the RPC config file and stop.`);
-    if (operation === "deploy") throw new Error("Deploy adapter is not configured");
+    if (operation === "deploy") {
+      // Export the generated `mcp-<app>` artifact to a sibling of the original source directory,
+      // restoring the headless "product beside source" layout. The target is derived from the
+      // trusted, persisted originalSourcePath (never caller-supplied at deploy time), and the whole
+      // operation is gated behind typed-project-name confirmation. retryOnTimeout:false because a
+      // half-finished tree-copy must not be re-run blindly — the CLI removes the prior target first.
+      if (!workspace.deployTarget) throw new Error("Deploy target is unavailable: this project has no recorded original source directory to place the artifact beside. Re-import from a local source directory to enable export.");
+      return { executable: process.execPath, args: [this.config.pipelineCliPath, "deploy", "--from", workspace.generatedRoot, "--to", workspace.deployTarget], cwd: workspace.root, operation, projectId: workspace.projectId, retryOnTimeout: false };
+    }
 
     const args: string[] = [this.config.pipelineCliPath];
     switch (operation) {
@@ -199,6 +211,7 @@ export class PipelineRunner {
 async function assertStageOutput(stage: PipelineStageId, workspace: PipelineWorkspace): Promise<void> {
   // analyze is gated by #analyzeWithSelfHeal (full schema validation); the other stages get a
   // lightweight required-artifact + JSON-parse check so a silent no-op fails fast at its own gate.
+  if (stage === "deploy") return assertDeployOutput(workspace);
   const required: Partial<Record<PipelineStageId, { path: string; json?: boolean }>> = {
     curate: { path: workspace.selectionPath, json: true },
     scaffold: { path: join(workspace.generatedRoot, "package.json"), json: true },
@@ -213,6 +226,17 @@ async function assertStageOutput(stage: PipelineStageId, workspace: PipelineWork
     if (output.json) JSON.parse(await readFile(output.path, "utf8"));
   } catch {
     throw new Error(`Stage ${stage} output ${output.path.split(/[\\/]/).at(-1)} is missing or invalid`);
+  }
+}
+
+/** `deploy` exports the artifact to a sibling of the original source — outside the runtime root —
+ *  so it gets its own directory check rather than the file/JSON check above. */
+async function assertDeployOutput(workspace: PipelineWorkspace): Promise<void> {
+  if (!workspace.deployTarget) return; // defensive: commandFor already refused an undefined target
+  try {
+    if (!(await stat(workspace.deployTarget)).isDirectory()) throw new Error("not a directory");
+  } catch {
+    throw new Error(`Stage deploy output ${workspace.deployTarget.split(/[\\/]/).at(-1)} is missing or not a directory`);
   }
 }
 

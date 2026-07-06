@@ -15,6 +15,9 @@ export interface ImportProjectRequest {
   readonly projectName: string;
   readonly files: readonly ImportFile[];
   readonly targetSchema: unknown;
+  /** Absolute path of the original local source directory, persisted so the `deploy` stage can
+   *  export the generated artifact beside it. Omit for uploads. */
+  readonly originalSourcePath?: string;
 }
 
 export class WorkspaceManager {
@@ -55,6 +58,7 @@ export class WorkspaceManager {
         root: finalRoot,
         importedAt: new Date().toISOString(),
         targetSchemaPath: join(finalRoot, "target-mcp-schema.json"),
+        ...(request.originalSourcePath ? { originalSourcePath: request.originalSourcePath } : {}),
       };
       await writeFile(join(staging, "project.json"), `${JSON.stringify(project, null, 2)}\n`, { flag: "wx" });
       await rename(staging, finalRoot);
@@ -76,7 +80,8 @@ export class WorkspaceManager {
         if (parsed.id !== entry.name || typeof parsed.name !== "string" || typeof parsed.importedAt !== "string") continue;
         const targetSchemaPath = join(root, "target-mcp-schema.json");
         if (!(await stat(join(root, "source"))).isDirectory() || !(await stat(targetSchemaPath)).isFile()) continue;
-        projects.push({ id: entry.name, name: parsed.name, importedAt: parsed.importedAt, root, targetSchemaPath });
+        const originalSourcePath = typeof parsed.originalSourcePath === "string" ? parsed.originalSourcePath : undefined;
+        projects.push({ id: entry.name, name: parsed.name, importedAt: parsed.importedAt, root, targetSchemaPath, ...(originalSourcePath ? { originalSourcePath } : {}) });
       } catch { /* ignore incomplete or invalid workspace records */ }
     }
     return projects.sort((a, b) => a.importedAt.localeCompare(b.importedAt));

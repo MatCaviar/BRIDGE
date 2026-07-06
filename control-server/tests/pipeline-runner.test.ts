@@ -34,6 +34,11 @@ class FakeProcessRunner {
         await writeFile(this.workspace.rpcConfigPath, "{}\n");
       }
       if (spec.operation === "schema_preview") await writeFile(join(this.workspace.root, "tools-schema.json"), '{"tools":[]}\n');
+      if (spec.operation === "deploy" && this.workspace?.deployTarget) {
+        // simulate the CLI deploy command copying generatedRoot -> deployTarget
+        await mkdir(this.workspace.deployTarget, { recursive: true });
+        await writeFile(join(this.workspace.deployTarget, "package.json"), "{}\n");
+      }
     }
     return { exitCode: this.nextExitCode, signal: null, stdout: "ok", stderr: this.stderr, durationMs: 1, timedOut: false, aborted: false, truncated: false };
   }
@@ -248,5 +253,25 @@ describe("PipelineRunner", () => {
     runner.markPassed("test");
     await runner.runStage(workspace, "verify", { confirmed: true });
     expect(fake.calls[0]).toMatchObject({ operation: "verify" });
+  });
+
+  it("exports the generated artifact to the deploy target via the CLI deploy command", async () => {
+    const { fake, runner } = createRunner();
+    // deployTarget sits outside generatedRoot, like a sibling of the original source.
+    const deployWorkspace = { ...workspace, deployTarget: join(workspace.root, "sibling", "mcp-demo") };
+    fake.workspace = deployWorkspace;
+    runner.markPassed("verify");
+    await runner.runStage(deployWorkspace, "deploy", { typedConfirmation: "demo" });
+    const deploy = fake.calls[0]!;
+    expect(deploy).toMatchObject({ executable: process.execPath, operation: "deploy", cwd: deployWorkspace.root, retryOnTimeout: false });
+    expect(deploy.args).toEqual(expect.arrayContaining(["deploy", "--from", deployWorkspace.generatedRoot, "--to", deployWorkspace.deployTarget]));
+    expect(runner.status("deploy")).toBe("passed");
+  });
+
+  it("refuses deploy when no original source path was recorded (upload import)", async () => {
+    const { runner } = createRunner();
+    runner.markPassed("verify");
+    // workspace carries no deployTarget — there is no sibling to export beside.
+    await expect(runner.runStage(workspace, "deploy", { typedConfirmation: "demo" })).rejects.toThrow(/Deploy target is unavailable/i);
   });
 });

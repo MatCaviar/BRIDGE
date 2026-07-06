@@ -64,12 +64,25 @@ export function confirmationFor(operation: OperationId): ConfirmationLevel {
   return "none";
 }
 
+/** Stable, filesystem-safe slug for a project name. Used to name the generated `mcp-<app>` artifact
+ *  folder and the deploy export target beside the original source. Shared by control-server and the
+ *  UI so both compute the identical deploy path. */
+export function safeProjectId(name: string): string {
+  const slug = name.normalize("NFKC").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return (slug || "project").slice(0, 48);
+}
+
 export interface ProjectSummary {
   readonly id: string;
   readonly name: string;
   readonly root: string;
   readonly importedAt: string;
   readonly targetSchemaPath: string;
+  /** Absolute path of the original local source directory the project was imported from. Absent for
+   *  uploads (no on-disk original). Drives the `deploy` export target: the generated `mcp-<app>`
+   *  artifact is copied to this directory's sibling, restoring the headless "product beside source"
+   *  layout. */
+  readonly originalSourcePath?: string;
 }
 
 export interface SourceNode {
