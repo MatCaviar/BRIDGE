@@ -175,12 +175,25 @@ build isn't slow — it's stuck on the progress write.
 > is still the fastest way to actually complete the build.
 
 ### Fix
-Run the UI build in the **foreground** (real stdio). It finishes in ~1s:
+Set `CI=true` (disables vite's interactive progress spinner) and run the UI
+build directly. This is the most reliable method — it works even when stdio is
+a captured non-TTY pipe (the exact cause of the stall), and finishes in ~1s:
 
 ```bash
 cd "<plugin-root>/ui"
-npx vite build           # foreground; prints "✓ 43 modules transformed" and exits
+CI=true FORCE_COLOR=0 npx vite build   # ~1s; "✓ 43 modules transformed" and exits
 ```
 
-`desktop/dist/main.js` (tsc) builds fine in the background; only the vite step
-needs the foreground.
+A real foreground TTY also works (vite detects the TTY and skips the stalling
+spinner), but `CI=true` is strictly more robust: task runners / agent harnesses
+may auto-background a long command and reattach it to a pipe even when you asked
+for foreground — `CI=true` makes the outcome independent of stdio.
+
+```bash
+cd "<plugin-root>/ui"
+npx vite build           # foreground TTY only; ~1s
+```
+
+For a one-shot full build, `CI=true npm run workbench:build` completes all four
+workspaces end-to-end without the stall. `desktop/dist/main.js` (tsc) is
+unaffected; only the vite step needs this.
