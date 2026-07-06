@@ -54,7 +54,13 @@ function generateSkillContext(): string {
   if (cachedGenerateSkill !== null) return cachedGenerateSkill;
   try {
     const skillPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "skills", "mcp-generate", "SKILL.md");
-    cachedGenerateSkill = readFileSync(skillPath, "utf8");
+    let content = readFileSync(skillPath, "utf8");
+    // Strip the YAML frontmatter: SKILL.md starts with `---`, and `claude -p <prompt>` parses a
+    // leading `---` as an unknown CLI option ("error: unknown option '---'"), failing the stage
+    // before the agent even runs. The frontmatter is skill metadata the agent doesn't need.
+    const fm = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+    if (fm) content = content.slice(fm[0].length);
+    cachedGenerateSkill = content.replace(/^\s+/, "");
   } catch {
     cachedGenerateSkill = ""; // skill file missing — fall back to bare prompt (no worse than before)
   }
