@@ -177,6 +177,28 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .evidence-list { display: grid; gap: 6px; margin-top: 10px; }
 .evidence-list code { display: flex; justify-content: space-between; padding: 9px 11px; border: 1px solid #ddd6fe; border-radius: 8px; background: var(--accent-soft); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--text); }
 
+/* Phase 2: pipeline completion banner + RPC file browser + findings list */
+.pipeline-done { margin-bottom: 14px; padding: 16px 18px; border: 1px solid #6ee7b7; border-radius: 14px; background: #ecfdf5; color: #065f46; display: grid; gap: 6px; }
+.pipeline-done p { margin: 0; font-size: 13px; line-height: 1.6; }
+.pipeline-done-title { font-size: 15px; font-weight: 700; }
+.pipeline-done code { font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; color: #047857; background: #d1fae5; padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+
+.rpc-browser { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 12px; }
+.rpc-files { list-style: none; margin: 0; padding: 6px; max-height: 330px; overflow: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); display: grid; gap: 2px; align-content: start; }
+.rpc-files button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-soft); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; text-align: left; cursor: pointer; }
+.rpc-files button:hover { background: var(--surface-3); }
+.rpc-files button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.rpc-files .kind { font-size: 10px; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; background: var(--surface-3); color: var(--muted); }
+.rpc-files .kind.src { background: #ddd6fe; color: #5b21b6; }
+.rpc-files .kind.dist { background: #dbeafe; color: #1d4ed8; }
+.rpc-code { margin: 0; }
+
+.findings { list-style: none; margin: 0; height: 330px; overflow: auto; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); display: grid; gap: 8px; align-content: start; }
+.findings li { margin: 0; padding: 8px 10px 8px 28px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font: 12.5px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--text); position: relative; }
+.findings li::before { content: "⚠"; position: absolute; left: 9px; top: 7px; color: var(--warn); }
+
+.artifact.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; text-align: center; }
+
 @media (max-width: 900px) {
   .dashboard-grid, .playground, .import-grid { grid-template-columns: 1fr; }
   .content { width: min(100% - 16px, 1480px); padding-top: 8px; }

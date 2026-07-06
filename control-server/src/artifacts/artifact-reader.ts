@@ -1,5 +1,5 @@
-import type { Capability, PipelineStageState, ProvenanceEdge, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
-import { readFile, stat } from "node:fs/promises";
+import type { Capability, PipelineStageState, ProvenanceEdge, RpcFileProjection, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 interface ArtifactProjection {
@@ -7,6 +7,7 @@ interface ArtifactProjection {
   readonly targets: readonly TargetProjection[];
   readonly tools: readonly ToolProjection[];
   readonly rpc: readonly RpcProjection[];
+  readonly rpcFiles: readonly RpcFileProjection[];
   readonly edges: readonly ProvenanceEdge[];
   readonly coverage: { readonly targeted: number; readonly matched: number; readonly discovered: number; readonly selected: number; readonly projected: number; readonly wired: number };
   readonly findings: readonly string[];
@@ -99,11 +100,26 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
     if (toolMap.has(cap.id)) edges.push({ from: `selection:${cap.id}`, to: `tool:${cap.id}`, relation: "projects" });
     if (rpcSet.has(cap.id)) edges.push({ from: `tool:${cap.id}`, to: `rpc:${cap.id}`, relation: "wires" });
   }
+  // Surface detected problems into findings (the 发现 tab) so the user sees what went wrong across
+  // the pipeline without grepping logs: a missing build, deferred RPC mappings, blocked tools, and
+  // low-confidence (partial/broken) capabilities.
+  if (!built) findings.push("build 产物 dist/index.js 缺失 — 工具不可执行");
+  if (deferred.size > 0) {
+    const shown = [...deferred].slice(0, 20).join(", ");
+    findings.push(`${deferred.size} 个操作被 deferred(未生成 RPC 映射): ${shown}${deferred.size > 20 ? ` …共 ${deferred.size}` : ""}`);
+  }
+  for (const tool of tools) if (tool.blockedReason) findings.push(`工具 ${tool.name} 不可执行: ${tool.blockedReason}`);
+  for (const cap of rawCapabilities) {
+    const status = cap && typeof cap === "object" && "status" in cap ? String((cap as Record<string, unknown>).status) : "";
+    if (status === "partial" || status === "broken") findings.push(`能力 ${String((cap as Record<string, unknown>).id ?? "?")} 状态为 ${status}`);
+  }
+  const rpcFiles = await readRpcFiles(generatedRoot, findings);
   return {
     capabilities,
     targets,
     tools,
     rpc,
+    rpcFiles,
     edges,
     coverage: {
       targeted: 0,
@@ -120,4 +136,34 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
 
 async function fileExists(path: string): Promise<boolean> {
   try { return (await stat(path)).isFile(); } catch { return false; }
+}
+
+/** Read the generated RPC source files (readable TypeScript under src/rpc, compiled JavaScript
+ *  under dist/rpc) so the 机器可读产物 → RPC tab can display what was actually generated. Skips
+ *  type declarations and source maps. Each file's content is capped at 256 KiB. A missing rpc
+ *  directory is silent — the project may not have generated one yet. */
+async function readRpcFiles(generatedRoot: string, findings: string[]): Promise<RpcFileProjection[]> {
+  const out: RpcFileProjection[] = [];
+  const groups: readonly { kind: "src" | "dist"; dir: string }[] = [
+    { kind: "src", dir: join(generatedRoot, "src", "rpc") },
+    { kind: "dist", dir: join(generatedRoot, "dist", "rpc") },
+  ];
+  const cap = 256 * 1024;
+  for (const { kind, dir } of groups) {
+    let names: string[];
+    try { names = await readdir(dir); } catch { continue; }
+    for (const name of names.sort()) {
+      const keep = kind === "src" ? (name.endsWith(".ts") && !name.endsWith(".d.ts")) : name.endsWith(".js");
+      if (!keep) continue;
+      try {
+        const content = await readFile(join(dir, name), "utf8");
+        if (content.length > cap) findings.push(`rpc 文件 ${kind}/${name} 超过 256 KiB，已截断`);
+        out.push({ name, kind, bytes: content.length, content: content.length > cap ? content.slice(0, cap) : content });
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT") findings.push(`rpc 文件 ${kind}/${name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  return out;
 }

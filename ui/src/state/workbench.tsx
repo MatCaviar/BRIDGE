@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import type { Capability, McpCallRecord, McpTool, PipelineAutomationRun, PipelineStageState, ProjectSummary, ProvenanceEdge, RpcEvidence, RpcProjection, SourceEdge, SourceIndex, SourceNode, TargetProjection, ToolProjection, WorkbenchEvent } from "@bridge/workbench-contracts";
+import type { Capability, McpCallRecord, McpTool, PipelineAutomationRun, PipelineStageState, ProjectSummary, ProvenanceEdge, RpcEvidence, RpcFileProjection, RpcProjection, SourceEdge, SourceIndex, SourceNode, TargetProjection, ToolProjection, WorkbenchEvent } from "@bridge/workbench-contracts";
 import { workbenchApi, subscribeEvents } from "../bridge/client";
 
-export interface Artifacts { capabilities: Capability[]; targets: TargetProjection[]; tools: ToolProjection[]; rpc: RpcProjection[]; edges: ProvenanceEdge[]; coverage: { targeted: number; matched: number; discovered: number; selected: number; projected: number; wired: number }; findings: string[]; stages: PipelineStageState[]; }
+export interface Artifacts { capabilities: Capability[]; targets: TargetProjection[]; tools: ToolProjection[]; rpc: RpcProjection[]; rpcFiles: RpcFileProjection[]; edges: ProvenanceEdge[]; coverage: { targeted: number; matched: number; discovered: number; selected: number; projected: number; wired: number }; findings: string[]; stages: PipelineStageState[]; }
 export interface McpState { state: string; mode?: "mock" | "real"; tools: McpTool[]; calls: McpCallRecord[]; error?: string; }
 interface WorkbenchState {
   project?: ProjectSummary; source: SourceNode[]; sourceEdges: SourceEdge[]; sourceEvidence: RpcEvidence[]; sourceFindings: string[]; artifacts?: Artifacts; events: WorkbenchEvent[]; logs: string[]; mcp?: McpState; pipelineRun?: PipelineAutomationRun; connection: "checking" | "online" | "offline"; busy?: string; error?: string;

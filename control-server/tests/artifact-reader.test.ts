@@ -28,7 +28,7 @@ describe("readArtifacts", () => {
         sourceRef: "src/service.ts:readStatus", safetyLevel: "readonly", sdkCalls: ["@yunos/car"], params: [],
       }, {
         id: "preview_sound", domain: "audio", object: "sound", action: "preview",
-        sourceRef: "src/audio.ts:previewSound", safetyLevel: "normal", sdkCalls: [], params: [],
+        sourceRef: "src/audio.ts:previewSound", safetyLevel: "normal", sdkCalls: [], params: [], status: "partial",
       }],
     }));
     await writeFile(join(state, "selection.json"), JSON.stringify({ selected: ["read_status", "preview_sound"] }));
@@ -37,6 +37,18 @@ describe("readArtifacts", () => {
       { name: "preview_sound", description: "Preview sound", inputSchema: { type: "object" }, executable: false },
     ] }));
     await writeFile(join(generated, "config.json"), JSON.stringify({ read_status: { type: "dbus" }, _deferred: { preview_sound: "transport unavailable" } }));
+    const srcRpc = join(generatedRoot, "src", "rpc");
+    const distRpc = join(generatedRoot, "dist", "rpc");
+    await mkdir(srcRpc, { recursive: true });
+    await mkdir(distRpc, { recursive: true });
+    await writeFile(join(srcRpc, "rpc-client.ts"), "export async function rpcCall() {}\n");
+    await writeFile(join(srcRpc, "rpc-engine.ts"), "export {};\n");
+    await writeFile(join(srcRpc, "rpc-types.ts"), "export class RpcError extends Error {}\n");
+    await writeFile(join(srcRpc, "rpc-types.d.ts"), "declare {};"); // must be skipped (src keeps .ts, not .d.ts)
+    await writeFile(join(distRpc, "rpc-client.js"), "\"use strict\";\n");
+    await writeFile(join(distRpc, "rpc-client.js.map"), "{}"); // must be skipped
+    await writeFile(join(distRpc, "rpc-engine.js"), "export {};\n");
+    await writeFile(join(distRpc, "rpc-types.js"), "export class RpcError {}\n");
     const result = await readArtifacts(root, "demo");
     expect(result.capabilities[0]).toMatchObject({ id: "read_status", selected: true, mockExecutable: true, realExecutable: true });
     expect(result.capabilities[1]).toMatchObject({ id: "preview_sound", selected: true, mockExecutable: true, realExecutable: false, blockedReason: "transport unavailable" });
@@ -46,6 +58,18 @@ describe("readArtifacts", () => {
     expect(result.coverage.targeted).toBe(0);
     expect(result.findings.join(" ")).not.toMatch(/reference_weather_lookup|no source-backed capability/i);
     expect((result as any).stages).toContainEqual({ id: "analyze", status: "passed" });
+    // RPC tab projects the generated src (TypeScript) + dist (JavaScript) rpc files, skipping .d.ts/.map.
+    expect(result.rpcFiles).toHaveLength(6);
+    expect(result.rpcFiles.filter((f) => f.kind === "src").map((f) => f.name).sort()).toEqual(["rpc-client.ts", "rpc-engine.ts", "rpc-types.ts"]);
+    expect(result.rpcFiles.filter((f) => f.kind === "dist").map((f) => f.name).sort()).toEqual(["rpc-client.js", "rpc-engine.js", "rpc-types.js"]);
+    expect(result.rpcFiles.some((f) => f.name.endsWith(".d.ts") || f.name.endsWith(".map"))).toBe(false);
+    expect(result.rpcFiles.find((f) => f.name === "rpc-client.ts" && f.kind === "src")?.content).toMatch(/rpcCall/);
+    // findings (发现 tab) reports the deferred op, the blocked tool, and the partial-confidence capability.
+    const findingsText = result.findings.join("\n");
+    expect(findingsText).toMatch(/1 个操作被 deferred/);
+    expect(findingsText).toMatch(/工具 preview_sound 不可执行: transport unavailable/);
+    expect(findingsText).toMatch(/能力 preview_sound 状态为 partial/);
+    expect(findingsText).not.toMatch(/build 产物 dist/); // build output exists in this fixture
   });
 
   it("turns malformed optional artifacts into findings", async () => {
@@ -55,5 +79,6 @@ describe("readArtifacts", () => {
     await writeFile(join(root, ".mcp-pipeline", "demo", "analysis.json"), "{");
     const result = await readArtifacts(root, "demo");
     expect(result.findings.join(" ")).toMatch(/analysis/i);
+    expect(result.findings.join(" ")).toMatch(/build 产物 dist/); // build output absent → reported
   });
 });

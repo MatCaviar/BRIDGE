@@ -154,6 +154,15 @@ export interface RpcProjection {
   readonly valid: boolean;
 }
 
+/** A generated RPC source file projected for inspection in the 机器可读产物 → RPC tab. `kind`
+ *  distinguishes the readable generated TypeScript (src) from the compiled JavaScript (dist). */
+export interface RpcFileProjection {
+  readonly name: string;
+  readonly kind: "src" | "dist";
+  readonly bytes: number;
+  readonly content: string;
+}
+
 export interface ProvenanceEdge {
   readonly from: string;
   readonly to: string;
