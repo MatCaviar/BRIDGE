@@ -1,5 +1,5 @@
 ---
-description: Reference for the im-mcp-codeagent plugin — skills, CLI subcommands, MCP suite deliverables, and install/装车 prerequisites
+description: Reference for the im-mcp-codeagent plugin — skills, CLI subcommands, MCP suite deliverables, and install / car-side prerequisites
 ---
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
@@ -16,7 +16,7 @@ Reference card for the **im-mcp-codeagent** plugin. Print this verbatim to the u
 | `/mcp-generate` | Author `rpc/config.json` (op→wire-spec map) from `analysis.json` + app source |
 | `/mcp-test` | Classify test failures in a generated server and produce fixes |
 
-> 全流程编排由 `/mcp-pipeline` 命令启动的可视化工作台接管(工作台内置自动流水线,已取代无头 9 步编排);上表 skill 供单步手动调用。
+> Full-pipeline orchestration is handled by the visual workbench launched via the `/mcp-pipeline` command (its built-in auto-pipeline has replaced the headless 9-step orchestration). The skills above are for single-step manual invocation.
 
 ## CLI subcommands (deterministic)
 
@@ -39,7 +39,7 @@ Run via `node "${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js" <subcmd>`:
 ## Install prerequisites
 
 1. **Plugin install** (local marketplace, `source: "./"`): the whole monorepo is the plugin. The `SessionStart` hook auto-runs `npm install` (framework + cli) and builds `cli/dist/cli.js` if missing — fails loud on error.
-2. **装车 (car-side) prerequisites — owned by a colleague, needed for real-device runs:**
+2. **Car-side prerequisites — owned by a colleague, needed for real-device runs:**
    - Build + install the car-side `RpcEngine.ts` (delivered by `scaffold` under `car-side/`).
    - Add the `page://<app>.yunos.com/rpcagent` manifest page to the device so `adb -host sendlink` can reach the engine.
    - `adb -host` must work against the device.
@@ -47,5 +47,5 @@ Run via `node "${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js" <subcmd>`:
 
 ## Entry points
 
-- `/mcp-pipeline [app源码目录]` — 启动 BRIDGE 可视化工作台(无参数也可,界面内选目录;工作台内置自动流水线)。
+- `/mcp-pipeline [app-source-dir]` — launch the BRIDGE visual workbench (works with no args too; pick the directory inside the UI; the workbench runs the built-in auto-pipeline).
 - `/mcp-verify <project-dir>` — verify a generated project.

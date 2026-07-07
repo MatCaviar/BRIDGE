@@ -1,4 +1,4 @@
-> **Visual Workbench:** run `npm install` and `npm run workbench:dev` for the localhost source-to-MCP control plane. It never opens a browser automatically. See [docs/WORKBENCH.md](docs/WORKBENCH.md).
+> **Visual Workbench:** launch it with `/mcp-pipeline [app-source-dir]` — a local Electron single-window app (no HTTP server, no browser) that drives the source-to-MCP pipeline. For development, `npm install` then `npm run workbench:dev`. See [docs/WORKBENCH.md](docs/WORKBENCH.md).
 
 <div align="center">
 
@@ -10,7 +10,7 @@
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
-![version](https://img.shields.io/badge/version-0.1.8-0066cc)
+![version](https://img.shields.io/badge/version-0.1.14-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
 ![platform](https://img.shields.io/badge/platform-Win%20%7C%20macOS%20%7C%20Linux-339933)
 
@@ -31,8 +31,8 @@ The pipeline below lays out the stages; the figure after it shows who does what 
 **Pipeline** — every step is a deterministic CLI subcommand or an agent skill:
 
 ```
-validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
-  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
+validate › analyze › [curate] › scaffold › generate › test › build › register › verify › schema_preview 🟢
+  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)        (CLI)
 ```
 
 Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `--only`, `--step`, `--batch`.
@@ -85,6 +85,25 @@ sequenceDiagram
     Server-->>Agent: tool result
 ```
 
+## 🖥️ Visualization
+
+The whole pipeline is drivable from a **visual workbench** — a local Electron single-window desktop app (no HTTP server, no `localhost`, no browser tab). Launch it from inside Claude Code or Codex:
+
+```
+/mcp-pipeline ./path/to/your-app
+```
+
+That command runs `scripts/launch-workbench.mjs`, which builds the workbench packages on first launch (expect ~2–5 min) and opens the window. Give the launching command a generous timeout (≥ 600000 ms) so the first build can finish.
+
+What you see (the UI is Chinese-labeled):
+
+- **Import & analyze** — pick a source directory and an optional format-reference Schema, then click 「导入并自动分析」 to run `analyze` (and `curate`) end-to-end. Candidate capabilities are discovered **only** from source; the reference Schema guides output format, it never seeds capabilities.
+- **Machine-readable artifacts** — the 「机器可读产物」 panel inspects the generated `analysis.json`, the selected capabilities, the full generated tool schema (under the 「工具」 tab), and discovery findings. Tabs: 「能力」 · 「工具」 · 「RPC」 · 「发现」.
+- **MCP debug** — the 「MCP 调试」 panel runs the built MCP server in place: list tools, call them, and inspect replies, so you can verify behavior before handing the server to a host agent.
+- **Traceability** — a 源码 → 能力 → MCP → RPC transformation map and a coverage dashboard (已发现 / 已选择 / 已投影 / 已接线) show, per capability, how source becomes a wired tool.
+
+The workbench talks to the same deterministic CLI the skills use — nothing about the pipeline changes when you drive it visually. For development (hot rebuild of the UI / desktop / control-server packages), use `npm run workbench:dev` instead of the command. Workbench internals are in [docs/WORKBENCH.md](docs/WORKBENCH.md); the package layout is listed under [Architecture](#-architecture).
+
 ## 📦 Deliverables
 
 A successful run should produce a reviewable delivery bundle, not just a generated folder:
@@ -134,13 +153,13 @@ Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
 /plugin install im-mcp-codeagent
 ```
 
-First session start auto-installs `framework/` + `cli/` and builds `cli/dist` (idempotent). Then start a pipeline run:
+First session start auto-installs `framework/` + `cli/` and builds `cli/dist` (idempotent). Then launch the visual workbench:
 
 ```
 /mcp-pipeline ./path/to/your-app
 ```
 
-Entry points — `/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`.
+`/mcp-pipeline` opens the visual workbench (see [Visualization](#-visualization)); pass an app source directory to pre-load it. Entry points — `/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`.
 
 **Codex** reads the mirrored `.codex-plugin/plugin.json` (dual-end).
 
@@ -220,18 +239,25 @@ No device handy? Local verification always works: `mcp-pipeline verify --dir <se
 
 ```
 im-mcp-codeagent/
-├── .claude-plugin/       Claude Code manifest + marketplace
-├── .codex-plugin/        Codex manifest (dual-end mirror)
-├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test  (methodology, no model calls)
-├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
-├── hooks/                SessionStart → polyglot build (run-hook.cmd → session-init.sh)
-├── cli/                  @im/mcp-pipeline-cli — deterministic Node
-│   ├── src/generators/   tool-schema · rpc-bridge · car-rpc-engine · …
-│   ├── assets/           car-rpc-engine.ts.template (bundled, de-hardcoded)
+├── .claude-plugin/        Claude Code manifest + marketplace
+├── .codex-plugin/         Codex manifest (dual-end mirror)
+├── skills/                mcp-analyze · mcp-curate · mcp-generate · mcp-test  (methodology, no model calls)
+├── commands/              /mcp-pipeline · /mcp-verify · /mcp-help
+├── hooks/                 SessionStart → polyglot build (run-hook.cmd → session-init.sh)
+├── cli/                   @im/mcp-pipeline-cli — deterministic Node
+│   ├── src/generators/    tool-schema · rpc-bridge · car-rpc-engine · …
+│   ├── assets/            car-rpc-engine.ts.template (bundled, de-hardcoded)
 │   └── bin/mcp-pipeline.js
-├── framework/            @im/mcp-server-framework (shared dispatch core: constructDbusCall / …)
-├── tools/adb/            bundled adb (self-contained; see LICENSE note)
-└── schema/               analysis.schema.json + fixtures
+├── framework/             @im/mcp-server-framework (shared dispatch core: constructDbusCall / …)
+├── workbench-contracts/   @bridge/workbench-contracts — shared TS types across the workbench packages
+├── control-server/        @bridge/control-server — in-process pipeline + MCP runner (imported by desktop, no HTTP)
+├── desktop/               @bridge/desktop — Electron main + preload (single window via loadFile, no HTTP server)
+├── ui/                    @bridge/ui — React + Vite render layer (Chinese-labeled)
+├── scripts/               launch-workbench.mjs · start-workbench.ps1 · smoke-*-workbench.mjs · check-manifests.js
+├── assets/                bridge.svg + workbench artwork
+├── docs/                  WORKBENCH.md · WORKBENCH-TROUBLESHOOTING.md · DELIVERABLE_CONTRACT.md
+├── tools/adb/             bundled adb (self-contained; see LICENSE note)
+└── schema/                analysis.schema.json + fixtures
 ```
 
 The CLI runs via a **skill-base-relative path** (`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`) — self-contained, no PATH / global-link dependency.

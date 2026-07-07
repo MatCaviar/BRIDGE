@@ -5,7 +5,7 @@ description: Use when the scaffolded MCP Server project exists and rpc/config.js
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
 
-> CLI：`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（`${SKILL_DIR}` 未展开时改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`）。
+> CLI: `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...` (if `${SKILL_DIR}` does not expand, use `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js` instead).
 
 # MCP Generate
 
@@ -17,34 +17,34 @@ Read the scaffolded MCP Server project and the original YunOS app source code, t
 NO INVENTED WIRE
 ```
 
-`rpc/config.json` 里每一个非 `_deferred` 的 op，其 `bus`/`path`/`method`/`interface`/`arg.funcName`/`arg.data`/`writes`/`stringify`/`reply`/`replyParts` 都必须**逐字**可追溯到 app proxy/manager 源码里的真实调用点。找不到真实依据 → 写进 `_deferred` 并注明原因。没有例外。
+Every non-`_deferred` op in `rpc/config.json` must have its `bus`/`path`/`method`/`interface`/`arg.funcName`/`arg.data`/`writes`/`stringify`/`reply`/`replyParts` traceable **verbatim** to a real call site in the app's proxy/manager source. If you cannot find real evidence → write it into `_deferred` with the reason. No exceptions.
 
-**违反字面就是违反精神**——没有"我 adapt 了一下但守了精神"这种事。按命名规律推 `bus` 名、给 `funcName` 填"符合格式"的字符串、因 `validate_config` 过了就默认 wire 对、从旧 config/fixture 抄找不到源码依据的 entry，都是臆造，都是违规。
+**Violating the letter is violating the spirit** — there is no "I adapted it but kept the spirit." Inferring a `bus` name from a naming pattern, filling `funcName` with a "format-matching" string, assuming the wire is correct because `validate_config` passed, or copying an entry from an old config/fixture that has no source backing — all of these are fabrication, all are violations.
 
-**为什么**：你抽的 wire 会让生成的 MCP server 在**真车上真的发出这条 D-Bus/native 调用**。臆造的 `funcName`/`bus` 不报错——只会静默地控制错误的东西。这是整条链的安全命门；"config 能过 gate" ≠ "wire 真实"。
+**Why**: the wire you extract makes the generated MCP server **actually emit this D-Bus/native call on the real car**. A fabricated `funcName`/`bus` does not error — it silently controls the wrong thing. This is the safety-critical joint of the whole chain; "config passes the gates" ≠ "the wire is real".
 
-## 借口预驳
+## Preempting common excuses
 
-| 你心里的话 | 现实 |
+| What you might think | Reality |
 |---|---|
-| "validate_config 过了，wire 应该对" | validate_config 只查 schema + coverage + dispatchable，**完全不读源码**，对 wire 真伪零判断 |
-| "wire_check 会兜底，过了就行" | wire_check 校验你**传入的** proxy + funcName 字面存在；它不读 bus/path 语义，也不是"wire 正确"的充分证明 |
-| "proxy 里没找到，但 fixture / 旧 config 有这个 bus 名" | fixture 不是 ground truth，proxy 源码才是。找不到 → `_deferred`，不抄 fixture |
-| "这个 funcName 符合命名规律，应该对" | funcName 是精确接口路径，必须逐字来自源码，"符合规律" ≠ 存在 |
-| "sourceRef 指的文件没这方法，可能重构了" | 去 app 源码 grep 真实 proxy/manager（按 object/action、bus 名、`createMethodCallMessage` 调用点）。仍找不到 → `_deferred` + 原因 |
-| "先发一版，后面再核对" | 臆造 wire 上车 = 静默错配。没有"先发的臆造版"，只有 verified 或 deferred |
+| "validate_config passed, so the wire should be right" | validate_config only checks schema + coverage + dispatchable; it **never reads source** and has zero judgment on wire truth |
+| "wire_check will catch it, passing is enough" | wire_check verifies the proxy + funcName you pass in exist literally; it does not read bus/path semantics, and is not sufficient proof the wire is correct |
+| "Not found in the proxy, but the fixture / old config has this bus name" | A fixture is not ground truth; the proxy source is. Not found → `_deferred`, do not copy the fixture |
+| "This funcName matches the naming pattern, so it should be right" | funcName is a precise interface path and must come verbatim from the source; "matches a pattern" ≠ exists |
+| "The file sourceRef points to has no such method; maybe it was refactored" | grep the app source for the real proxy/manager (by the capability's object/action, the bus name, the `createMethodCallMessage` call site). Still not found → `_deferred` + reason |
+| "Ship a version first, verify later" | Fabricated wire on the car = silent mismatch. There is no "first fabricated version"; only verified or deferred |
 
-## 判断标准（何为 verified wire）
+## Judgment criteria (what counts as a verified wire)
 
-一条 op 算 **verified**，当且仅当你能对**每个字段**指出"这逐字来自源码哪里"：
-- `bus`/`path` ← proxy 构造函数 / `BUS_NAME`/`BUS_PATH` 常量
-- `method` ← `createMethodCallMessage("<这个>")` 的字面参数
-- `arg.funcName` ← 源码 `writeString` 对象里 `funcName:` 的字面值
-- `arg.data` 的 `${var}` ← 与 capability `params` 名字一一对应（单占位符、类型保留）
-- `stringify` ← 与源码 `JSON.stringify(...)` 目标路径一致
-- `reply` ← `readJSON()`→`json` / `readString()`→`string` / 类型读 → `int`/`double`/`bool`（值用 `int`，**非 `int32`**；`int32` 只用于 `writes[].kind`/`replyParts[].kind`，放进 `reply` 会被 `validate_config` 拒绝）
+An op counts as **verified** if and only if, for **every field**, you can point to "this comes verbatim from this spot in the source":
+- `bus`/`path` ← the proxy's constructor / `BUS_NAME`/`BUS_PATH` constants
+- `method` ← the literal argument to `createMethodCallMessage("<this>")`
+- `arg.funcName` ← the literal value of `funcName:` in the source's `writeString` object
+- `arg.data`'s `${var}` ← one-to-one with the capability `params` names (single placeholder, type preserved)
+- `stringify` ← matches the source's `JSON.stringify(...)` target path
+- `reply` ← `readJSON()`→`json` / `readString()`→`string` / typed read → `int`/`double`/`bool` (use `int` for the value, **not `int32`**; `int32` is only valid for `writes[].kind`/`replyParts[].kind`; putting it in `reply` is rejected by `validate_config`)
 
-任一字段无法指出源码位置 → 这条不是 verified：要么继续 grep 找，要么进 `_deferred`。**两个 gate 全绿 ≠ 这些字段对**——gate 只查下限。
+If any field cannot be pointed to a source location → this op is not verified: either keep grepping, or move it to `_deferred`. **Both gates green ≠ these fields are correct** — the gates only check the lower bound.
 
 Scaffold **deterministically** produces the schema-first MCP runtime: `TOOL_SCHEMA`, `TOOL_REGISTRY`, server wiring, the weak-typed `rpcCall(op, args)` adapter, the RPC bridge, and the car-side artifacts. Your **only** judgment product this step is `rpc/config.json`. Do not edit generated adapter/server/tool source here; fix the judgment artifact and rerun the deterministic gates.
 
@@ -100,7 +100,7 @@ For each capability in `analysis.json`, extract how it is actually called on the
    - **Pattern A — single JSON write (most common):** proxy does `createMethodCallMessage("m")` + `writeString(JSON.stringify({ funcName, data }))` + one read. Use `arg` + optional `stringify` + `reply`.
      - `arg` — the object written: `{ funcName, data: { ... } }`. Parameterize inputs with `${var}` matching capability `params` names. A **single** `${var}` placeholder preserves the value's type (number stays number, object stays object) — so `arg: { body: "${info}" }` passes the whole `info` object through verbatim (no need to flatten).
      - `stringify` — dotted paths inside `arg` that the proxy `JSON.stringify`s before send (e.g. `["data"]` when the proxy nests a stringified blob).
-     - `reply` — `readJSON()`→`"json"` / `readString()`→`"string"` / `readInt32()`→`"int"` / `readDouble()`→`"double"` / `readBool()`→`"bool"`. **`reply` 只能取 `json`/`string`/`int`/`double`/`bool` 这 5 个值**。易错点：`readInt32()` 的函数名带 "32"，但映射出的 `reply` 值是 **`"int"`（不带 32）**；`"int32"` 只能出现在 `writes[].kind`/`replyParts[].kind`，**放进 `reply` 会被 `validate_config` 拒绝**（`dbus.reply must be one of json,string,int,double,bool`）。按 `returns.type` 选：`integer`/`long`→`"int"`，`float`/`double`→`"double"`，`boolean`→`"bool"`，`string`→`"string"`，`object`/结构体→`"json"`。
+     - `reply` — `readJSON()`→`"json"` / `readString()`→`"string"` / `readInt32()`→`"int"` / `readDouble()`→`"double"` / `readBool()`→`"bool"`. **`reply` may only take one of these 5 values: `json`/`string`/`int`/`double`/`bool`.** Common pitfall: `readInt32()` has "32" in the function name, but the mapped `reply` value is **`"int"` (no 32)**; `"int32"` may only appear in `writes[].kind`/`replyParts[].kind` — **putting it in `reply` is rejected by `validate_config`** (`dbus.reply must be one of json,string,int,double,bool`). Choose by `returns.type`: `integer`/`long`→`"int"`, `float`/`double`→`"double"`, `boolean`→`"bool"`, `string`→`"string"`, `object`/struct→`"json"`.
    - **Pattern B — positional multi-write:** proxy does several `writeString(...)` / `writeInt32(...)` in order (NOT one `writeString(JSON.stringify(...))`). Use **`writes`** (an ordered array) instead of `arg`. Each item `{ kind, value }`: `kind` = `"string"`|`"int32"`|`"double"`|`"bool"`|`"json"`; `value` = literal or `${var}`. `kind:"json"` ⇒ `writeString(JSON.stringify(value))`; `kind:"string"` ⇒ bare `writeString(value)` (no JSON quotes). This is how you wire capabilities the old engine had to defer — **6 positional writes is fine, not "partial"**.
    - **Pattern C — bare-string write:** proxy does a single `writeString(cpType)` with a raw string (not JSON). Use `writes: [ { kind: "string", value: "${cpType}" } ]` — `kind:"string"` writes the value bare; `kind:"json"` would wrongly wrap it in quotes and corrupt the value.
    - **Pattern D — multi-segment read:** proxy reads several values (`readString()` then `readInt32()`, etc.). Use **`replyParts`** (ordered array of `{ kind }`); the engine returns an array of the segments in order. Omit `replyParts` for the common single-read case (then `reply` drives one read).
@@ -108,12 +108,12 @@ For each capability in `analysis.json`, extract how it is actually called on the
    - **Native** (`require`/factory + method): extract `require`, optional `factory`, `method`, and the literal `args` array (each item a `${var}` or `{ expr: "arithmetic" }`).
 3. **Write the entry** into `rpc/config.json` with `op` = `capability.id` (the key under which the spec is stored).
 
-**sourceRef 对不上真实源码时的处理（绝不臆造 wire）**：
-1. 若 sourceRef 指向的方法在真实源码里不存在或方法名不符，**不要按 fixture 臆造 wire**——在 app 源码里搜索该 capability 真正的 proxy/manager（按 capability 的 object/action 关键词、D-Bus bus 名、`createMethodCallMessage` 调用点grep）。
-2. 找到真实 proxy → 按其 `createMethodCallMessage`+`funcName`+`stringify` 模式抽真实 wire-spec，写入 config（verified）。
-3. **先排除"可 wire 却误判为 defer"**（最常见的能力丢失）：位置式多写（`writeString`/`writeInt32` × N）、裸字符串写、多段读 **都是 dbus RPC**（见上 Pattern B/C/D），**必须用 `writes`/`replyParts` wire，不得 defer**。"参数多/写多段" 不是 defer 理由——引擎支持任意段。只有**真不走 dbus/native RPC**（如 `launch_app`=adb sendlink、`appstatus`=进程内读取、纯 UI 页面跳转）才 defer：在 `rpc/config.json` 顶层写入 `_deferred` 允许清单——`"_deferred": { "<cap.id>": "<原因>" }`（例 `"_deferred": { "launch_app": "adb sendlink — 非 RPC" }`）。**不要给它写 wire-spec**；`_deferred` 里登记即代表有意不提供 wire。`validate_config` 的 coverage 闸门会豁免 `_deferred` 登记的 capability，并把它们作为 `deferred` 信息型字段返回。
-4. 报告里清晰区分每条 capability：`verified`（源码核对过 wire）vs `deferred`（写入 `_deferred`+原因）。**禁止把 inferred/猜测的 wire 当 verified 发出。**
-5. `validate_config` 会要求每个进 config 的 capability 都 dispatchable；deferred 的只进 `_deferred`（不进 wire-spec）——覆盖率闸门对它们放行（它们不在 RPC 模型内，机器可读地登记在 `_deferred` 里）。
+**Handling a sourceRef that does not match the real source (never fabricate wire):**
+1. If the method the sourceRef points to does not exist in the real source or the method name does not match, **do not fabricate wire from a fixture** — search the app source for the capability's real proxy/manager (grep by the capability's object/action keywords, the D-Bus bus name, the `createMethodCallMessage` call site).
+2. Found the real proxy → extract the real wire-spec from its `createMethodCallMessage` + `funcName` + `stringify` pattern and write it into the config (verified).
+3. **First rule out "wireable but misjudged as defer"** (the most common cause of lost capabilities): positional multi-write (`writeString`/`writeInt32` × N), bare-string write, and multi-segment read **are all dbus RPC** (see Patterns B/C/D above) — **they must be wired via `writes`/`replyParts`, never deferred**. "Many params / many writes" is not a defer reason — the engine supports any number of segments. Only capabilities that **genuinely do not go through dbus/native RPC** (e.g. `launch_app` = adb sendlink, `appstatus` = in-process read, pure UI page navigation) are deferred: write a `_deferred` allow-list at the top level of `rpc/config.json` — `"_deferred": { "<cap.id>": "<reason>" }` (e.g. `"_deferred": { "launch_app": "adb sendlink — not RPC" }`). **Do not write a wire-spec for it**; registering it in `_deferred` means intentionally not providing a wire. `validate_config`'s coverage gate exempts capabilities registered in `_deferred` and returns them as informational `deferred` fields.
+4. In the report, clearly distinguish each capability: `verified` (wire checked against source) vs `deferred` (written into `_deferred` + reason). **Never emit inferred/guessed wire as verified.**
+5. `validate_config` requires every capability in the config to be dispatchable; deferred ones only go into `_deferred` (not into wire-specs) — the coverage gate passes them through (they are outside the RPC model, registered machine-readably in `_deferred`).
 
 4. **Run both gates** (these are deterministic CLI gates — the reliability spine). On failure, read the gate's error message, fix the config, and re-run. Retry up to 3 attempts; if still failing, surface the gate errors to the user and stop.
 
@@ -123,7 +123,7 @@ For each capability in `analysis.json`, extract how it is actually called on the
    ```
 
    - `validate_config` checks: schema conformance (RpcConfig), **coverage** (every capability has a matching `op`), and **dispatchable** (`constructDbusCall`/`constructNativeCall` runs against sample args synthesized from `cap.params` without crashing, `${var}` interpolation and `stringify` correct).
-   - `wire_check` 现在双向校验。**正向（proxy→config）**：解析 proxy 的 `createMethodCallMessage("m") ... funcName: "f"` 模式，重建期望 wire，与 `constructDbusCall(config[op])` 比较。**反向（config→proxy 共现溯源）**：每个非 `_deferred` dbus op 的 `method`/`funcName` 必须出现在某个 proxy 文件里，**且其 `bus`/`path`/`interface` 必须与该 method/funcName 同文件共现**（防止 method 在 proxy A、bus 却取自 proxy B；或 interface 误用 `bus+".interface"` 而源码用的是裸 bus 名——后者是高频静默失败，现已能被拦）。app 跨多 proxy 时传**全部** `--proxy`，按文件粒度校验。任一方向 mismatch → 修对应 entry 重跑。**仍要记住**：wire_check 校验字面存在 + bus/path/interface 共现，但 `arg` 字段是否齐全/语义正确仍需你逐字段核对源码（见「判断标准」），别把 wire_check 当成 wire 正确的充分证明。`wire_check` 还会**信息性报告**未被任何 op 接线的 proxy method（surface coverage）——可能是遗漏的 capability，也可能是有意 defer/internal，需你判断。
+   - `wire_check` now validates bidirectionally. **Forward (proxy→config)**: parses the proxy's `createMethodCallMessage("m") ... funcName: "f"` pattern, rebuilds the expected wire, and compares it against `constructDbusCall(config[op])`. **Reverse (config→proxy co-occurrence provenance)**: every non-`_deferred` dbus op's `method`/`funcName` must appear in some proxy file, **and its `bus`/`path`/`interface` must co-occur with that method/funcName in the same file** (prevents method from proxy A while `bus` is taken from proxy B; or `interface` misusing `bus+".interface"` when the source uses the bare bus name — the latter is a frequent silent failure, now caught). When the app spans multiple proxies, pass **all** `--proxy` args; validation is per-file. A mismatch in either direction → fix the offending entry and re-run. **Remember**: wire_check verifies literal existence + bus/path/interface co-occurrence, but whether the `arg` fields are complete/semantically correct still requires you to check the source field by field (see "Judgment criteria"); do not treat wire_check as sufficient proof the wire is correct. `wire_check` also **informationally reports** proxy methods not wired by any op (surface coverage) — these may be missed capabilities or intentional deferrals/internal methods; you decide.
 
 **Worked example — `feature.read` / `feature.set`** (the proxy is `demo_app/ts/proxy/FeatureProxy.ts`, whose `getFeature` / `setFeature` use `createMethodCallMessage("request")` + `writeString(JSON.stringify({ funcName, data }))` + `readJSON()`):
 
@@ -199,9 +199,9 @@ Note how this mirrors the proxy exactly: `method` `"request"` matches `createMet
 - `default_cp_read`: one **bare-string** write (`kind:"string"` — NOT `kind:"json"`, which would corrupt `music` into `"\"music\""`), plus a **2-segment read** (`replyParts`: cpid string + code int32 → returns `[cpid, code]`).
 - `sound_library_query`: single JSON write (Pattern A) with `vin` as `${__device__.vin}` (resolved on-car, fail-closed; must be declared in `app.deviceSources`). `interface` **omitted** — this proxy uses the default `bus+".interface"`.
 
-**Worked example — 数值返回 → `reply: "int"` / `"double"`（reply 用 `int`，不是 `int32`）**
+**Worked example — numeric returns → `reply: "int"` / `"double"` (use `int` for `reply`, not `int32`)**
 
-proxy 用 `readInt32()` / `readDouble()` 读单个数值（音量、车速、油量）时，`reply` 必须是 `"int"` / `"double"`：
+When the proxy reads a single numeric value via `readInt32()` / `readDouble()` (volume, vehicle speed, fuel level), `reply` must be `"int"` / `"double"`:
 
 ```json
 {
@@ -226,7 +226,7 @@ proxy 用 `readInt32()` / `readDouble()` 读单个数值（音量、车速、油
 }
 ```
 
-`returns.type` 为 `integer`/`long` → `reply: "int"`；`float`/`double` → `reply: "double"`。**最易错点**：`readInt32()` 函数名带 "32"，但 `reply` 值是 `"int"`（不带 32）；`"int32"` 仅用于 `writes[].kind`/`replyParts[].kind`，放进 `reply` 会被 `validate_config` 拒绝。
+`returns.type` of `integer`/`long` → `reply: "int"`; `float`/`double` → `reply: "double"`. **Most error-prone point**: `readInt32()` has "32" in the function name, but the `reply` value is `"int"` (no 32); `"int32"` is only for `writes[].kind`/`replyParts[].kind` — putting it in `reply` is rejected by `validate_config`.
 
 ### Step 3: Verify via the gates
 
@@ -236,7 +236,7 @@ The two gates are the verification: both must print success before this step is 
 
 ## Quality Checklist
 
-- [ ] **Iron Law 满足**：每个非 `_deferred` op 的 bus/path/method/funcName/stringify/reply 都逐字可追溯到真实 proxy/manager 源码（不是 guessed、不是抄 fixture）——两个 gate 全绿 ≠ 满足此条
+- [ ] **Iron Law satisfied**: every non-`_deferred` op's bus/path/method/funcName/stringify/reply is traceable verbatim to the real proxy/manager source (not guessed, not copied from a fixture) — both gates green ≠ satisfying this item
 - [ ] Every capability in `analysis.json` has a matching `op` (= `capability.id`) in `rpc/config.json` — no missing, no extra
 - [ ] Each D-Bus `op`'s `bus`/`path`/`method`/`arg`/`stringify`/`reply` is copied from the real proxy source, not guessed
 - [ ] `${var}` placeholders match the capability `params` names; `stringify` paths match the proxy's `JSON.stringify` targets

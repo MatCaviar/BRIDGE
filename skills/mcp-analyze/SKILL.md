@@ -5,26 +5,26 @@ description: Use when given a YunOS HDT or Android app directory and analysis.js
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
 
-> CLI：`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（`${SKILL_DIR}` 未展开时改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`）。
+> CLI: `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...` (if `${SKILL_DIR}` does not expand, use `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js` instead).
 
 # MCP Analyze
 
 Analyze the specified YunOS HDT or Android application and produce a structured `analysis.json` that captures its interface surface — capabilities, parameters, returns, safety levels, and error codes. Detect the platform from source evidence; never force an Android Gradle/AIDL project into YunOS assumptions.
 
-## 判断标准
+## Judgment criteria
 
-`analysis.json` 是后续所有步骤的唯一输入：scaffold 用它生成项目骨架，generate 用每个 capability 的 `sourceRef` 去源码抽真实 wire。**漏一个 capability = 最终 server 漏一个 tool；写错一个 sourceRef = generate 找不到 wire、被迫 defer。** `validate` 只查 schema 格式——它不查你漏没漏 capability、sourceRef 精不精确、safetyLevel 合不合理。这些是你的判断。
+`analysis.json` is the sole input to every downstream step: scaffold uses it to generate the project skeleton, generate uses each capability's `sourceRef` to extract the real wire from source. **Missing one capability = the final server is missing one tool; a wrong sourceRef = generate can't find the wire and is forced to defer.** `validate` only checks the schema format — it does not check whether you missed a capability, whether the sourceRef is precise, or whether the safetyLevel is reasonable. Those are your judgment.
 
-用户提供的 MCP Schema 是**输出格式参考**，其中已有的工具只用于理解字段结构、参数编码和描述风格。**候选 capability 只能来自源码**：不得把 Schema 示例变成 capability，不得因为源码没有实现某个示例而报告缺失项，也不得为迎合示例改写源码证据。
+The MCP Schema the user provides is an **output-format reference**; tools already present in it are used only to understand field structure, parameter encoding, and description style. **Candidate capabilities come only from source**: do not turn Schema examples into capabilities, do not report missing items because the source doesn't implement some example, and do not rewrite source evidence to match an example.
 
-逐条自检一份好的 analysis：
-- **完整**：app 里每个调用 YunOS SDK（`@system.*`/`@yunos.*`）且对外可触发的函数，都捕成一个 capability（漏了 = 用户少一个 tool）。
-- **可追溯**：每个 capability 的 `sourceRef` 精确到 `file:method`——模糊 sourceRef 是 generate 臆造/defer 的源头。
-- **准确**：params/returns 的 type 来自源码类型标注（不是"大概 string"）；`safetyLevel` 按**行为风险**定（只读无副作用→`readonly`；驾驶中安全的状态改变→`normal`；需 P 档→`p_gear_required`；+用户确认→`p_gear_and_confirm`；+网络热点→`p_gear_and_network`；拿不准取**更严**一档）。
-- **enum 是 wire 值**：`param.enum` 必须是**上游 agent 直接传的真实 wire 值**（从源码逐字抽取），不是展示名——schema_preview 把它们原样进 `inputSchema.enum`。档位传 `["P","R","N","D"]`（真值）而非 `["PARK","REVERSE"]`（展示名）；声场模式传 wire 数值（`["0","1",...]`）而非中文名（`["全车均衡",...]`）。传展示名 = 上游 agent 按 schema 调用错值。
-- **interface-level only**：只描述对外接口表面，不写内部实现。
+Self-check a good analysis item by item:
+- **Complete**: every function in the app that calls a YunOS SDK (`@system.*`/`@yunos.*`) and is externally triggerable is captured as a capability (missing one = the user is short one tool).
+- **Traceable**: each capability's `sourceRef` is precise to `file:method` — a vague sourceRef is the root cause of generate fabricating/deferring.
+- **Accurate**: params/returns types come from source type annotations (not "probably string"); `safetyLevel` is set by **behavioral risk** (read-only with no side effects → `readonly`; a state change safe while driving → `normal`; requires P-gear → `p_gear_required`; + user confirmation → `p_gear_and_confirm`; + network hotspot → `p_gear_and_network`; when unsure, pick the **stricter** level).
+- **enums are wire values**: `param.enum` must be the **real on-the-wire values an upstream agent passes directly** (extracted verbatim from source), not display names — schema_preview puts them into `inputSchema.enum` as-is. Pass gears as `["P","R","N","D"]` (real values) not `["PARK","REVERSE"]` (display names); pass sound-field modes as wire numbers (`["0","1",...]`) not Chinese names (`["全车均衡",...]`). Passing display names = the upstream agent calls with the wrong value per the schema.
+- **interface-level only**: describe only the external interface surface, not internal implementation.
 
-**借口预驳**：「这函数扫过了大概 read 类」→ 必须读源码确认 action/object；「safetyLevel 按函数名猜」→ 按行为副作用，拿不准取更严；「sourceRef 写文件名就行」→ generate 靠它定位 wire，必须精确到方法；「enum 用展示名就行」→ enum 必须是 wire 真实值，上游 agent 传它去 wire，传展示名 = 调用错；「这些 enum 没人用省了」→ 凡 params/returns 引用的 enum 都要抽。
+**Preempting common excuses**: "I scanned this function, it's roughly a read-type" → you must read the source to confirm the action/object; "guess safetyLevel from the function name" → go by behavioral side effects, pick stricter when unsure; "the file name is enough for sourceRef" → generate relies on it to locate the wire, it must be precise to the method; "display names are fine for enum" → enum must be the real wire value, the upstream agent passes it to the wire, passing a display name = calling wrong; "nobody uses these enums, skip them" → extract every enum referenced by params/returns.
 
 ## Input
 

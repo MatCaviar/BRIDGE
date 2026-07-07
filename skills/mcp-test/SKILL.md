@@ -5,21 +5,21 @@ description: Use when a generated MCP Server project exists (post-generate, arou
 
 > 🌐 默认用中文与用户交互和输出（推理、解释、检查点、报告、选项都用中文）；代码、命令、标识符、文件名保持英文。
 
-> CLI：`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...`（`${SKILL_DIR}` 未展开时改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`）。本 skill 主要直接跑 `npx vitest`/`npx tsc`（在生成的项目目录内），CLI 供跨 skill 复用。
+> CLI: `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" <subcmd> ...` (if `${SKILL_DIR}` does not expand, use `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js` instead). This skill mostly runs `npx vitest`/`npx tsc` directly (inside the generated project directory); the CLI is for cross-skill reuse.
 
 # MCP Test
 
 Generate comprehensive business scenario tests for the MCP Server project, run the full test suite, and fix any failures.
 
-## 判断标准
+## Judgment criteria
 
-scaffold 自动生成了 registry/schema contract test。它们只测"分析结果是否进入生成物"，不测"这个 MCP suite 是否真的对 host agent 有用"。**你写的 business scenario test 测 agent-facing 工具行为**——需要你理解业务逻辑、参数边界、安全拦截、deferred 行为和代表性调用数据。这是自动测试覆盖不到的，是你的判断价值所在。
+scaffold auto-generates the registry/schema contract tests. They only verify "the analysis results made it into the generated artifacts" — they do not verify "this MCP suite is actually useful to a host agent". **The business scenario tests you write cover agent-facing tool behavior** — they require you to understand the business logic, parameter boundaries, safety interception, deferred behavior, and representative call data. This is what auto-tests cannot cover; it is where your judgment adds value.
 
-**好测试 = 能发现真 bug**：
-- **测真实工具契约，不测内部猜测**：断言 `TOOL_SCHEMA` / MCP tools/list / tools/call 暴露给上游 agent 的名字、参数、枚举、安全提示、deferred 状态和返回形态，而不是测试某个不存在的内部 adapter 方法。
-- **用真实代表性数据**：真实档位（P/R/N/D）、真实页面名、真实边界值——不构造 toy 值只为过测。
-- **覆盖会真出 bug 的路径**：错误注入后状态是否仍可用、安全 guard 是否真拦、数值边界、逆操作（导航前进再返回）。
-- **fix root cause 不 fix symptom**：测试失败先分类（生成代码 bug / 测试 bug / schema 错 / 类型错），修根因，不调测试迁就。
+**A good test = one that can find a real bug:**
+- **Test the real tool contract, not internal guesses**: assert the names, params, enums, safety hints, deferred status, and return shape that `TOOL_SCHEMA` / MCP tools/list / tools/call expose to the upstream agent — not some internal adapter method that may not exist.
+- **Use real representative data**: real gears (P/R/N/D), real page names, real boundary values — not toy values constructed just to pass the test.
+- **Cover the paths where bugs actually happen**: whether state is still usable after error injection, whether the safety guard really blocks, numeric boundaries, inverse operations (navigate forward then go back).
+- **Fix the root cause, not the symptom**: when a test fails, classify first (generated-code bug / test bug / schema error / type error), fix the root cause, do not tweak the test to accommodate it.
 
 ## Input
 

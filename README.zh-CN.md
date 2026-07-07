@@ -1,4 +1,4 @@
-> **可视化工作台：**执行 `npm install` 与 `npm run workbench:dev` 启动仅绑定本机的 Source-to-MCP 控制面；脚本不会自动打开浏览器。详见 [docs/WORKBENCH.md](docs/WORKBENCH.md)。
+> **可视化工作台：**以 `/mcp-pipeline [app-source-dir]` 启动——一个仅绑定本机的 Electron 单窗口应用（无 HTTP 服务器、无浏览器），驱动 Source-to-MCP 全流程。开发态可用 `npm install` 后 `npm run workbench:dev`。详见 [docs/WORKBENCH.md](docs/WORKBENCH.md)。
 
 <div align="center">
 
@@ -11,7 +11,7 @@
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
-![version](https://img.shields.io/badge/version-0.1.8-0066cc)
+![version](https://img.shields.io/badge/version-0.1.14-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
 ![platform](https://img.shields.io/badge/platform-Win%20%7C%20macOS%20%7C%20Linux-339933)
 
@@ -32,8 +32,8 @@
 **Pipeline**——每一步均为确定性 CLI 子命令或智能体 skill：
 
 ```
-validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
-  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
+validate › analyze › [curate] › scaffold › generate › test › build › register › verify › schema_preview 🟢
+  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)        (CLI)
 ```
 
 进度持久化于 `.mcp-pipeline/<app>/state.json`，支持断点续跑——`--from`、`--only`、`--step`、`--batch`。
@@ -86,6 +86,25 @@ sequenceDiagram
     Server-->>Agent: tool result
 ```
 
+## 🖥️ 可视化
+
+整个 pipeline 可由**可视化工作台**驱动——一个仅绑定本机的 Electron 单窗口桌面应用（无 HTTP 服务器、无 `localhost`、无浏览器标签页）。在 Claude Code 或 Codex 内启动：
+
+```
+/mcp-pipeline ./path/to/your-app
+```
+
+该命令运行 `scripts/launch-workbench.mjs`，首次启动会构建工作台各包（约 2–5 分钟）并打开窗口。请为发起命令预留充足超时（≥ 600000 ms），以让首次构建完成。
+
+界面所呈现（UI 为中文标签）：
+
+- **导入与分析**——选择源码目录与可选的格式参考 Schema，点击「导入并自动分析」即可端到端运行 `analyze`（及 `curate`）。候选能力**仅从源码发现**；参考 Schema 仅用于指导输出格式，绝不播种为能力。
+- **机器可读产物**——「机器可读产物」面板检视生成的 `analysis.json`、已选能力、完整生成的工具 schema（「工具」tab 下）与发现项。Tab：「能力」·「工具」·「RPC」·「发现」。
+- **MCP 调试**——「MCP 调试」面板就地运行已构建的 MCP server：列出工具、发起调用、检视回包，从而在交付给宿主智能体前验证行为。
+- **可追溯性**——一张「源码 → 能力 → MCP → RPC」转换图与覆盖率看板（已发现 / 已选择 / 已投影 / 已接线）逐能力呈现源码如何变为已接线工具。
+
+工作台与 skill 所用的是同一套确定性 CLI——可视化驱动不改变 pipeline 任何行为。开发态（热重建 UI / desktop / control-server 各包）请改用 `npm run workbench:dev`。工作台内部详见 [docs/WORKBENCH.md](docs/WORKBENCH.md)；包布局见下方[架构](#-架构)。
+
 ## 📦 交付物
 
 一次成功的运行应产出一套可评审的交付 bundle，而非仅仅一个生成目录：
@@ -135,13 +154,13 @@ mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-s
 /plugin install im-mcp-codeagent
 ```
 
-首次会话启动会自动安装 `framework/` + `cli/` 并构建 `cli/dist`（幂等）。随后启动一次 pipeline 运行：
+首次会话启动会自动安装 `framework/` + `cli/` 并构建 `cli/dist`（幂等）。随后启动可视化工作台：
 
 ```
 /mcp-pipeline ./path/to/your-app
 ```
 
-入口——`/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`。
+`/mcp-pipeline` 打开可视化工作台（见[可视化](#-可视化)）；传入 app 源码目录可预加载。入口——`/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`。
 
 **Codex** 读取镜像的 `.codex-plugin/plugin.json`（双端）。
 
@@ -221,18 +240,25 @@ mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<
 
 ```
 im-mcp-codeagent/
-├── .claude-plugin/       Claude Code manifest + marketplace
-├── .codex-plugin/        Codex manifest（双端镜像）
-├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test（方法论，无模型调用）
-├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
-├── hooks/                SessionStart → 多语言构建（run-hook.cmd → session-init.sh）
-├── cli/                  @im/mcp-pipeline-cli——确定性 Node
-│   ├── src/generators/   tool-schema · rpc-bridge · car-rpc-engine · …
-│   ├── assets/           car-rpc-engine.ts.template（内嵌、去硬编码）
+├── .claude-plugin/        Claude Code manifest + marketplace
+├── .codex-plugin/         Codex manifest（双端镜像）
+├── skills/                mcp-analyze · mcp-curate · mcp-generate · mcp-test（方法论，无模型调用）
+├── commands/              /mcp-pipeline · /mcp-verify · /mcp-help
+├── hooks/                 SessionStart → 多语言构建（run-hook.cmd → session-init.sh）
+├── cli/                   @im/mcp-pipeline-cli——确定性 Node
+│   ├── src/generators/    tool-schema · rpc-bridge · car-rpc-engine · …
+│   ├── assets/            car-rpc-engine.ts.template（内嵌、去硬编码）
 │   └── bin/mcp-pipeline.js
-├── framework/            @im/mcp-server-framework（共享 dispatch 核心：constructDbusCall / …）
-├── tools/adb/            内嵌 adb（自包含；见 LICENSE 注）
-└── schema/               analysis.schema.json + fixtures
+├── framework/             @im/mcp-server-framework（共享 dispatch 核心：constructDbusCall / …）
+├── workbench-contracts/   @bridge/workbench-contracts——工作台各包共享的 TS 类型
+├── control-server/        @bridge/control-server——进程内 pipeline + MCP 运行器（由 desktop 直接导入，无 HTTP）
+├── desktop/               @bridge/desktop——Electron 主进程 + preload（loadFile 单窗口，无 HTTP 服务器）
+├── ui/                    @bridge/ui——React + Vite 渲染层（中文标签）
+├── scripts/               launch-workbench.mjs · start-workbench.ps1 · smoke-*-workbench.mjs · check-manifests.js
+├── assets/                bridge.svg + 工作台美术资源
+├── docs/                  WORKBENCH.md · WORKBENCH-TROUBLESHOOTING.md · DELIVERABLE_CONTRACT.md
+├── tools/adb/             内嵌 adb（自包含；见 LICENSE 注）
+└── schema/                analysis.schema.json + fixtures
 ```
 
 CLI 经 **skill-base 相对路径**（`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`）运行——自包含，不依赖 PATH / 全局链接。

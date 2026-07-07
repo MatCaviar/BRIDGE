@@ -4,26 +4,26 @@ description: Use when analysis.json exists and the user must choose WHICH capabi
 ---
 
 > 🌐 默认用中文与用户交互和输出；代码/命令/标识符保持英文。
-> CLI：`node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" curate <analysis.json> [--prd <prd.md>]`
-> 若 `${SKILL_DIR}` 未展开，改用 `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js`。
+> CLI: `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" curate <analysis.json> [--prd <prd.md>]`
+> If `${SKILL_DIR}` does not expand, use `${CLAUDE_PLUGIN_ROOT}/cli/bin/mcp-pipeline.js` instead.
 
 # MCP Curate
 
 After analyze, decide WHICH capabilities become MCP tools.
 
-## 判断标准
+## Judgment criteria
 
-大部分 app 暴露的能力远多于需要 MCP 化的。curate 决定**哪些**成为 tool——这是**用户的判断**，你只负责：用确定性命令枚举候选 → 基于候选表 + PRD propose 一个子集 → **交给用户拍板** → 用户选定后才写 `selection.json`。
+Most apps expose far more capabilities than need to be MCP-ified. curate decides **which** become tools — this is **the user's judgment**; you only: enumerate candidates with a deterministic command → propose a subset based on the candidate table + PRD → **hand it to the user to decide** → write `selection.json` only after the user picks.
 
-- **用户选择优先**：你 propose 的子集只是建议，最终写什么由用户定。用户没选之前不写文件。
-- **不 fabricate**：PRD 里提到、但代码里没有的 feature → flag 给用户，**绝不硬造** capability（MCP 化需要真实 wire，没代码就没 wire，造了下游也只能臆造 wire，违反 generate 的 Iron Law）。
-- **可重选**：重跑只需改 `selection.json` + 再走 pipeline（生成物重建，`rpc/config.json` + `conf/config.yaml` 保留）。
+- **User choice first**: the subset you propose is only a suggestion; what gets written is decided by the user. Do not write the file before the user chooses.
+- **Do not fabricate**: a feature mentioned in the PRD but absent from the code → flag it to the user, **never fabricate** a capability (MCP-ifying needs a real wire; no code means no wire, and fabricating one forces the downstream step to invent wire, violating generate's Iron Law).
+- **Re-pickable**: re-running is just editing `selection.json` + re-running the pipeline (generated files rebuild; `rpc/config.json` + `conf/config.yaml` are preserved).
 
 ## Process
 1. **Enumerate** (deterministic): `mcp-pipeline curate <analysis.json> [--prd <prd.md>]` → candidate table.
 2. **Propose a subset** (your judgment, informed by the table + PRD): which capabilities are worth MCP-ifying now.
-3. **Present the subset to the user and let them pick** (第一要义：用户选择). Do not write until the user chooses.
-4. On the user's choice, **write `selection.json`** = `{ "selected": ["<cap.id>", ...] }` 到 `.mcp-pipeline/<app>/selection.json`（与 `analysis.json` 同目录）。随后 scaffold 须带 `--selection .mcp-pipeline/<app>/selection.json`，才会只生成被选中的能力。
+3. **Present the subset to the user and let them pick** (first principle: user choice). Do not write until the user chooses.
+4. On the user's choice, **write `selection.json`** = `{ "selected": ["<cap.id>", ...] }` to `.mcp-pipeline/<app>/selection.json` (same directory as `analysis.json`). scaffold must then be run with `--selection .mcp-pipeline/<app>/selection.json` so only the chosen capabilities are generated.
 
 ## Rules
 - Re-pick = edit `selection.json` + re-run the pipeline (generated files regenerate; `rpc/config.json` + `conf/config.yaml` preserved).
