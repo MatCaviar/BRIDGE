@@ -72,8 +72,12 @@ function fieldToSchema(s: Shape): JsonSchema {
   let elemSchema: JsonSchema;
   if (s.enum && s.enum.length > 0) {
     elemSchema = enumSchema(elem, s.enum, s.description ?? s.type);
-  } else if (elem === "string" || elem === "number" || elem === "boolean") {
+  } else if (elem === "string" || elem === "boolean") {
     elemSchema = { type: elem };
+  } else if (elem === "number" || elem === "float" || elem === "double") {
+    elemSchema = { type: "number" };
+  } else if (elem === "integer" || elem === "int" || elem === "long") {
+    elemSchema = { type: "integer" };
   } else if (s.properties && s.properties.length > 0) {
     const props: JsonSchema = {};
     for (const sub of s.properties) props[sub.name] = fieldToSchema(sub);
@@ -88,8 +92,8 @@ function fieldToSchema(s: Shape): JsonSchema {
     if (s.description) arr.description = s.description;
     return arr;
   }
-  if (s.minimum !== undefined && elemSchema.type === "number") elemSchema.minimum = s.minimum;
-  if (s.maximum !== undefined && elemSchema.type === "number") elemSchema.maximum = s.maximum;
+  if (s.minimum !== undefined && (elemSchema.type === "number" || elemSchema.type === "integer")) elemSchema.minimum = s.minimum;
+  if (s.maximum !== undefined && (elemSchema.type === "number" || elemSchema.type === "integer")) elemSchema.maximum = s.maximum;
   if (s.description) elemSchema.description = s.description;
   return elemSchema;
 }
@@ -108,23 +112,22 @@ function paramToJsonSchema(p: ParamDef): JsonSchema {
  *  bare-string fields → untyped properties; an array-suffix on returns.type wraps in {type:"array",items}. */
 function returnsToJsonSchema(returns: ReturnsDef | undefined): JsonSchema | undefined {
   if (!returns) return undefined;
-  const { array, elem } = stripArray(returns.type);
+  const { array } = stripArray(returns.type);
   const fields = returns.fields ?? [];
-  const isScalar = elem === "string" || elem === "number" || elem === "boolean";
-  let node: JsonSchema;
-  if (!isScalar && fields.length > 0) {
+  // MCP mandates outputSchema.type === "object" (structuredContent is always an object). Structured
+  // returns (named fields, non-array) project to typed properties — enables tool chaining (e.g. read
+  // resourceCode from query_sound_library, feed it to install_sound_library). Scalar / array /
+  // unstructured returns get a permissive object: the server emits content (not structuredContent),
+  // so outputSchema is a declarative hint, not a validated wire contract.
+  if (!array && fields.length > 0) {
     const properties: JsonSchema = {};
     for (const f of fields) {
       if (typeof f === "string") properties[f] = {}; // bare name — type unknown
       else properties[f.name] = fieldToSchema(f);    // TypedField → items/properties/enum project (enables chaining)
     }
-    node = { type: "object", properties };
-  } else if (isScalar) {
-    node = { type: elem }; // scalar return — any `fields` are authoring noise, ignored
-  } else {
-    node = { type: "object", additionalProperties: true };
+    return { type: "object", properties };
   }
-  return array ? { type: "array", items: node } : node;
+  return { type: "object", additionalProperties: true };
 }
 
 function capabilityInputSchema(cap: { readonly params?: readonly ParamDef[]; readonly safetyLevel?: string }): Record<string, unknown> {
