@@ -129,9 +129,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .curate-list small { color: var(--muted); }
 .curate-list em { font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--ok); font-style: normal; }
 
-.map { overflow: auto; }
+.map { max-height: 440px; overflow: auto; }
 .lane-head, .map-row { min-width: 850px; display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr; gap: 8px; }
-.lane-head { color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; padding: 8px; }
+.lane-head { position: sticky; top: 0; z-index: 1; background: var(--surface); color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; padding: 8px; }
 .map-row > * { position: relative; overflow: hidden; margin: 3px 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); text-overflow: ellipsis; white-space: nowrap; font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--text); }
 .map-row > *:not(:last-child)::after { content: "→"; position: absolute; right: -9px; color: var(--plasma); }
 .map-row .linked { border-color: #a7f3d0; color: #047857; }

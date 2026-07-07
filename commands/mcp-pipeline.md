@@ -18,7 +18,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/launch-workbench.mjs" $ARGUMENTS
 - If `${CLAUDE_PLUGIN_ROOT}` does not expand, use the plugin root path shown when this command was loaded.
 - The launcher resolves the agent backend (claude first, codex fallback) and opens a standalone Electron window; it returns once the window is up and does not block the session. On first launch, if `dist` is missing it builds first (see the next bullet).
 - **The first launch triggers a build** (4 workspaces, ~2–5 min; later launches skip the build and open in seconds). Before running, tell the user "the first launch needs to build, please wait a few minutes"; and give this command **a long enough timeout (at least 600000 ms / 10 min) — do not kill it midway** — the launcher prints build progress in real time.
-- If the launcher reports a build failure or stall (it auto-terminates after 3 min with no output or an 8 min timeout and prints the reason), **do not retry verbatim**: run `npm run workbench:build` manually in the plugin root to see the full error (common: a workspace tsc error, or missing deps), fix it, then re-run `/mcp-pipeline` (the build is skipped thereafter).
+- If the launcher reports a build failure or stall (it auto-terminates after 3 min with no output or an 8 min timeout and prints the reason), **do not retry verbatim**: run `npm run workbench:build` manually in the plugin root to see the full error (common: a workspace tsc error, or missing deps), fix it, then re-run `/mcp-pipeline` (the build is skipped thereafter). If the error is `'tsc' is not recognized`, the plugin cache shipped without `node_modules` — run `npm install` in the plugin root first (see `docs/WORKBENCH-TROUBLESHOOTING.md` #5).
 
 Once the window is open, tell the user:
 

@@ -16,6 +16,10 @@ the workbench won't come up.
 >   below, fixed by this commit.
 > - The **stale ≤0.1.9 command body** (entry #2) is a session-cache artifact, not
 >   a code bug; reload the plugin to refresh it.
+> - **0.1.17** added entry #5 (plugin cache can ship without `node_modules` →
+>   `'tsc' is not recognized`; run `npm install`). Also fixed the workbench
+>   溯源场/TransformationMap panel not scrolling (CSS: bounded `.map` height +
+>   sticky lane header) — a display bug, not a launch failure.
 
 ---
 
@@ -197,3 +201,47 @@ npx vite build           # foreground TTY only; ~1s
 For a one-shot full build, `CI=true npm run workbench:build` completes all four
 workspaces end-to-end without the stall. `desktop/dist/main.js` (tsc) is
 unaffected; only the vite step needs this.
+
+---
+
+## 5. First-launch build fails with `'tsc' is not recognized`
+
+### Symptom
+The first `/mcp-pipeline` launch runs `npm run workbench:build`, which fails
+immediately across all four workspaces with:
+
+```
+'tsc' is not recognized as an internal or external command,
+operable program or batch file.
+```
+
+### Root cause
+The plugin cache (`.../cache/im-mcp-marketplace/im-mcp-codeagent/<version>/`)
+ships **without `node_modules`** — dependencies are gitignored and not vendored
+into the cache. Each workspace's `build` script calls the local `tsc` at
+`node_modules/.bin/tsc`, which doesn't exist until deps are installed.
+`typescript` (and `electron`) are workspace deps that `npm install` hoists into
+the root `node_modules/.bin`.
+
+### Detect
+```bash
+ls "<plugin-root>/node_modules/.bin/tsc" 2>/dev/null || echo "missing — run npm install"
+```
+
+### Fix
+Run `npm install` once in the plugin root, then re-launch. This is distinct
+from entry #3 (which is about `npm install --prefix` ENOENT) — there the
+install command itself errors; here `node_modules` is simply absent and a plain
+`npm install` from inside the plugin root is the fix:
+
+```bash
+cd "<plugin-root>"
+npm install --no-audit --no-fund
+node scripts/launch-workbench.mjs
+```
+
+After installing deps, the build may still hit the vite non-TTY stall through
+the launcher's idle timer (it reports `超过 3 分钟无输出,疑似卡死`) — see
+entry #4. The fastest completion is `CI=true npm run workbench:build`, or build
+once manually so later launches skip the build entirely (the launcher's
+`ensureBuilt()` then opens the window in seconds).
