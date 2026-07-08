@@ -4,7 +4,7 @@ import type { AgentBackend } from "./agent-backend.js";
 import { CommandPolicy } from "./command-policy.js";
 import type { CommandSpec, ProcessResult } from "./process-runner.js";
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StageStore } from "./stage-store.js";
@@ -48,12 +48,30 @@ const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
  *  plugins (including this one) — so the `$mcp-generate` skill trigger never resolves and the agent
  *  receives NO op→wire-spec format guidance, producing a `{methods:[...]}` list instead of an op map.
  *  Inject the skill's SKILL.md directly into the prompt to bypass the skill-trigger mechanism.
- *  Cached after first read. Path mirrors analysis-validator.ts (3 dirs up from dist/pipeline = plugin root). */
+ *  Cached after first read. Path resolved via resolvePluginResource (walks up to plugin root). */
 let cachedGenerateSkill: string | null = null;
+
+/** Resolve a plugin-root resource (e.g. skills/mcp-generate/SKILL.md) without assuming a fixed
+ *  parent depth. See analysis-validator.ts: when this package is loaded from the installed
+ *  workbench's node_modules copy, `../../../<resource>` lands under node_modules/@bridge/ and misses
+ *  (the SKILL.md read silently falls back to "" and the generate stage loses its op->wire-spec
+ *  guidance). Walk up until the file exists; fall back to the 3-up guess for a recognizable path. */
+function resolvePluginResource(...segments: string[]): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    const candidate = resolve(dir, ...segments);
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ...segments);
+}
+
 function generateSkillContext(): string {
   if (cachedGenerateSkill !== null) return cachedGenerateSkill;
   try {
-    const skillPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "skills", "mcp-generate", "SKILL.md");
+    const skillPath = resolvePluginResource("skills", "mcp-generate", "SKILL.md");
     let content = readFileSync(skillPath, "utf8");
     // Strip the YAML frontmatter: SKILL.md starts with `---`, and `claude -p <prompt>` parses a
     // leading `---` as an unknown CLI option ("error: unknown option '---'"), failing the stage

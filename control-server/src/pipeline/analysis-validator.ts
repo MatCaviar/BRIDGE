@@ -1,4 +1,5 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,13 +11,30 @@ import { fileURLToPath } from "node:url";
 // later, only caught right after the agent run with one self-healing retry instead of after curate.
 let cachedValidate: ValidateFunction | undefined;
 
+/** Resolve <plugin-root>/schema/analysis.schema.json without assuming a fixed number of parent
+ *  directories. From control-server/dist/pipeline/analysis-validator.js the schema is three dirs up
+ *  in the dev layout (control-server -> plugin root), but when this package is consumed via the
+ *  installed workbench's node_modules copy (<plugin-root>/node_modules/@bridge/control-server/), the
+ *  same `../../../schema` lands at <plugin-root>/node_modules/@bridge/schema - which does not exist
+ *  (ENOENT, the analyze-stage crash). Walk up until the file is found; this is correct for dev, the
+ *  installed copy, and vitest (src/pipeline). Falls back to the original 3-up guess so a missing
+ *  schema still surfaces a recognizable path in the error. */
+function resolveAnalysisSchemaPath(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 8; i++) {
+    const candidate = resolve(dir, "schema", "analysis.schema.json");
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "schema", "analysis.schema.json");
+}
+
 async function loadAnalysisValidator(): Promise<ValidateFunction> {
   if (cachedValidate) return cachedValidate;
   const { Ajv } = await import("ajv");
-  // From control-server/dist/pipeline/analysis-validator.js (or src/pipeline under vitest), the
-  // schema lives three directories up at <repo-root>/schema/analysis.schema.json — the same relative
-  // depth the CLI's validate command resolves from cli/dist/commands.
-  const schemaPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "schema", "analysis.schema.json");
+  const schemaPath = resolveAnalysisSchemaPath();
   const schema = JSON.parse(await readFile(schemaPath, "utf8"));
   const ajv = new Ajv({ allErrors: true, strict: true, allowUnionTypes: true });
   cachedValidate = ajv.compile(schema);
@@ -73,3 +91,4 @@ export function analyzeCorrectionPrompt(analysisPath: string, errors: string): s
 ${errors}
 Read ${analysisPath}, then fix EXACTLY these violations and overwrite ${analysisPath} with valid JSON. This is a correction pass, NOT a fresh analysis: preserve every field and capability that already passed, keep all ids / sourceRefs / descriptions / sdkCalls unchanged, and change only what is needed to satisfy the constraints above. Do not add or remove capabilities. Do not regenerate from source. Write ONLY the file ${analysisPath} by overwriting it. Do NOT run shell, bash, or PowerShell commands; do NOT copy, move, install, build, fetch, or use the network; do NOT touch node_modules or any file other than ${analysisPath}. Output the corrected file and stop.`;
 }
+
