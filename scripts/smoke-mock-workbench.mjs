@@ -39,6 +39,21 @@ class FixtureAgentRunner {
       await writeFile(path, `${JSON.stringify({ _deferred: Object.fromEntries(selection.selected.map((id) => [id, "Android AIDL fixture has no real vehicle adapter"])) }, null, 2)}\n`);
       return success("fixture RPC judgment complete");
     }
+    // build/test/verify compile+run the GENERATED package, whose scaffolded package.json pulls
+    // network deps (sdk/zod/typescript/vitest) via an un-timed `npm install` that hangs the smoke
+    // offline. The mock smoke validates orchestration + the pure schema_preview projection, not real
+    // tsc/vitest - so stub these. build writes the one artifact the smoke asserts (dist/index.js);
+    // test/verify produce no smoke-checked artifacts. validate_config/wire_check/schema_preview stay real.
+    if (spec.operation === "build") {
+      const dirIdx = spec.args.indexOf("--dir");
+      const generatedRoot = dirIdx !== -1 ? spec.args[dirIdx + 1] : resolve(spec.cwd, "mcp-mock-audio-auto");
+      await mkdir(resolve(generatedRoot, "dist"), { recursive: true });
+      await writeFile(resolve(generatedRoot, "dist", "index.js"), "// fixture build placeholder - real tsc skipped in mock smoke\n");
+      return success("fixture build complete (tsc skipped)");
+    }
+    if (spec.operation === "test" || spec.operation === "verify") {
+      return success(`fixture ${spec.operation} complete (skipped)`);
+    }
     return this.real.run(spec, signal, onLog);
   }
 }
