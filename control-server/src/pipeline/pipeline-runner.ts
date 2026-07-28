@@ -41,7 +41,7 @@ const ANSI_ESCAPE = /\u001B(?:[@-_]|\[[0-?]*[ -/]*[@-~])/g;
 const REQUIRED: Partial<Record<PipelineStageId, readonly PipelineStageId[]>> = {
   curate: ["analyze"], scaffold: ["curate"], generate: ["scaffold"],
   validate_config: ["generate"], wire_check: ["generate"], build: ["validate_config", "wire_check"],
-  test: ["build"], register: ["build"], verify: ["build", "test"], schema_preview: ["generate"], deploy: ["verify"],
+  test: ["build"], verify: ["build", "test"], schema_preview: ["generate"], deploy: ["verify"],
 };
 
 /** The generate stage runs the agent under `claude --bare`, which skips loading globally-installed
@@ -168,7 +168,7 @@ export class PipelineRunner {
 
   private assertRunnable(stage: PipelineStageId): void {
     const failedGate = GATES.find((gate) => this.status(gate) === "failed");
-    if (failedGate && ["build", "register", "verify", "deploy"].includes(stage)) throw new Error(`Stage ${stage} is blocked by failed gate ${failedGate}`);
+    if (failedGate && ["build", "verify", "deploy"].includes(stage)) throw new Error(`Stage ${stage} is blocked by failed gate ${failedGate}`);
     const missing = (REQUIRED[stage] ?? []).find((dependency) => this.status(dependency) !== "passed");
     if (missing) throw new Error(`Stage ${stage} is blocked until ${missing} passes`);
   }
@@ -197,9 +197,6 @@ $mcp-generate Generate only RPC configuration for ${workspace.generatedRoot} usi
       case "validate_config": args.push("validate_config", workspace.rpcConfigPath, "--analysis", workspace.analysisPath, "--selection", workspace.selectionPath); break;
       case "wire_check": args.push("wire_check", workspace.rpcConfigPath, ...workspace.proxyPaths.flatMap((path) => ["--proxy", path])); break;
       case "test": case "build": args.push(operation, "--dir", workspace.generatedRoot); break;
-      case "register":
-        if (!this.config.gatewayRoot) throw new Error("Gateway root is not configured");
-        args.push("register", "--dir", workspace.generatedRoot, "--gateway", this.config.gatewayRoot); break;
       case "verify": args.push("verify", "--dir", workspace.generatedRoot, ...(this.config.gatewayRoot ? ["--gateway", this.config.gatewayRoot] : [])); break;
       case "schema_preview": args.push("schema_preview", workspace.analysisPath, workspace.rpcConfigPath, "--selection", workspace.selectionPath, "--output", `${workspace.root}/tools-schema.json`); break;
     }

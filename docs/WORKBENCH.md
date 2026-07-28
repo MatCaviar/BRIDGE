@@ -122,7 +122,9 @@ node scripts\smoke-imaudio-workbench.mjs source_code\imaudio_app_code schema\sch
 npm run test:smoke --prefix desktop
 ```
 
-The default mock smoke uses deterministic fixture agents for the two LLM-judgment stages while exercising the real import, Curate, CLI gates, dependency build, generated tests, schema preview, verification, and persistence path. Use `workbench:smoke:mock:live` to run the same fixture through real Codex Analyze and Generate; it requires `codex` on `PATH` and available model quota. The real-project import smoke checks representative audio manager/proxy declarations, `querySoundLibrary` RPC evidence, and project recovery. The Electron smoke must run in a normal interactive Windows user session; restricted CI or sandbox sessions may not permit Chromium GPU subprocesses.
+The default mock smoke uses deterministic fixture agents for the two LLM-judgment stages while exercising the real import, Curate, CLI gates, schema preview, and persistence path. In this default mode `build`/`test`/`verify` are stubbed by the fixture (offline: the generated package's `npm install` would hang), so a real dependency build / generated tests only run under `workbench:smoke:mock:live`, which drives the same fixture through real Codex Analyze and Generate and requires `codex` on `PATH` and available model quota. The real-project import smoke checks representative audio manager/proxy declarations, `querySoundLibrary` RPC evidence, and project recovery. The Electron smoke must run in a normal interactive Windows user session; restricted CI or sandbox sessions may not permit Chromium GPU subprocesses.
+
+> Known gaps: several advertised visualizations are mocked, unreachable, or not exercised by any smoke (REAL MCP mode, the `register` stage, target coverage, RPC wiring validity, renderer assertions). See [VISUALIZATION-GAPS.md](VISUALIZATION-GAPS.md) for the full audit.
 
 ## Troubleshooting
 

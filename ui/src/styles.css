@@ -120,6 +120,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .safety { font: 600 10px ui-monospace, SFMono-Regular, Consolas, monospace; text-transform: uppercase; color: var(--warn); }
 .chips { grid-column: 1 / -1; display: flex; gap: 4px; flex-wrap: wrap; }
 .chips span { padding: 4px 8px; border-radius: 999px; background: var(--surface-3); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--text-soft); }
+.chips .rpc-ok { background: #ecfdf5; color: #047857; }
+.chips .rpc-unknown { background: #fefce8; color: #b45309; }
+.chips .rpc-missing { background: #fef2f2; color: #b91c1c; }
 
 .toolbar, .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .curate-list label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }

@@ -54,8 +54,6 @@ describe("readArtifacts", () => {
     expect(result.capabilities[1]).toMatchObject({ id: "preview_sound", selected: true, mockExecutable: true, realExecutable: false, blockedReason: "transport unavailable" });
     expect(result.edges.map((edge) => edge.relation)).toEqual(expect.arrayContaining(["declares", "selects", "projects", "wires"]));
     expect(result.coverage).toMatchObject({ discovered: 2, selected: 2, projected: 2, wired: 1 });
-    expect(result.targets).toEqual([]);
-    expect(result.coverage.targeted).toBe(0);
     expect(result.findings.join(" ")).not.toMatch(/reference_weather_lookup|no source-backed capability/i);
     expect((result as any).stages).toContainEqual({ id: "analyze", status: "passed" });
     // RPC tab projects the generated src (TypeScript) + dist (JavaScript) rpc files, skipping .d.ts/.map.

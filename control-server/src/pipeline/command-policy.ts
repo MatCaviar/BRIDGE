@@ -3,7 +3,7 @@ import { confirmationFor, type OperationId } from "@bridge/workbench-contracts";
 
 const OPERATIONS = new Set<OperationId>([
   "scan", "analyze", "curate", "scaffold", "generate", "validate_config",
-  "wire_check", "test", "build", "register", "verify", "schema_preview",
+  "wire_check", "test", "build", "verify", "schema_preview",
   "deploy", "mcp_start", "mcp_stop", "mcp_call_mock", "mcp_call_real",
 ]);
 

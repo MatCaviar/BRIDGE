@@ -1,15 +1,14 @@
-import type { Capability, PipelineStageState, ProvenanceEdge, RpcFileProjection, RpcProjection, TargetProjection, ToolProjection } from "@bridge/workbench-contracts";
+import type { Capability, PipelineStageState, ProvenanceEdge, RpcFileProjection, RpcProjection, ToolProjection } from "@bridge/workbench-contracts";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 interface ArtifactProjection {
   readonly capabilities: readonly Capability[];
-  readonly targets: readonly TargetProjection[];
   readonly tools: readonly ToolProjection[];
   readonly rpc: readonly RpcProjection[];
   readonly rpcFiles: readonly RpcFileProjection[];
   readonly edges: readonly ProvenanceEdge[];
-  readonly coverage: { readonly targeted: number; readonly matched: number; readonly discovered: number; readonly selected: number; readonly projected: number; readonly wired: number };
+  readonly coverage: { readonly discovered: number; readonly selected: number; readonly projected: number; readonly wired: number };
   readonly findings: readonly string[];
   readonly stages: readonly PipelineStageState[];
 }
@@ -92,7 +91,6 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   }));
   // Imported schemas describe output shape and may contain examples. They are
   // never a target catalog; candidates and coverage originate only in source.
-  const targets: TargetProjection[] = [];
   const edges: ProvenanceEdge[] = [];
   for (const cap of capabilities) {
     edges.push({ from: `source:${cap.sourceRef}`, to: `capability:${cap.id}`, relation: "declares" });
@@ -116,14 +114,11 @@ export async function readArtifacts(projectRoot: string, appName: string): Promi
   const rpcFiles = await readRpcFiles(generatedRoot, findings);
   return {
     capabilities,
-    targets,
     tools,
     rpc,
     rpcFiles,
     edges,
     coverage: {
-      targeted: 0,
-      matched: 0,
       discovered: capabilities.length,
       selected: capabilities.filter((cap) => cap.selected).length,
       projected: capabilities.filter((cap) => toolMap.has(cap.id)).length,

@@ -1,9 +1,27 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { McpCallRecord, McpTool } from "@bridge/workbench-contracts";
 import { EventBus } from "../events/event-bus.js";
 import { CommandPolicy } from "../pipeline/command-policy.js";
+
+/** Point the generated server's adapter at the right backend before it is spawned. The server reads
+ *  conf/config.yaml once at startup (`readConfig`), so toggling `mock_mode` here flips mock ↔ real.
+ *  mock → ensure `mock_mode: true`; real → write `mock_mode: false` (server dispatches ops through the
+ *  adb bridge to the device). Only acts when a config exists - test fixtures and non-generated servers
+ *  manage their own mode. If the key is absent the parser already defaults to mock, so mock is a no-op. */
+export async function applyMockMode(cwd: string, mode: McpMode): Promise<void> {
+  const configPath = join(cwd, "conf", "config.yaml");
+  if (!existsSync(configPath)) return;
+  const yaml = await readFile(configPath, "utf-8");
+  const want = mode === "real" ? "false" : "true";
+  const replaced = yaml.replace(/(mock_mode:\s*)(true|false)/, `$1${want}`);
+  const next = replaced === yaml && mode === "real" ? yaml.replace(/(adapter:\s*\r?\n)/, `$1  mock_mode: false\n`) : replaced;
+  if (next !== yaml) await writeFile(configPath, next, "utf-8");
+}
 
 export interface McpWorkspace { readonly projectId: string; readonly projectName: string; readonly root: string; }
 export interface McpLaunchSpec { readonly executable: string; readonly args: readonly string[]; readonly cwd: string; readonly env?: Readonly<Record<string, string>>; }
@@ -63,6 +81,7 @@ export class McpSessionManager {
   async start(workspace: McpWorkspace, launch: McpLaunchSpec, mode: McpMode, confirmation: McpConfirmation): Promise<McpSessionSnapshot> {
     if (this.#sessions.get(workspace.projectId)?.snapshot.state === "running") throw new Error("MCP session is already running");
     this.policy.authorize({ operation: "mcp_start", projectId: workspace.projectId, projectName: workspace.projectName, workspaceRoot: workspace.root, cwd: launch.cwd, ...confirmation });
+    await applyMockMode(launch.cwd, mode);
     // The workbench runs in-process under Electron, so `launch.executable` (process.execPath) is
     // electron.exe. Spawning `electron.exe dist/index.js` WITHOUT ELECTRON_RUN_AS_NODE does not run
     // it as a plain node stdio server — it never answers the MCP `initialize` handshake and the

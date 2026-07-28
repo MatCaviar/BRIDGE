@@ -38,7 +38,6 @@ export const pipelineStages: readonly PipelineStageDefinition[] = [
   { id: "wire_check", label: "接线检查", kind: "deterministic" },
   { id: "build", label: "构建", kind: "deterministic" },
   { id: "test", label: "测试", kind: "deterministic" },
-  { id: "register", label: "注册", kind: "deterministic" },
   { id: "verify", label: "验证", kind: "deterministic" },
   { id: "schema_preview", label: "Schema 预览", kind: "deterministic" },
   { id: "deploy", label: "部署", kind: "deployment" },
@@ -50,7 +49,6 @@ const CONFIRM_OPERATIONS = new Set<OperationId>([
   "generate",
   "test",
   "build",
-  "register",
   "verify",
   "schema_preview",
   "mcp_start",
@@ -142,18 +140,6 @@ export interface ToolProjection {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: Record<string, unknown>;
-  /** @deprecated Prefer mockExecutable and realExecutable. */
-  readonly executable: boolean;
-  readonly mockExecutable: boolean;
-  readonly realExecutable: boolean;
-  readonly blockedReason?: string;
-}
-
-export interface TargetProjection {
-  readonly name: string;
-  readonly description: string;
-  readonly inputSchema: Record<string, unknown>;
-  readonly matchedCapabilityIds: readonly string[];
   /** @deprecated Prefer mockExecutable and realExecutable. */
   readonly executable: boolean;
   readonly mockExecutable: boolean;
