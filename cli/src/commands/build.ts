@@ -30,7 +30,10 @@ async function npmInstallIfNeeded(dir: string): Promise<void> {
     await new Promise<void>((resolvePromise, reject) => {
       execFile(
         commandFile("npm"),
-        commandArgs("npm", ["install"]),
+        // --prefer-offline + --ignore-scripts: resolve esbuild binaries from cache and skip the
+        // esbuild postinstall (its binary-download postinstall crashes npm on Windows with
+        // ERR_INVALID_ARG_TYPE; the binary comes from the @esbuild/win32-x64 optional dep).
+        commandArgs("npm", ["install", "--prefer-offline", "--no-audit", "--no-fund", "--ignore-scripts"]),
         { cwd: dir, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
         (error) => {
           if (error) {

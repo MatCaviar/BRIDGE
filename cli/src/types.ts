@@ -65,6 +65,72 @@ export interface CapabilityDef {
   readonly sourceRef: string;
   /** Authoring-confidence marker: verified (wire source-traced) | partial (e.g. signal-loss) | broken (known no-op/bug). */
   readonly status?: "verified" | "partial" | "broken";
+  /** Dispatch mechanism the on-car bridge executor uses to execute this capability. The mechanism
+   *  selects the executor's dispatch path and the mechanism-specific registry fields emitted into
+   *  registry.json (the executor's on-car dispatch table). See the mcp-analyze skill's "Mechanism
+   *  assignment" section. Default "aidl" when omitted. */
+  readonly mechanism?:
+    | "aidl"        // reflect the target app's AIDL method by methodName (registry: methodName, pattern, devicePaths).
+    | "media"       // MediaSessionManager transportControls (media_* built-in, no registry entry; not SmartLink-projectable).
+    | "carproperty" // CarPropertyManager get/set by propId+areaId (registry: propId, areaId, valueType, mode).
+    | "audio"       // AudioManager.setStreamVolume (no-op on Banma/SmartLink; use shell/caraudio instead).
+    | "caraudio"    // CarAudioManager.setGroupVolume via reflection - hidden API, system app only (registry: mode).
+    | "shell";      // run an adb-style shell command on-car (registry: command, ${arg} substitution).
+
+  // ── Mechanism-specific fields (present only when `mechanism` needs them). These are mapped
+  //    1:1 into registry.json (the on-car bridge executor's dispatch table) by generate_registry.
+  /** aidl: AIDL method name to reflect on the bound service. Default: derived from `sourceRef` (method after ':'). */
+  readonly methodName?: string;
+  /** aidl: param shape — none (no-arg) | scalar (args JSON) | dataclass (args JSON) | envelope (wrapped + device injection). */
+  readonly pattern?: "none" | "scalar" | "dataclass" | "envelope";
+  /** aidl envelope: device-value paths to inject (e.g. ["body.vin"]). Default from app.deviceSources when envelope. */
+  readonly devicePaths?: readonly string[];
+  /** carproperty: Android VehiclePropertyIds value (e.g. HVAC_TEMPERATURE_SET=358614275). */
+  readonly propId?: number;
+  /** carproperty: VehicleAreaSeat area (e.g. SEAT_ROW_1_LEFT=1). */
+  readonly areaId?: number;
+  /** carproperty: property value type. */
+  readonly valueType?: "float" | "int" | "bool";
+  /** carproperty/caraudio: get | set | up | down. */
+  readonly mode?: "get" | "set" | "up" | "down";
+  /** shell: command to run on-car via `sh -c`, with ${arg} placeholders substituted from invoke args. */
+  readonly command?: string;
+}
+
+/** A tool in registry.json — the on-car bridge executor's dispatch table. One entry per capability,
+ *  carrying the mechanism + mechanism-specific fields the executor needs to bind/dispatch/execute. */
+export interface RegistryTool {
+  readonly id: string;
+  readonly mechanism?: CapabilityDef["mechanism"];
+  /** aidl: reflected AIDL method name on the bound service. */
+  readonly methodName?: string;
+  /** aidl: param shape — none (no-arg) | scalar (args JSON) | dataclass (args JSON) | envelope (wrapped + device injection). */
+  readonly pattern?: "none" | "scalar" | "dataclass" | "envelope";
+  /** aidl envelope: device-value paths to inject (e.g. ["body.vin"]). */
+  readonly devicePaths?: readonly string[];
+  /** carproperty: Android VehiclePropertyIds value (e.g. HVAC_TEMPERATURE_SET). */
+  readonly propId?: number;
+  /** carproperty: VehicleAreaSeat area (e.g. SEAT_ROW_1_LEFT=1). */
+  readonly areaId?: number;
+  /** carproperty: property value type. */
+  readonly valueType?: "float" | "int" | "bool";
+  /** carproperty/caraudio: get | set | up | down. */
+  readonly mode?: "get" | "set" | "up" | "down";
+  /** shell: command to run on-car via `sh -c`, with ${arg} placeholders substituted from invoke args. */
+  readonly command?: string;
+  readonly form?: string;
+  readonly safetyLevel: string;
+  readonly status: "verified" | "partial" | "broken";
+  readonly sourceRef: string;
+}
+
+/** registry.json — generated alongside analysis.json, pushed to the executor's filesDir on-car. */
+export interface RegistryData {
+  readonly app: string;
+  readonly framework: string;
+  readonly nativeCallTool: boolean;
+  readonly deviceSources?: readonly string[];
+  readonly tools: readonly RegistryTool[];
 }
 
 export interface EnumDef {

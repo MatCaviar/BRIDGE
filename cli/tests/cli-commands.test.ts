@@ -41,7 +41,7 @@ describe("CLI commands: build → test → verify", () => {
 
   it("scaffold and install", { timeout: 120_000 }, async () => {
     scaffoldProject(analysis, projectDir, FRAMEWORK_DIR);
-    const result = await run("npm", ["install"], { cwd: projectDir, timeout: 120_000 });
+    const result = await run("npm", ["install", "--prefer-offline", "--no-audit", "--no-fund", "--ignore-scripts"], { cwd: projectDir, timeout: 120_000 });
     expect(result.exitCode, `npm install failed: ${result.stderr}`).toBe(0);
   });
 

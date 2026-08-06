@@ -1,14 +1,28 @@
 {
   "name": "im-mcp-codeagent",
   "displayName": "CodeAgent @ MCP",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "description": "Auto-generate controllable MCP Servers from YunOS HDT apps: analyze → scaffold → generate → gates → build. Car-side RPC bridge, deterministic config gates, dual-end (Claude Code + Codex).",
-  "author": { "name": "Tongji University & IM" },
+  "author": {
+    "name": "Tongji University & IM"
+  },
   "license": "MIT",
   "homepage": "https://github.com/MatCaviar/im-mcp-codeagent",
   "repository": "https://github.com/MatCaviar/im-mcp-codeagent",
-  "keywords": ["yunos", "automotive", "mcp", "claude-code", "codex", "rpc-bridge"],
-  "skills": ["./skills/"],
-  "commands": ["./commands/"],
-  "defaultEnabled": true
+  "keywords": [
+    "yunos",
+    "automotive",
+    "mcp",
+    "claude-code",
+    "codex",
+    "rpc-bridge"
+  ],
+  "skills": [
+    "./skills/"
+  ],
+  "commands": [
+    "./commands/"
+  ],
+  "defaultEnabled": true,
+  "hooks": "./hooks/hooks.json"
 }

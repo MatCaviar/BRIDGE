@@ -9,6 +9,7 @@ import { wireCheckCommand } from "./commands/wire-check.js";
 import { curateCommand } from "./commands/curate.js";
 import { schemaPreviewCommand } from "./commands/schema-preview.js";
 import { deployCommand } from "./commands/deploy.js";
+import { registryCommand } from "./commands/registry.js";
 
 type CommandHandler = (args: string[]) => Promise<void>;
 
@@ -24,6 +25,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   curate: curateCommand,
   schema_preview: schemaPreviewCommand,
   deploy: deployCommand,
+  registry: registryCommand,
 };
 
 export async function dispatch(argv: string[]): Promise<number> {
@@ -43,6 +45,7 @@ export async function dispatch(argv: string[]): Promise<number> {
   process.stderr.write("  curate     Enumerate MCP-ifiable capabilities\n");
   process.stderr.write("  schema_preview <analysis.json> [<rpc/config.json>]  Project MCP schema to tools-schema.json (no build)\n");
   process.stderr.write("  deploy     Export the generated MCP Server to a sibling of the original source\n");
+  process.stderr.write("  registry   <analysis.json> [--out <registry.json>]  Project analysis -> on-car bridge executor dispatch table\n");
     return 1;
   }
 

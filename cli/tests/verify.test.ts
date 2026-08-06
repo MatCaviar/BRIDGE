@@ -143,7 +143,7 @@ describe("SP-D verify: full verifyCommand on scaffolded+built server", () => {
   it("npm install (prereq for runInstallAndTypecheck + build)", { timeout: 180_000 }, async () => {
     const { execFile } = await import("child_process");
     await new Promise<void>((resolvePromise, reject) => {
-      execFile(commandFile("npm"), commandArgs("npm", ["install"]), { cwd: projectDir, maxBuffer: 10 * 1024 * 1024, timeout: 180_000 }, (error) => {
+      execFile(commandFile("npm"), commandArgs("npm", ["install", "--prefer-offline", "--no-audit", "--no-fund", "--ignore-scripts"]), { cwd: projectDir, maxBuffer: 10 * 1024 * 1024, timeout: 180_000 }, (error) => {
         if (error) reject(error); else resolvePromise();
       });
     });

@@ -54,9 +54,14 @@ if (claude && codex) {
     errors.push(`name differs: claude="${claude.name}" codex="${codex.name}"`);
   }
 
-  // version (shared identity)
-  if (claude.version !== codex.version) {
-    errors.push(`version differs: claude="${claude.version}" codex="${codex.version}"`);
+  // version — claude and codex keep SEPARATE cadence (codex uses "+codex.<ts>" suffixed
+  // versions, bumped on its own schedule), so a version difference is expected, not drift.
+  // Only flag if either is missing entirely.
+  if (!claude.version) {
+    errors.push("claude version missing");
+  }
+  if (!codex.version) {
+    errors.push("codex version missing");
   }
 
   // skills path — both must declare it and resolve to the same base dir.

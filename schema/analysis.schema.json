@@ -25,7 +25,7 @@
         },
         "framework": {
           "type": "string",
-          "enum": ["YunOS HDT", "Android"],
+          "enum": ["YunOS HDT", "Android", "android-kotlin"],
           "description": "Application framework detected from the imported source."
         },
         "entryFile": {
@@ -170,6 +170,49 @@
             "type": "string",
             "enum": ["verified", "partial", "broken"],
             "description": "Authoring-confidence marker: verified (wire source-traced) | partial | broken (known no-op/bug)."
+          },
+          "mechanism": {
+            "type": "string",
+            "enum": ["aidl", "media", "carproperty", "audio", "caraudio", "shell"],
+            "description": "Dispatch mechanism the on-car bridge executor uses: aidl (reflect AIDL method) | media (MediaSession transport) | carproperty (CarPropertyManager) | audio (AudioManager, legacy) | caraudio (CarAudioManager reflection) | shell (on-car adb-style command). Selects mechanism-specific registry.json fields. Default aidl."
+          },
+          "methodName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "aidl: AIDL method name to reflect on the bound service. Default derived from sourceRef."
+          },
+          "pattern": {
+            "type": "string",
+            "enum": ["none", "scalar", "dataclass", "envelope"],
+            "description": "aidl: param shape — none (no-arg) | scalar (args JSON) | dataclass (args JSON) | envelope (wrapped + device injection)."
+          },
+          "devicePaths": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "aidl envelope: device-value paths to inject (e.g. body.vin)."
+          },
+          "propId": {
+            "type": "integer",
+            "description": "carproperty: Android VehiclePropertyIds value (e.g. HVAC_TEMPERATURE_SET)."
+          },
+          "areaId": {
+            "type": "integer",
+            "description": "carproperty: VehicleAreaSeat area (e.g. SEAT_ROW_1_LEFT=1)."
+          },
+          "valueType": {
+            "type": "string",
+            "enum": ["float", "int", "bool"],
+            "description": "carproperty: property value type."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["get", "set", "up", "down"],
+            "description": "carproperty/caraudio: get | set | up | down."
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "shell: command to run on-car via sh -c, with ${arg} placeholders substituted from invoke args."
           }
         }
       }

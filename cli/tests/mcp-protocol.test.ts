@@ -103,7 +103,7 @@ describe("MCP protocol integration", () => {
     const { promisify } = await import("util");
     const execAsync = promisify(execFile);
 
-    await execAsync(commandFile("npm"), commandArgs("npm", ["install"]), { cwd: outDir });
+    await execAsync(commandFile("npm"), commandArgs("npm", ["install", "--prefer-offline", "--no-audit", "--no-fund", "--ignore-scripts"]), { cwd: outDir });
     await execAsync(commandFile("npx"), commandArgs("npx", ["tsc"]), { cwd: outDir });
 
     const server = await startServer(outDir);

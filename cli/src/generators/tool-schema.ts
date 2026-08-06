@@ -109,24 +109,29 @@ function paramToJsonSchema(p: ParamDef): JsonSchema {
 
 /** returns → MCP outputSchema, so a downstream agent can chain tools (e.g. read resourceCode from
  *  query_sound_library, feed it to install_sound_library). TypedField fields → typed properties;
- *  bare-string fields → untyped properties; an array-suffix on returns.type wraps in {type:"array",items}. */
+ *  bare-string fields → untyped properties; an array-suffix on returns.type wraps in {type:"array",items};
+ *  scalar returns (boolean/string/number/integer) project the scalar type directly (authoring-noise
+ *  `fields` are ignored for scalars). */
 function returnsToJsonSchema(returns: ReturnsDef | undefined): JsonSchema | undefined {
   if (!returns) return undefined;
-  const { array } = stripArray(returns.type);
+  const { array, elem } = stripArray(returns.type);
   const fields = returns.fields ?? [];
-  // MCP mandates outputSchema.type === "object" (structuredContent is always an object). Structured
-  // returns (named fields, non-array) project to typed properties — enables tool chaining (e.g. read
-  // resourceCode from query_sound_library, feed it to install_sound_library). Scalar / array /
-  // unstructured returns get a permissive object: the server emits content (not structuredContent),
-  // so outputSchema is a declarative hint, not a validated wire contract.
-  if (!array && fields.length > 0) {
+  // TypedField fields → typed properties (enables chaining); bare string → untyped property.
+  const objectFromFields = (): JsonSchema => {
     const properties: JsonSchema = {};
     for (const f of fields) {
       if (typeof f === "string") properties[f] = {}; // bare name — type unknown
-      else properties[f.name] = fieldToSchema(f);    // TypedField → items/properties/enum project (enables chaining)
+      else properties[f.name] = fieldToSchema(f);    // TypedField → items/properties/enum project
     }
     return { type: "object", properties };
+  };
+  if (array) {
+    return { type: "array", items: fields.length > 0 ? objectFromFields() : { type: "object", additionalProperties: true } };
   }
+  if (elem === "boolean" || elem === "string") return { type: elem };
+  if (elem === "number" || elem === "float" || elem === "double") return { type: "number" };
+  if (elem === "integer" || elem === "int" || elem === "long") return { type: "integer" };
+  if (fields.length > 0) return objectFromFields();
   return { type: "object", additionalProperties: true };
 }
 

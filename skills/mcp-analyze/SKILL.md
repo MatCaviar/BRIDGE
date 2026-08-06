@@ -71,6 +71,37 @@ For each callable function in the service layer that interacts with YunOS SDKs:
     - **Return fields → chaining**: bare field names (`["success"]`) are fine for unknown shapes, but for structured/array returns use a **TypedField** (`{name,type,items?,properties?,required?}`) so the projector emits an `outputSchema`. **This is what lets a downstream agent chain tools** — e.g. declare `query_sound_library`'s return as `{name:"entries",type:"SoundEntry[]",items:{type:"object",properties:[{name:"resourceCode",type:"string"}]}}` and the agent can read `entries[].resourceCode` from the schema alone to feed `install_sound_library`. Same rules as params for `items`/`properties` (recursive — nest as deep as the source type does).
     - **Don't fabricate shapes you can't trace**: only declare `properties`/`items` fields you read from the source type annotation. If a return field's shape is genuinely opaque (untyped payload, arbitrary JSON), leave it as a bare name — never invent fields.
 
+### Step 2b: Assign the dispatch mechanism (bridge executor)
+
+Every capability gets a `mechanism` — the on-car bridge executor's dispatch path. This is what makes
+the tool actually EXECUTE on the car (not just validate). Pick by how the wire is reached on the target
+car; the mechanism selects the mechanism-specific fields emitted into `registry.json` (the executor's
+on-car dispatch table — see Output).
+
+| mechanism | executor dispatch path | registry fields | when to use |
+|---|---|---|---|
+| `aidl` (default) | reflect the target app's AIDL method by `methodName` on the bound service | `methodName`, `pattern`(none/scalar/dataclass/envelope), `devicePaths` | the app exposes a bindable AIDL service (e.g. imaudio `IIMAudioService`) |
+| `media` | MediaSessionManager.getActiveSessions → transportControls (media_* built-in, no registry entry) | — | control an active MediaSession. **Not SmartLink-projection** (pure audio pipe, no control channel — keyevents/MediaController don't reach the phone app). |
+| `carproperty` | CarPropertyManager.getProperty/setProperty by propId+areaId | `propId`, `areaId`, `valueType`(float/int/bool), `mode`(get/set) | Android Automotive vehicle properties (HVAC, windows, seats). **Read usually works; write may be silently rejected by the vendor VHAL** → mark the set tool `status:"broken"`. |
+| `audio` | AudioManager.setStreamVolume / adjustVolume (STREAM_MUSIC) | (built-in via `volume_*` prefix — deprecated) | legacy; on Banma/SmartLink it changes the stream index but NOT perceived volume → use `shell`/`caraudio`. |
+| `caraudio` | CarAudioManager.setGroupVolume / getGroupVolume via reflection (hidden API; system app only) | `mode`(get/set/up/down) | real AAOS volume-group control. Requires the executor to be a system app (hidden-API blocklist exempt) + `CAR_CONTROL_AUDIO_VOLUME`. |
+| `shell` | run an adb-style command on-car: `Runtime.exec("sh -c '<command>'")` as the app uid; `${arg}` placeholders substituted from invoke args | `command` | anything reachable via shell: **volume keys** (`/vendor/bin/adb shell input keyevent 24/25`), `am start` intents, `cmd audio`/`cmd car_service`, reads. The universal escape hatch when standard APIs are vendor-blocked. |
+
+**Verified-working examples (2026-08, IM/Banma gen5 car):**
+- `volume_up`/`volume_down`/`volume_set` → `shell`, command `/vendor/bin/adb shell input keyevent 24/25` (setup:
+  `setup-adbd.sh` chmods `/dev/socket/adbd` to 666 + executor declares `INTERNET` — the app's local adb server
+  connects to the car's own adbd and runs keyevents as shell uid 2000, which has the input group).
+- `volume_get` → `caraudio`, mode get (CarAudioManager.getGroupVolume reads the real volume group).
+- mic volume (`set_mic_vocal`) → `aidl` (imaudio AIDL — genuinely works).
+- HVAC read (`hvac_get_temperature`) → `carproperty`, mode get; **set is broken** (vendor VHAL rejects writes even via `cmd car_service set-property-value` / `inject-vhal-event`).
+
+**Vendor-blocked → `status:"broken"`:** On Banma/AliOS cars the vendor layer silently rejects many
+standard-API writes — `CarPropertyManager.setProperty` (returns success, value unchanged), `MediaController`
+transportControls (SmartLink doesn't forward), `AudioManager.setStreamVolume`/`adjustVolume` (no perceived
+change). Mark these `status:"broken"` so serve skips them; NEVER expose a no-op as a working tool. Verify
+writes are real (set → get → compare, or user-observable), not just that the wire returns success.
+
+
 ### Step 3: Extract Enums
 
 For each TypeScript enum found in type definitions:
@@ -90,7 +121,11 @@ After writing the analysis.json file, run:
 
 ```bash
 node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" validate .mcp-pipeline/<app-name>/analysis.json
+node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" registry .mcp-pipeline/<app-name>/analysis.json --out <repo>/registry.json
 ```
+
+If validation fails, fix the analysis.json and re-validate until it passes. Then generate the on-car
+executor dispatch table with `registry` (see Output).
 
 If validation fails, fix the analysis.json and re-validate until it passes.
 
@@ -136,7 +171,17 @@ The output must conform to this structure (validated by `analysis.schema.json`):
       },
       "safetyLevel": "readonly|normal|p_gear_required|p_gear_and_confirm|p_gear_and_network",
       "sdkCalls": ["@system.module"],
-      "sourceRef": "file:method"
+      "sourceRef": "file:method",
+      "status": "verified|partial|broken — broken = known no-op/vendor-blocked write; serve skips it",
+      "mechanism": "aidl|media|carproperty|audio|caraudio|shell — dispatch path (see Step 2b)",
+      "methodName": "aidl only — AIDL method to reflect (default derived from sourceRef)",
+      "pattern": "aidl only — none|scalar|dataclass|envelope",
+      "devicePaths": ["body.vin — aidl envelope: device-value paths to inject"],
+      "propId": 358614275,
+      "areaId": 1,
+      "valueType": "float",
+      "mode": "get",
+      "command": "shell only — /vendor/bin/adb shell input keyevent 24 (with ${arg} placeholders)"
     }
   ],
   "enums": {
@@ -151,6 +196,32 @@ The output must conform to this structure (validated by `analysis.schema.json`):
   }
 }
 ```
+
+### registry.json — the on-car executor dispatch table (required alongside analysis.json)
+
+The bridge executor (`com.immotors.bridge.executor`, a system priv-app) does NOT know the app — it reads a
+`registry.json` pushed to its `filesDir` that maps each tool id → mechanism + mechanism-specific fields. Every
+capability in analysis.json gets one `tools[]` entry here; serve only exposes tools whose registry entry +
+`status` are sound. Output to `<repo>/registry.json` (canonical source) and push to the executor on-car.
+
+```json
+{
+  "app": "imaudio",
+  "framework": "android-kotlin",
+  "nativeCallTool": false,
+  "deviceSources": ["vin"],
+  "tools": [
+    { "id": "query_sound_library", "methodName": "querySoundLibrary", "pattern": "envelope", "devicePaths": ["body.vin"], "form": "binder", "safetyLevel": "readonly", "status": "verified", "sourceRef": "IMAudioServiceAdapter.kt:querySoundLibrary" },
+    { "id": "hvac_get_temperature", "mechanism": "carproperty", "pattern": "none", "propId": 358614275, "areaId": 1, "valueType": "float", "mode": "get", "form": "carproperty", "safetyLevel": "readonly", "status": "verified", "sourceRef": "CarPropertyManager:HVAC_TEMPERATURE_SET" },
+    { "id": "volume_up", "mechanism": "shell", "command": "/vendor/bin/adb shell input keyevent 24", "pattern": "none", "safetyLevel": "normal", "status": "verified", "sourceRef": "shell:volume_up" },
+    { "id": "volume_get", "mechanism": "caraudio", "mode": "get", "pattern": "none", "safetyLevel": "readonly", "status": "verified", "sourceRef": "CarAudioManager:getGroupVolume" }
+  ]
+}
+```
+
+Mechanism-specific registry fields (see Step 2b): `methodName`+`pattern`+`devicePaths` (aidl);
+`propId`+`areaId`+`valueType`+`mode` (carproperty); `command` with `${arg}` placeholders (shell);
+`mode` (caraudio). `media_*` and legacy `volume_*` are built-in executor prefixes and need no registry entry.
 
 ## Quality Checklist
 
@@ -167,3 +238,5 @@ Before completing, verify:
 - [ ] The output passes `node "${SKILL_DIR}/../../cli/bin/mcp-pipeline.js" validate` with zero errors
 - [ ] `framework` is `"YunOS HDT"` or `"Android"` according to source evidence
 - [ ] No internal implementation details — only interface surface
+- [ ] Every capability has a `mechanism` (aidl/media/carproperty/audio/caraudio/shell) matching how it executes on the car, and `registry.json` was produced with the mechanism-specific fields (methodName/pattern/devicePaths / propId/areaId/valueType/mode / command)
+- [ ] Writes are VERIFIED real (set → get → compare, or user-observable), not just wire success — vendor-blocked no-ops (CarPropertyManager.set / MediaController / AudioManager on Banma) are marked `status:"broken"`

@@ -18,6 +18,8 @@ Most apps expose far more capabilities than need to be MCP-ified. curate decides
 - **User choice first**: the subset you propose is only a suggestion; what gets written is decided by the user. Do not write the file before the user chooses.
 - **Do not fabricate**: a feature mentioned in the PRD but absent from the code → flag it to the user, **never fabricate** a capability (MCP-ifying needs a real wire; no code means no wire, and fabricating one forces the downstream step to invent wire, violating generate's Iron Law).
 - **Re-pickable**: re-running is just editing `selection.json` + re-running the pipeline (generated files rebuild; `rpc/config.json` + `conf/config.yaml` are preserved).
+- **Skip broken / vendor-blocked**: capabilities with `status:"broken"` (known no-op — e.g. CarPropertyManager.set / MediaController / AudioManager writes silently rejected by the Banma vendor layer) must NOT be MCP-ified — exposing a no-op as a tool deceives the agent. Flag them, don't include them.
+- **Mechanism travels with the capability**: selection picks by `id` only; each capability's `mechanism` (aidl/media/carproperty/audio/caraudio/shell) + mechanism-specific fields stay with it and flow into `registry.json`. Selection never changes the mechanism.
 
 ## Process
 1. **Enumerate** (deterministic): `mcp-pipeline curate <analysis.json> [--prd <prd.md>]` → candidate table.

@@ -83,7 +83,7 @@ describe("E2E: scaffold → build → test → verify", () => {
   });
 
   it("npm install succeeds", { timeout: 120_000 }, async () => {
-    const result = await runInDir(outDir, "npm", ["install", "--prefer-offline", "--no-audit", "--no-fund"], 120_000);
+    const result = await runInDir(outDir, "npm", ["install", "--prefer-offline", "--no-audit", "--no-fund", "--ignore-scripts"], 120_000);
     expect(result.exitCode, `npm install failed: ${result.stderr}`).toBe(0);
   });
 
