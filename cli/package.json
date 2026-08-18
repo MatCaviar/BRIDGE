@@ -1,6 +1,6 @@
 {
   "name": "@im/mcp-pipeline-cli",
-  "version": "0.1.0",
+  "version": "0.1.23",
   "description": "CLI tool for MCP Server generation pipeline",
   "type": "module",
   "bin": {
@@ -14,8 +14,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@clack/prompts": "^1.6.0",
-    "@im/mcp-server-framework": "file:../framework",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.0",
     "ajv": "^8.17.0"
   },
   "peerDependencies": {

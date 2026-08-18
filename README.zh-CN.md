@@ -9,7 +9,7 @@
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
-![version](https://img.shields.io/badge/version-0.1.8-0066cc)
+![version](https://img.shields.io/badge/version-0.1.23-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
 ![platform](https://img.shields.io/badge/platform-Win%20%7C%20macOS%20%7C%20Linux-339933)
 

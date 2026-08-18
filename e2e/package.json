@@ -1,6 +1,6 @@
 {
   "name": "mcp-gateway",
-  "version": "1.0.0",
+  "version": "0.1.23",
   "description": "Multi-backend LLM Gateway for MCP ecosystem — bridges Agent APIs to MCP servers",
   "main": "dist/index.js",
   "type": "module",

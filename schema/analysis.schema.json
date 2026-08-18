@@ -33,9 +33,11 @@
           "type": "string",
           "enum": [
             "YunOS HDT",
-            "android-kotlin"
+            "android-kotlin",
+            "apk-reverse",
+            "prd-only"
           ],
-          "description": "Application framework. 'YunOS HDT' = agil/TS (legacy D-Bus substrate); 'android-kotlin' = Android/Kotlin+AIDL (active substrate)."
+          "description": "输入形态: YunOS HDT(legacy) / android-kotlin(源码) / apk-reverse(逆向) / prd-only(仅文档)"
         },
         "entryFile": {
           "type": "string",

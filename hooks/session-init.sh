@@ -38,15 +38,7 @@ needs_build() {
   [ ! -f "$out" ] || newer_than "$out" "$dir/src" "$dir/bin" "$dir/package.json" "$dir/tsconfig.json"
 }
 
-install_if_needed "$ROOT/framework"
 install_if_needed "$ROOT/cli"
-
-# Build framework first: cli imports @im/mcp-server-framework, so framework/dist
-# must exist before cli tsc resolves the file dependency on a fresh install.
-if needs_build "$ROOT/framework" "$ROOT/framework/dist/index.js"; then
-  echo "[im-mcp] building framework/dist"
-  (cd "$ROOT/framework" && npx tsc) || { echo "[im-mcp] framework build failed" >&2; exit 1; }
-fi
 
 if needs_build "$ROOT/cli" "$ROOT/cli/dist/cli.js"; then
   echo "[im-mcp] building cli/dist"

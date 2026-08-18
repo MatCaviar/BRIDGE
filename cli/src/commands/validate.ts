@@ -3,7 +3,6 @@ import type { ErrorObject } from "ajv";
 import { readFileSync } from "fs";
 import { resolve, dirname, basename } from "path";
 import { fileURLToPath } from "url";
-import { readState, writeState, createInitialState, updateStep } from "../state/manager.js";
 
 export interface ValidationResult {
   readonly valid: boolean;
@@ -152,27 +151,16 @@ export async function validateCommand(args: string[]): Promise<void> {
   }
 
   const appName = (data as any)?.app?.name ?? basename(resolvedPath, ".json");
-  let state = readState(appName) ?? createInitialState(appName, resolvedPath);
   try {
-    state = updateStep(state, "validate", { status: "in_progress" });
-    writeState(state);
   } catch {}
 
   const result = validateAnalysis(data);
 
   if (result.valid) {
-    try {
-      state = updateStep(state, "validate", { status: "completed" });
-      writeState(state);
-    } catch {}
     process.stdout.write(`Valid: ${resolvedPath}\n`);
     return;
   }
 
   const errorMsg = result.errors.map((e) => `  ${e.path}: ${e.message}`).join("\n");
-  try {
-    state = updateStep(state, "validate", { status: "failed", error: errorMsg });
-    writeState(state);
-  } catch {}
   throw new Error(`Invalid: ${resolvedPath}\n${errorMsg}`);
 }

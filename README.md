@@ -8,7 +8,7 @@
 
 `analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
 
-![version](https://img.shields.io/badge/version-0.1.8-0066cc)
+![version](https://img.shields.io/badge/version-0.1.23-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
 ![platform](https://img.shields.io/badge/platform-Win%20%7C%20macOS%20%7C%20Linux-339933)
 
@@ -262,6 +262,8 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 **E2E 快速开始**：`cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`（先起 `asr/asr-whisper-server.py`），浏览器 `http://localhost:3000/cockpit` 点 🎤 说话。
 
 **规格对齐**：`schema/analysis.schema.json` 已扩展支持 mechanism 等新字段（sdkCalls/app.domain/entryFile 降为可选）——新旧 analysis 均可通过旧 `validate`；新流程推荐用 bridge-analyze 自带校验器。
+
+**0.1.23 清理说明**：旧 scaffold 流程已整体移除（`scaffold/generate/curate/build/register/verify/test/schema_preview/wire_check/validate_config/validate_aidl` 命令、`generators/`、`framework/` 包、`mcp-curate/mcp-generate/mcp-pipeline/mcp-test` skills、`commands/`、`docs/`）——它们面向"生成完整 MCP server 工程"的旧流水线，现 E2E 不再使用。当前有效链路：**bridge-analyze（分析+校验）→ analysis.json → serve（MCP 投影）/ invoke（车端执行）**，CLI 仅保留 `validate`/`serve`/`invoke` 三个子命令，formatResponse 已内联，依赖收敛为 `@modelcontextprotocol/sdk`/`zod`/`ajv`。测试保留并改写为对齐新规格（29 用例全绿）。README 主体为 0.1.8 原文，其中 pipeline 描述属旧流程，以本节为准。
 
 **工具规格流（唯一真相源）**：`e2e/bridge-analysis.json`(serve 字段+机制字段) → `node e2e/analysis-to-registry.mjs` 生成车端 registry → 校验 `node skills/bridge-analyze/validate-analysis.mjs e2e/bridge-analysis.json`。
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { formatResponse } from "@im/mcp-server-framework";
+import { formatResponse } from "../utils/response.js";
 import type { AnalysisData, CapabilityDef, FieldShape, ParamDef } from "../types.js";
 import { CliAdb } from "../car/adb.js";
 import { invokeTool, type InvokeOptions } from "./invoke.js";
