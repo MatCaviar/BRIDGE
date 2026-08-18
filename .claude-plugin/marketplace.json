@@ -1,0 +1,13 @@
+{
+  "name": "im-mcp-marketplace",
+  "description": "IM Cockpit MCP CodeAgent 插件市场（本地/团队）",
+  "owner": { "name": "Tongji University & IM" },
+  "plugins": [
+    {
+      "name": "im-mcp-codeagent",
+      "description": "Auto-generate controllable MCP Servers from YunOS HDT apps.",
+      "version": "0.1.8",
+      "source": "./"
+    }
+  ]
+}

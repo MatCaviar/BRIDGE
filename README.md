@@ -1,61 +1,274 @@
-# BRIDGE / imaudio MCP 化 — 座舱智能体
+<div align="center">
 
-把**车机 app 的对外能力**确定性地变成**上游 LLM agent 可调用的 MCP 工具集**：本地 PC 用语音智能体驱动真实车机（不是 mock）。
+# 🎛️ Code Agent Suite BRIDGE
+
+<img src="assets/bridge.svg" alt="BRIDGE" height="76">
+
+**B**uilding **R**eal-device **I**nterfaces via **D**eterministic **G**ated **E**xecution
+
+`analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
+
+![version](https://img.shields.io/badge/version-0.1.8-0066cc)
+![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
+![platform](https://img.shields.io/badge/platform-Win%20%7C%20macOS%20%7C%20Linux-339933)
+
+**English** · [简体中文](README.zh-CN.md)
+
+</div>
+
+---
+
+**BRIDGE** (*Building Real-device Interfaces via Deterministic Gated Execution*): agent-driven **skills** carry the methodology, a **deterministic** Node CLI does the heavy lifting, and the host agent drives every step. **No model calls live inside the plugin** — the host agent supplies all judgment, and every generated artifact is byte-for-byte reproducible.
+
+## 🧠 How it works
+
+Given an app's source + manifest, BRIDGE emits an **MCP suite**: agent-facing function schemas, a runnable MCP Server, an RPC wire contract, car-side bridge artifacts, and verification evidence. The upstream agent can call those tools to **actually drive the device** — EQ, soundstage, Beosonic, karaoke, vehicle signals, … — not a throw-stub mock. The function schema surface is the primary artifact for upstream model understanding; the rest of the suite makes those tools executable and auditable.
+
+The pipeline below lays out the stages; the figure after it shows who does what during generation.
+
+**Pipeline** — every step is a deterministic CLI subcommand or an agent skill:
 
 ```
-🎤 语音 → cockpit.html → mcp-gateway(LLM + MCP 编排)
-                                   ↓ stdio
-        bridge serve(MCP server, host PC) ← bridge-serve-wrapper(动态IP+自愈)
-                                   ↓ invoke(D-step, adb)
-             车端 bridge_executor (com.immotors.bridge.executor, system priv-app)
-                                   ↓ bind 显式组件 + 反射 / MediaController / CustomService / 地图AI接口
-                         目标 app (imaudio / QQ音乐 / BanmaMap / CarControlService)
-                                   ↓
-                              真实车机操作 → result.json → 回显 + TTS
+validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
+  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
 ```
 
-## 核心设计
+Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `--only`, `--step`, `--batch`.
 
-- **目标 app 零改动**：执行器 bind 目标 app 现有的 AIDL service，所有 per-app 知识（AIDL 契约 + registry）都在 bridge 侧。
-- **四类直接执行机制**（binder 直调，不碰屏幕）：
-  | 机制 | 覆盖 |
-  |---|---|
-  | execmd | imaudio 23 能力（executeCommand 单入口） |
-  | media | 媒体会话控制（QQ音乐 切歌/播放/暂停） |
-  | mapnav | 车机地图导航（任意地点，联网 geocode 坐标） |
-  | carcontrol | CarControlService（座椅加热/通风/按摩/热石等） |
-- **App 型兜底**：bridge-ui（ui_launch/ui_dump/ui_tap_text…）——按文本驱动任意 app 界面。
-- **唯一真相源**：`e2e/bridge-analysis.json`（serve 字段 + 车端机制字段）→ `analysis-to-registry.mjs` 生成车端 registry，不双份手写。
-- **skill**：`skill/bridge-analyze/` — host codeagent 自主分析任意应用 → 能力 schema（自包含 + 自带校验器）。
+> The two gates (`validate_config` + `wire_check`) are inline sub-steps of `generate`, retried until both pass before the pipeline advances. `[curate]` is optional.
 
-## 组件
+**The generation process.** Who does what: the host agent supplies judgment (extraction, wire authoring), the CLI is deterministic (scaffold, gates). Each capability is mapped to one tool definition — `name ← id`, `inputSchema ← params`, `annotations ← safety`.
 
-| 组件 | 位置 | 状态 |
-|---|---|---|
-| bridge-analyze skill | `skill/bridge-analyze/` | ✅ 重构完成, 校验器 PASS |
-| E2E 主入口 (mcp-gateway) | `e2e/` | ✅ 跑通, 38 工具面 |
-| 车端执行器源码 | `bridge-executor/` | ✅ 代码完, 待部署验证 |
-| 工具脚本 | `tools/` (car_invoke.sh / probe_carcontrol.sh) | ✅ |
-| 本地 ASR | `asr/asr-whisper-server.py` (faster-whisper, 端口 8765) | ✅ |
-| 逆向素材说明 | `reverse/README.md` (dex 太大不入库) | ✅ |
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as 🎛️ host codeAgent
+    participant Source as 🧱 app source
+    participant CLI as 🛠️ deterministic CLI
+    participant Tool as 🧩 MCP tool schemas
 
-## 快速开始
+    Agent->>Source: read proxy + manifest
+    Source-->>Agent: methods · capabilities
+    Agent->>CLI: scaffold (analysis)
+    CLI-->>Agent: server skeleton + adapter
+    Agent->>Source: read proxy wire calls
+    Agent->>Agent: author per-op wire specs
+    Agent->>CLI: validate_config + wire_check
+    CLI-->>Agent: pass (or fail → retry)
+    loop each capability
+        Agent->>Tool: name ← id · inputSchema ← params · annotations ← safety
+    end
+    Tool-->>Agent: N tool schemas injected
+```
+
+**The runtime bridge.** Once built, a tool call flows from the upstream agent through the generated server and a deterministic bridge to the real device — the transport is swappable (`adb` / file / socket), and the wire is constructed purely from `rpc/config.json`, so the bridge carries zero app literals.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as ⚛️ upstream agent
+    participant Server as 📡 MCP server
+    participant Bridge as 🔌 rpc bridge
+    participant Engine as ⚙️ car-side engine
+
+    Agent->>Server: tools/call (name, args)
+    Note over Server: safety-gated tools verify a precondition first (fail-closed)
+    Server->>Bridge: dispatch(tool, args)
+    Bridge->>Bridge: build wire from rpc/config.json
+    Bridge->>Engine: command (adb / file / socket)
+    Engine->>Engine: drive the real app operation
+    Engine-->>Bridge: reply
+    Bridge->>Bridge: parse reply → tool return shape
+    Bridge-->>Server: typed result
+    Server-->>Agent: tool result
+```
+
+## 📦 Deliverables
+
+A successful run should produce a reviewable delivery bundle, not just a generated folder:
+
+| Audience | Deliverable | Location | Why it matters |
+|---|---|---|---|
+| **Upstream agent** | Function schema surface | `tools-schema.json` from `schema_preview`, and `src/tools/schema.ts` inside the generated server | The exact tool names, descriptions, input schemas, safety annotations, and executability flags injected into Claude / Codex. |
+| **MCP host** | Runnable MCP Server | Generated server directory, `dist/index.js` after build, and `conf/config.yaml` | The stdio server that hosts the tools. |
+| **App / device integrator** | RPC wire contract | `rpc/config.json`, `src/rpc/*`, and `car-side/` | The traceable bridge from each tool call to real app / device operations. |
+| **Reviewer** | Verification evidence | `.mcp-pipeline/<app>/state.json`, `.mcp-pipeline/test-results.json`, gate output, build output, verify output | The audit trail showing schema validity, wire coverage, buildability, tool discovery, and tool-call responsiveness. |
+
+Produce the upstream-agent schema directly from analysis plus optional wire status:
 
 ```bash
-# 1) 本地 ASR(先起)
-python asr/asr-whisper-server.py    # 依赖本地 venv + HF 镜像, 见 asr/README
-
-# 2) mcp-gateway + cockpit(两个 MCP server 自动拉起: bridge + bridge-ui)
-cd e2e && npm install && npm run dashboard -- --config config-cockpit.yaml
-#    需 QWEN_API_KEY 环境变量(凭据见 handoff/README.md)
-
-# 3) 浏览器 http://localhost:3000/cockpit → 点 🎤 说话
+mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-schema.json
 ```
 
-实测通过的语音场景：音量调节 / 切歌 / 音场切换 / 任意地点导航 / 座椅加热·按摩 / UI 驱动页面操作（详见 `handoff/README.md` 验证矩阵）。
+`rpc/config.json` may mark intentionally unwired tools in `_deferred`; those appear as `executable:false` rather than silently pretending to work.
 
-## 交接
+Done means:
 
-- 移交说明: `handoff/README.md`
-- 下一步: `handoff/NEXT_STEPS.md`
-- 术语与设计: `handoff/README.md` §9
+1. `tools-schema.json` exposes every selected capability exactly once.
+2. Every tool has a concrete description, concrete input schema, correct enum values, and safety annotations.
+3. `validate`, `validate_config`, `wire_check`, `test`, `build`, and `verify` all pass.
+4. `verify` proves business-tool calls, not only `health_check`.
+5. `car-side/` can be handed to the device-side colleague without reverse-engineering the pipeline internals.
+
+Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
+
+## 🛡️ Why it's reliable
+
+| Guarantee | How it's enforced |
+|---|---|
+| **Deterministic output** | Generators carry zero app literals — any app, any machine, byte-for-byte reproducible. |
+| **Verified before build** | Two fail-closed gates — `validate_config` (schema + coverage + dispatchable) and `wire_check` (proxy wire-format match) — must pass on the host's only judgment product, `rpc/config.json`. |
+| **Fail-closed safety** | `p_gear_required` tools are blocked unless Park is verified; degenerate input (empty / unmatched) errors instead of passing vacuously. |
+| **Honest selection** | `--selection` with a missing file, unknown ids, or an empty list **errors loudly** rather than silently over- or under-generating. |
+| **Real bridge, no network** | A car-side RPC engine (delivered to a colleague) bridges host → device over adb / file / sendlink. |
+| **Self-contained** | CLI runs via a skill-base-relative path; `framework/` + `cli/` deps auto-install and build on first session. |
+
+## 📥 Install & run
+
+**Claude Code**
+
+```bash
+/plugin marketplace add https://github.com/MatCaviar/im-mcp-codeagent.git
+/plugin install im-mcp-codeagent
+```
+
+First session start auto-installs `framework/` + `cli/` and builds `cli/dist` (idempotent). Then start a pipeline run:
+
+```
+/mcp-pipeline ./path/to/your-app
+```
+
+Entry points — `/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`.
+
+**Codex** reads the mirrored `.codex-plugin/plugin.json` (dual-end).
+
+Typical run shape:
+
+```bash
+# deterministic checks / generation
+mcp-pipeline validate <analysis.json>
+mcp-pipeline scaffold <analysis.json> --output <server>
+
+# host-agent judgment product + deterministic gates
+mcp-pipeline validate_config <server>/rpc/config.json --analysis <analysis.json>
+mcp-pipeline wire_check <server>/rpc/config.json --proxy <path/to/Proxy.ts>
+
+# upstream-agent schema and runtime proof
+mcp-pipeline schema_preview <analysis.json> <server>/rpc/config.json --output <server>/tools-schema.json
+mcp-pipeline test --dir <server>
+mcp-pipeline build --dir <server>
+mcp-pipeline verify --dir <server>
+```
+
+Normal plugin users usually enter through `/mcp-pipeline`; the lower-level CLI commands are shown so the generated delivery bundle is auditable and reproducible.
+
+## 🧩 Capability selection
+
+Most apps expose far more capabilities than you want to MCP-ify. After install and initial `analyze`, **curate** lets you choose the subset — the user's pick is the first priority.
+
+```bash
+# 1. Enumerate candidates deterministically (writes nothing)
+mcp-pipeline curate <analysis.json> [--prd <prd.md>]
+
+# 2. /mcp-curate proposes a subset, you choose → writes selection.json
+# 3. Scaffold generates only the chosen capabilities
+mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<app>/selection.json
+```
+
+`selection.json = { "selected": ["<cap.id>", …] }`. Re-pick any time — the generate-layer regenerates, while `conf/config.yaml` and `rpc/config.json` are preserved.
+
+## 🔄 Update (already installed)
+
+When a new version ships, refresh and reload:
+
+```text
+/plugin marketplace update im-mcp-marketplace        # 1. refresh the catalog   (arg = marketplace name)
+/plugin update im-mcp-codeagent@im-mcp-marketplace   # 2. pull the new version  (arg = plugin@marketplace)
+/reload-plugins                                      # 3. activate it + re-run the build hook
+```
+
+> `/reload-plugins` (or a full `/exit` + relaunch) is **required** — until then the previous version stays live. The first session after reload re-runs the `SessionStart` build hook, which compiles `cli/dist` for the new version.
+
+Verify the installed version:
+
+```text
+/plugin list
+```
+
+**Fallback** — if `/plugin update` reports "already latest" but the code didn't change (stale cache, or the version wasn't bumped):
+
+```text
+/plugin uninstall im-mcp-codeagent@im-mcp-marketplace
+/plugin marketplace update im-mcp-marketplace
+/plugin install im-mcp-codeagent@im-mcp-marketplace
+/reload-plugins
+```
+
+## 📡 Real-device prerequisites
+
+The generated server drives the car over an adb / file bridge. Before a real device responds:
+
+1. **Colleague** builds + installs the car-side `RpcEngine.ts` and registers the `page://<app>/rpcagent` manifest page — both emitted under `car-side/`.
+2. **`adb -host`** reachability to the device.
+3. **ZebraAlfred** keep-alive (or equivalent) — otherwise the device sleeps and sendlink intermittently returns exit `-1`.
+
+No device handy? Local verification always works: `mcp-pipeline verify --dir <server>` (install + tsc + tool responsiveness + bridge readiness).
+
+## 🧱 Architecture
+
+```
+im-mcp-codeagent/
+├── .claude-plugin/       Claude Code manifest + marketplace
+├── .codex-plugin/        Codex manifest (dual-end mirror)
+├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test  (methodology, no model calls)
+├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
+├── hooks/                SessionStart → polyglot build (run-hook.cmd → session-init.sh)
+├── cli/                  @im/mcp-pipeline-cli — deterministic Node
+│   ├── src/generators/   tool-schema · rpc-bridge · car-rpc-engine · …
+│   ├── assets/           car-rpc-engine.ts.template (bundled, de-hardcoded)
+│   └── bin/mcp-pipeline.js
+├── framework/            @im/mcp-server-framework (shared dispatch core: constructDbusCall / …)
+├── tools/adb/            bundled adb (self-contained; see LICENSE note)
+└── schema/               analysis.schema.json + fixtures
+```
+
+The CLI runs via a **skill-base-relative path** (`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`) — self-contained, no PATH / global-link dependency.
+
+## 🛠️ Develop
+
+This section is for maintainers changing the plugin itself. Normal users running `/mcp-pipeline` do not need these commands.
+
+```bash
+cd framework && npm install
+cd ../cli     && npm install && npx tsc     # build cli/dist (the real CLI loads dist/ — rebuild after source edits)
+cd ../cli     && npx vitest run             # full suite
+node scripts/check-manifests.js             # claude / codex manifest drift guard
+```
+
+
+## 🆕 2026-08 新增: E2E 语音闭环 / bridge-analyze / 车端执行器
+
+本仓库在 0.1.8 插件之上新增了落地产物（与插件 CLI 互补，CLI 不变）：
+
+| 新增 | 位置 | 说明 |
+|---|---|---|
+| **bridge-analyze skill** | `skills/bridge-analyze/` | 面向现 E2E serve 规格的重构版分析 skill：任意 app(源码/PRD/APK/观察) → analysis.json。自带校验器 `validate-analysis.mjs`（对齐 serve 规格；旧插件 validate 面向 scaffold 流程）。取代 mcp-analyze 用于现 E2E 流程，二者并存。 |
+| **E2E 端到端测试** | `e2e/` | 语音→车 闭环：mcp-gateway 源码 + `bridge-analysis.json`(唯一真相源) + `bridge-serve-wrapper.mjs`(动态 IP 探测+断线自愈) + `bridge-ui-server.mjs`(App 型能力 ui_launch/ui_dump/ui_tap_text/geo_search) + `analysis-to-registry.mjs`(analysis→车端 registry 生成器)。38 工具面全绿实测。 |
+| **车端执行器源码** | `bridge-executor/` | `com.immotors.bridge.executor`：execmd/media/mapnav/carcontrol/intent 五机制分派，手写 binder 契约（事务码声明序、typed-parcelable）。 |
+| **工具脚本** | `tools/car_invoke.sh` `tools/probe_carcontrol.sh` + 车控 57 候选(handlers/candidates json) | 车端 invoke 助手 + 车控批量验证脚本 |
+| **移交文档** | `handoff/` | 移交说明 + NEXT STEPS |
+| **本地 ASR** | `asr/` | faster-whisper 中文识别(端口 8765) |
+
+**E2E 快速开始**：`cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`（先起 `asr/asr-whisper-server.py`），浏览器 `http://localhost:3000/cockpit` 点 🎤 说话。
+
+**工具规格流（唯一真相源）**：`e2e/bridge-analysis.json`(serve 字段+机制字段) → `node e2e/analysis-to-registry.mjs` 生成车端 registry → 校验 `node skills/bridge-analyze/validate-analysis.mjs e2e/bridge-analysis.json`。
+
+凭据(DashScope key / 车签名 keystore)不随仓库分发。逆向素材(dex dump, 1.7GB)不入库, 位置见 `reverse/README.md`。
+
+## 📜 License
+
+MIT — see [LICENSE](LICENSE). `tools/adb/` bundles Google's adb under its own terms.
+
+<div align="center">
+<sub>Code Agent Suite BRIDGE — built by Tongji University &amp; IM · controllable code generation for the cockpit</sub>
+</div>

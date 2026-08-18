@@ -1,4 +1,4 @@
-> 本文档中的 `D:\IM\...` 为交接机的绝对路径；仓库内对应结构：根 `README.md`（总览）/ `e2e/`（网关与配置）/ `bridge-executor/`（执行器源码）/ `skill/`（bridge-analyze）/ `tools/`（脚本与车控清单）。
+> 本文档中的 `D:\IM\...` 为交接机的绝对路径；仓库内对应结构：`e2e/`（网关与配置）/ `bridge-executor/`（执行器源码）/ `skills/bridge-analyze/`（重构版 skill）/ `tools/`（脚本与车控清单）/ `handoff/`（本文档）。
 
 # BRIDGE 座舱智能体 — 移交说明 (Handoff)
 

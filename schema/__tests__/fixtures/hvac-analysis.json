@@ -1,0 +1,389 @@
+{
+  "app": {
+    "name": "hvac",
+    "domain": "cockpit",
+    "framework": "YunOS HDT",
+    "entryFile": "src/index.ts",
+    "pages": [
+      "pages/main/main"
+    ],
+    "permissions": [
+      "system.vehicle",
+      "system.network"
+    ],
+    "voiceEnabled": true,
+    "dualScreen": true
+  },
+  "capabilities": [
+    {
+      "id": "set_temperature",
+      "domain": "climate",
+      "object": "temperature",
+      "action": "set",
+      "params": [
+        {
+          "name": "value",
+          "type": "number"
+        },
+        {
+          "name": "unit",
+          "type": "string",
+          "enum": [
+            "celsius",
+            "fahrenheit"
+          ],
+          "optional": true
+        }
+      ],
+      "returns": {
+        "type": "TemperatureResult",
+        "fields": [
+          "success",
+          "currentTemp",
+          "targetTemp"
+        ]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [
+        "@system.hvac"
+      ],
+      "sourceRef": "src/services/climate.ts:setTemperature",
+      "description": "Set temperature"
+    },
+    {
+      "id": "set_fan_speed",
+      "domain": "climate",
+      "object": "fan",
+      "action": "set_speed",
+      "params": [
+        {
+          "name": "speed",
+          "type": "number"
+        },
+        {
+          "name": "zone",
+          "type": "string",
+          "enum": [
+            "front",
+            "rear",
+            "all"
+          ]
+        }
+      ],
+      "returns": {
+        "type": "FanSpeedResult",
+        "fields": [
+          "success",
+          "currentSpeed",
+          "zone"
+        ]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [
+        "@system.hvac"
+      ],
+      "sourceRef": "src/services/climate.ts:setFanSpeed",
+      "description": "Set speed for fan"
+    },
+    {
+      "id": "toggle_ac",
+      "domain": "climate",
+      "object": "ac",
+      "action": "toggle",
+      "params": [
+        {
+          "name": "enabled",
+          "type": "boolean"
+        }
+      ],
+      "returns": {
+        "type": "AcToggleResult",
+        "fields": [
+          "success",
+          "isActive"
+        ]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [
+        "@system.hvac"
+      ],
+      "sourceRef": "src/services/climate.ts:toggleAc",
+      "description": "Toggle ac"
+    },
+    {
+      "id": "read_cabin_temperature",
+      "domain": "climate",
+      "object": "cabin",
+      "action": "read_temperature",
+      "params": [],
+      "returns": {
+        "type": "CabinTempResult",
+        "fields": [
+          "success",
+          "temperature",
+          "humidity"
+        ]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": [
+        "@system.sensor"
+      ],
+      "sourceRef": "src/services/sensor.ts:readCabinTemp",
+      "description": "Read temperature for cabin"
+    },
+    {
+      "id": "defrost_front",
+      "domain": "climate",
+      "object": "windshield",
+      "action": "defrost",
+      "params": [
+        {
+          "name": "intensity",
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "returns": {
+        "type": "DefrostResult",
+        "fields": [
+          "success",
+          "intensity",
+          "estimated_time"
+        ]
+      },
+      "safetyLevel": "p_gear_required",
+      "sdkCalls": [
+        "@system.hvac"
+      ],
+      "sourceRef": "src/services/climate.ts:defrostFront",
+      "description": "Defrost windshield"
+    },
+    {
+      "id": "open_window",
+      "domain": "window",
+      "object": "window",
+      "action": "open",
+      "params": [
+        {
+          "name": "position",
+          "type": "string",
+          "enum": [
+            "driver",
+            "passenger",
+            "rear_left",
+            "rear_right"
+          ]
+        },
+        {
+          "name": "percentage",
+          "type": "number"
+        }
+      ],
+      "returns": {
+        "type": "WindowResult",
+        "fields": [
+          "success",
+          "currentPosition",
+          "percentage"
+        ]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [
+        "@system.window"
+      ],
+      "sourceRef": "src/services/window.ts:openWindow",
+      "description": "Open window"
+    },
+    {
+      "id": "close_window",
+      "domain": "window",
+      "object": "window",
+      "action": "close",
+      "params": [
+        {
+          "name": "position",
+          "type": "string",
+          "enum": [
+            "driver",
+            "passenger",
+            "rear_left",
+            "rear_right"
+          ]
+        }
+      ],
+      "returns": {
+        "type": "WindowResult",
+        "fields": [
+          "success",
+          "currentPosition",
+          "percentage"
+        ]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [
+        "@system.window"
+      ],
+      "sourceRef": "src/services/window.ts:closeWindow",
+      "description": "Close window"
+    },
+    {
+      "id": "read_air_quality",
+      "domain": "sensor",
+      "object": "aqi",
+      "action": "read",
+      "params": [],
+      "returns": {
+        "type": "AqiResult",
+        "fields": [
+          "success",
+          "pm25",
+          "pm10",
+          "aqi_level"
+        ]
+      },
+      "safetyLevel": "readonly",
+      "sdkCalls": [
+        "@system.sensor"
+      ],
+      "sourceRef": "src/services/sensor.ts:readAqi",
+      "description": "Read aqi"
+    },
+    {
+      "id": "set_seat_ventilation",
+      "domain": "seat",
+      "object": "ventilation",
+      "action": "set",
+      "params": [
+        {
+          "name": "seat",
+          "type": "string",
+          "enum": [
+            "driver",
+            "passenger"
+          ]
+        },
+        {
+          "name": "level",
+          "type": "number"
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "optional": true
+        }
+      ],
+      "returns": {
+        "type": "SeatVentResult",
+        "fields": [
+          "success",
+          "currentLevel",
+          "seat"
+        ]
+      },
+      "safetyLevel": "normal",
+      "sdkCalls": [
+        "@system.seat"
+      ],
+      "sourceRef": "src/services/seat.ts:setVentilation",
+      "description": "Set ventilation"
+    }
+  ],
+  "enums": {
+    "TempUnit": {
+      "values": [
+        "celsius",
+        "fahrenheit"
+      ],
+      "type": "string",
+      "sourceFile": "src/types/climate.ts"
+    },
+    "FanZone": {
+      "values": [
+        "front",
+        "rear",
+        "all"
+      ],
+      "type": "string",
+      "sourceFile": "src/types/climate.ts"
+    },
+    "DefrostIntensity": {
+      "values": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "type": "string",
+      "sourceFile": "src/types/climate.ts"
+    },
+    "WindowPosition": {
+      "values": [
+        "driver",
+        "passenger",
+        "rear_left",
+        "rear_right"
+      ],
+      "type": "string",
+      "sourceFile": "src/types/window.ts"
+    },
+    "SeatPosition": {
+      "values": [
+        "driver",
+        "passenger"
+      ],
+      "type": "string",
+      "sourceFile": "src/types/seat.ts"
+    }
+  },
+  "errorCodes": {
+    "climate": {
+      "prefix": 4,
+      "domainName": "climate",
+      "codes": {
+        "TEMP_OUT_OF_RANGE": {
+          "value": 1,
+          "message": "温度超出范围"
+        },
+        "FAN_SPEED_INVALID": {
+          "value": 2,
+          "message": "风扇速度无效"
+        },
+        "AC_UNAVAILABLE": {
+          "value": 3,
+          "message": "空调不可用"
+        },
+        "DEFROST_FAILED": {
+          "value": 4,
+          "message": "除雾失败"
+        }
+      }
+    },
+    "window": {
+      "prefix": 5,
+      "domainName": "window",
+      "codes": {
+        "WINDOW_BLOCKED": {
+          "value": 1,
+          "message": "车窗被阻挡"
+        },
+        "WINDOW_TIMEOUT": {
+          "value": 2,
+          "message": "车窗操作超时"
+        }
+      }
+    },
+    "sensor": {
+      "prefix": 6,
+      "domainName": "sensor",
+      "codes": {
+        "SENSOR_UNAVAILABLE": {
+          "value": 1,
+          "message": "传感器不可用"
+        }
+      }
+    }
+  }
+}
