@@ -13,7 +13,7 @@ dist/
 .superpowers-spb/
 .superpowers-spd/
 _sp_*/
-mcp-*/
+/mcp-*/
 _fix_review/
 *.log
 
