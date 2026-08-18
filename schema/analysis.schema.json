@@ -4,13 +4,19 @@
   "title": "MCP CodeAgent Analysis",
   "description": "Interface-level analysis of a YunOS HDT application, produced by /mcp-analyze. Captures capabilities, params, returns, safety levels, and error codes — NOT internal implementation details.",
   "type": "object",
-  "required": ["app", "capabilities"],
+  "required": [
+    "app",
+    "capabilities"
+  ],
   "additionalProperties": false,
   "properties": {
     "app": {
       "type": "object",
       "description": "Application metadata extracted from manifest and source.",
-      "required": ["name", "domain", "framework", "entryFile"],
+      "required": [
+        "name",
+        "framework"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -25,7 +31,10 @@
         },
         "framework": {
           "type": "string",
-          "enum": ["YunOS HDT", "android-kotlin"],
+          "enum": [
+            "YunOS HDT",
+            "android-kotlin"
+          ],
           "description": "Application framework. 'YunOS HDT' = agil/TS (legacy D-Bus substrate); 'android-kotlin' = Android/Kotlin+AIDL (active substrate)."
         },
         "entryFile": {
@@ -35,12 +44,18 @@
         },
         "pages": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "Page names from the app manifest."
         },
         "permissions": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "Declared permissions from the app manifest."
         },
         "voiceEnabled": {
@@ -55,7 +70,10 @@
         },
         "deviceSources": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "Device-resolved variable names usable as ${__device__.X} in wires (resolved on-car, fail-closed if unset)."
         },
         "nativeCallTool": {
@@ -67,8 +85,16 @@
           "description": "Capability ids the safety guard calls to verify preconditions for p_gear_* tools. Declared explicitly per-app (no hardcoded probe ids). If a probe is omitted, the corresponding p_gear_* tools fail-closed (rejected).",
           "additionalProperties": false,
           "properties": {
-            "gear": { "type": "string", "minLength": 1, "description": "Capability id returning {isParked, ignoreMode} — gates p_gear_required / p_gear_and_confirm." },
-            "hotspot": { "type": "string", "minLength": 1, "description": "Capability id returning {ssid} — gates p_gear_and_network." }
+            "gear": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Capability id returning {isParked, ignoreMode} — gates p_gear_required / p_gear_and_confirm."
+            },
+            "hotspot": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Capability id returning {ssid} — gates p_gear_and_network."
+            }
           }
         },
         "safetyRules": {
@@ -78,10 +104,21 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "requiresGear": { "type": "boolean", "description": "Check the gear probe (isParked) before allowing." },
-              "requiresHotspot": { "type": "boolean", "description": "Check the hotspot probe (ssid != null) before allowing." },
-              "requiresConfirm": { "type": "boolean", "description": "Require args.confirmed === true." },
-              "description": { "type": "string" }
+              "requiresGear": {
+                "type": "boolean",
+                "description": "Check the gear probe (isParked) before allowing."
+              },
+              "requiresHotspot": {
+                "type": "boolean",
+                "description": "Check the hotspot probe (ssid != null) before allowing."
+              },
+              "requiresConfirm": {
+                "type": "boolean",
+                "description": "Require args.confirmed === true."
+              },
+              "description": {
+                "type": "string"
+              }
             }
           }
         }
@@ -93,7 +130,15 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "domain", "object", "action", "description", "safetyLevel", "sdkCalls", "sourceRef"],
+        "required": [
+          "id",
+          "domain",
+          "object",
+          "action",
+          "description",
+          "safetyLevel",
+          "sourceRef"
+        ],
         "additionalProperties": false,
         "properties": {
           "id": {
@@ -124,12 +169,16 @@
           "params": {
             "type": "array",
             "description": "Input parameters accepted by this capability (each a $defs/paramDef). Object params declare `properties`, array params declare `items`; both nest recursively.",
-            "items": { "$ref": "#/$defs/paramDef" }
+            "items": {
+              "$ref": "#/$defs/paramDef"
+            }
           },
           "returns": {
             "type": "object",
             "description": "Return type information.",
-            "required": ["type"],
+            "required": [
+              "type"
+            ],
             "additionalProperties": false,
             "properties": {
               "type": {
@@ -142,8 +191,13 @@
                 "description": "Return fields — bare name (string, type unknown) or $defs/typedField. TypedField items/properties project to outputSchema, enabling tool chaining (e.g. read a resourceCode from query_*, feed it to install_*).",
                 "items": {
                   "oneOf": [
-                    { "type": "string", "minLength": 1 },
-                    { "$ref": "#/$defs/typedField" }
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "$ref": "#/$defs/typedField"
+                    }
                   ]
                 }
               }
@@ -162,8 +216,11 @@
           },
           "sdkCalls": {
             "type": "array",
-            "items": { "type": "string", "minLength": 1 },
-            "description": "YunOS SDK module paths called by this capability (e.g. '@system.router')."
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "YunOS SDK module paths called by this capability (e.g. '@system.router'). (可选: 旧 scaffold 流程需要; 新 E2E 流程可不填)"
           },
           "sourceRef": {
             "type": "string",
@@ -172,28 +229,77 @@
           },
           "status": {
             "type": "string",
-            "enum": ["verified", "partial", "broken"],
+            "enum": [
+              "verified",
+              "partial",
+              "broken"
+            ],
             "description": "Authoring-confidence marker: verified (wire source-traced) | partial | broken (known no-op/bug)."
           },
           "pattern": {
             "type": "string",
-            "enum": ["scalar", "dataclass", "envelope", "none"],
-            "description": "android-kotlin only: how the adapter reads paramJson. scalar=parseJsonObject+intArg; dataclass=fromJson<T>; envelope=parseRequest→request envelope (e.g. ICloudServiceRequest{body,headers,options}); none=no-arg getter."
+            "enum": [
+              "none",
+              "scalar",
+              "dataclass",
+              "envelope"
+            ],
+            "description": "execmd: 参数解析方式"
           },
           "devicePaths": {
             "type": "array",
-            "items": { "type": "string", "minLength": 1 },
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
             "description": "android-kotlin only: dot-paths of device-resolved values the executor injects (the agent cannot supply them). Each path's top segment must be listed in app.deviceSources."
           },
           "form": {
             "type": "string",
-            "enum": ["binder", "intent"],
+            "enum": [
+              "binder",
+              "intent"
+            ],
             "description": "android-kotlin only: platform invocation form. binder=background AIDL call (returns data; uses the car executor); intent=start-activity (fire-and-forget; host am start, no car executor)."
           },
           "dataClass": {
             "type": "string",
-            "minLength": 1,
-            "description": "android-kotlin only (dataclass pattern): the T in fromJson<T> — the typed data class the adapter deserializes paramJson into. Gate B verifies it exists in Types.kt."
+            "description": "dataclass: fromJson<T> 的 T"
+          },
+          "mechanism": {
+            "type": "string",
+            "enum": [
+              "execmd",
+              "media",
+              "mapnav",
+              "carcontrol",
+              "intent"
+            ],
+            "description": "车端执行机制(serve 忽略; 车端 registry 消费): execmd=executeCommand单入口, media=媒体会话, mapnav=地图AI导航, carcontrol=CustomService functionId, intent=页面跳转"
+          },
+          "methodName": {
+            "type": "string",
+            "description": "execmd: executeCommand 的 command 名"
+          },
+          "servicePackage": {
+            "type": "string",
+            "description": "bind 目标包名(缺省回退执行器默认)"
+          },
+          "serviceClass": {
+            "type": "string",
+            "description": "bind 目标服务类名"
+          },
+          "bindAction": {
+            "type": "string",
+            "description": "bind intent action(部分服务要求匹配 intent-filter)"
+          },
+          "ccDomain": {
+            "type": "string",
+            "description": "carcontrol: 域代码(如 002)"
+          },
+          "ccFunction": {
+            "type": "string",
+            "description": "carcontrol: functionId(以服务端 handler 注册为准)"
           }
         }
       }
@@ -203,18 +309,27 @@
       "description": "Enum types referenced by capability params or returns.",
       "additionalProperties": {
         "type": "object",
-        "required": ["values", "type"],
+        "required": [
+          "values",
+          "type"
+        ],
         "additionalProperties": false,
         "properties": {
           "values": {
             "type": "array",
-            "items": { "type": "string", "minLength": 1 },
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
             "minItems": 1,
             "description": "Enum member names."
           },
           "type": {
             "type": "string",
-            "enum": ["string", "number"],
+            "enum": [
+              "string",
+              "number"
+            ],
             "description": "Underlying type of the enum."
           },
           "sourceFile": {
@@ -224,7 +339,9 @@
           },
           "map": {
             "type": "object",
-            "additionalProperties": { "type": "string" },
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "wireValue → human name map, projected as a reverse lookup export."
           }
         }
@@ -235,7 +352,11 @@
       "description": "Domain-prefixed error codes. Key is the domain prefix identifier.",
       "additionalProperties": {
         "type": "object",
-        "required": ["prefix", "domainName", "codes"],
+        "required": [
+          "prefix",
+          "domainName",
+          "codes"
+        ],
         "additionalProperties": false,
         "properties": {
           "prefix": {
@@ -253,7 +374,10 @@
             "type": "object",
             "additionalProperties": {
               "type": "object",
-              "required": ["value", "message"],
+              "required": [
+                "value",
+                "message"
+              ],
               "additionalProperties": false,
               "properties": {
                 "value": {
@@ -278,7 +402,10 @@
     "paramDef": {
       "type": "object",
       "description": "A named field — a capability param or an object-property field. Nested `properties`/`items` make object/array params project to structured JSON-Schema.",
-      "required": ["name", "type"],
+      "required": [
+        "name",
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -294,7 +421,10 @@
         },
         "enum": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "minItems": 1,
           "description": "Wire values — the upstream agent passes these verbatim, so they MUST be the real on-the-wire values extracted from source (NOT display names). schema_preview projects them directly into inputSchema.enum."
         },
@@ -309,20 +439,35 @@
         },
         "examples": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "minItems": 1,
           "description": "Example wire values projected to JSON-Schema examples — strongest LLM steering signal."
         },
-        "minimum": { "type": "number", "description": "Numeric lower bound (number fields) → JSON-Schema minimum." },
-        "maximum": { "type": "number", "description": "Numeric upper bound (number fields) → JSON-Schema maximum." },
+        "minimum": {
+          "type": "number",
+          "description": "Numeric lower bound (number fields) → JSON-Schema minimum."
+        },
+        "maximum": {
+          "type": "number",
+          "description": "Numeric upper bound (number fields) → JSON-Schema maximum."
+        },
         "defaultValue": {
-          "type": ["string", "number", "boolean"],
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
           "description": "Default value when omitted → JSON-Schema default."
         },
         "properties": {
           "type": "array",
           "description": "Structured object fields (when `type` names a model) → JSON-Schema `properties`. Each field is itself a paramDef, so nesting recurses.",
-          "items": { "$ref": "#/$defs/paramDef" }
+          "items": {
+            "$ref": "#/$defs/paramDef"
+          }
         },
         "items": {
           "$ref": "#/$defs/fieldShape",
@@ -333,7 +478,10 @@
     "typedField": {
       "type": "object",
       "description": "A named return field — narrower than paramDef (no enum/examples/defaultValue) but carries items/properties/required, so structured/array returns project to outputSchema for tool chaining.",
-      "required": ["name", "type"],
+      "required": [
+        "name",
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -357,11 +505,16 @@
         "properties": {
           "type": "array",
           "description": "Structured object fields (when `type` names a model). Recurses via paramDef.",
-          "items": { "$ref": "#/$defs/paramDef" }
+          "items": {
+            "$ref": "#/$defs/paramDef"
+          }
         },
         "required": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "Which of `properties` are required in the returned object."
         }
       }
@@ -369,7 +522,9 @@
     "fieldShape": {
       "type": "object",
       "description": "A nameless recursive field shape — an array element (`items`) or nested sub-shape. Named fields (params, return fields, object properties) use paramDef/typedField.",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -379,7 +534,10 @@
         },
         "enum": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "minItems": 1,
           "description": "Wire values (same wire-truth rule as paramDef.enum)."
         },
@@ -387,8 +545,14 @@
           "type": "string",
           "description": "Per-element description surfaced to upstream agents."
         },
-        "minimum": { "type": "number", "description": "Numeric lower bound → JSON-Schema minimum." },
-        "maximum": { "type": "number", "description": "Numeric upper bound → JSON-Schema maximum." },
+        "minimum": {
+          "type": "number",
+          "description": "Numeric lower bound → JSON-Schema minimum."
+        },
+        "maximum": {
+          "type": "number",
+          "description": "Numeric upper bound → JSON-Schema maximum."
+        },
         "items": {
           "$ref": "#/$defs/fieldShape",
           "description": "Element shape when this shape is itself an array (array-of-array)."
@@ -396,11 +560,16 @@
         "properties": {
           "type": "array",
           "description": "Structured object fields (when `type` names a model). Recurses via paramDef.",
-          "items": { "$ref": "#/$defs/paramDef" }
+          "items": {
+            "$ref": "#/$defs/paramDef"
+          }
         },
         "required": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "description": "Which of `properties` are required."
         }
       }

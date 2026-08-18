@@ -261,6 +261,8 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 
 **E2E 快速开始**：`cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`（先起 `asr/asr-whisper-server.py`），浏览器 `http://localhost:3000/cockpit` 点 🎤 说话。
 
+**规格对齐**：`schema/analysis.schema.json` 已扩展支持 mechanism 等新字段（sdkCalls/app.domain/entryFile 降为可选）——新旧 analysis 均可通过旧 `validate`；新流程推荐用 bridge-analyze 自带校验器。
+
 **工具规格流（唯一真相源）**：`e2e/bridge-analysis.json`(serve 字段+机制字段) → `node e2e/analysis-to-registry.mjs` 生成车端 registry → 校验 `node skills/bridge-analyze/validate-analysis.mjs e2e/bridge-analysis.json`。
 
 凭据(DashScope key / 车签名 keystore)不随仓库分发。逆向素材(dex dump, 1.7GB)不入库, 位置见 `reverse/README.md`。

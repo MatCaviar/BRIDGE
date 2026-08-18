@@ -1,3 +1,5 @@
+> ⚠️ **已被 `skills/bridge-analyze/` 取代**（2026-08）：本 skill 面向旧 scaffold→generate 流程；现 E2E 流程（serve 直接投影）请用 bridge-analyze —— 输出规格对齐 E2E（description 触发场景 / status 三态 / mechanism 机制字段），并自带校验器 `validate-analysis.mjs`。以下内容保留供旧流程参考。
+
 ---
 name: mcp-analyze
 description: Use when given a YunOS HDT (agil/D-Bus) or Android/Kotlin+AIDL app directory and analysis.json (its interface surface — capabilities, params, returns, safety levels, error codes) must be produced, before scaffold/generate. This is the input every later step depends on.
