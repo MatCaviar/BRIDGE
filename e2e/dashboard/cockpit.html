@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BRIDGE · 座舱智能体</title>
+<style>
+:root{
+  --amber:#e07000; --amber-bright:#ffb35c; --teal:#35666a; --teal-bright:#9ecfd3;
+  --text:#f2f0f0; --text-dim:rgba(242,240,240,.6); --text-faint:rgba(242,240,240,.35);
+  --glass:rgba(15,18,20,.55); --glass-strong:rgba(10,12,14,.72); --line:rgba(255,255,255,.09);
+  --ok:#7bd88f; --warn:#e0b64a; --err:#ff8a80;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:ui-sans-serif,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text);-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+#bg{position:fixed;inset:0;z-index:0}
+.overlay{position:fixed;inset:0;z-index:1;display:flex;flex-direction:column;gap:10px;padding:14px}
+.glass{background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06)}
+/* header */
+header{display:flex;align-items:center;gap:14px;padding:12px 18px}
+.brand{display:flex;align-items:center}
+.brand h1{font-size:17px;font-weight:800;letter-spacing:.08em;white-space:nowrap}
+.brand h1 .t-sep{color:var(--text-dim);font-weight:400;margin:0 6px}
+/* BRIDGE 六个字母 — 品牌渐变色 (同 assets/bridge.svg) */
+.bc{background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.bc:nth-child(1){background-image:linear-gradient(180deg,#818CF1,#4338CA)} /* B indigo */
+.bc:nth-child(2){background-image:linear-gradient(180deg,#FB7185,#BE123C)} /* R rose */
+.bc:nth-child(3){background-image:linear-gradient(180deg,#22D3EE,#0E7490)} /* I cyan */
+.bc:nth-child(4){background-image:linear-gradient(180deg,#FBBF24,#B45309)} /* D amber */
+.bc:nth-child(5){background-image:linear-gradient(180deg,#34D399,#047857)} /* G emerald */
+.bc:nth-child(6){background-image:linear-gradient(180deg,#A78BFA,#6D28D9)} /* E purple */
+.chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);transition:background .3s}
+.chip[data-s=ok] .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.chip[data-s=busy] .dot{background:var(--warn);box-shadow:0 0 8px var(--warn);animation:pulse 1s infinite}
+.chip[data-s=err] .dot{background:var(--err);box-shadow:0 0 8px var(--err)}
+.chip .chip-label{color:var(--text-dim)}
+@keyframes pulse{50%{opacity:.35}}
+/* layout */
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-height:0}
+.left{display:flex;flex-direction:column;min-height:0}
+.right{display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0;padding-right:2px}
+/* chat */
+#chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.msg{max-width:82%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.6;animation:rise .35s ease}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,rgba(224,112,0,.25),rgba(224,112,0,.12));border:1px solid rgba(224,112,0,.3)}
+.msg.agent{align-self:flex-start;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.msg .mtime{display:block;font-size:10px;color:var(--text-faint);margin-top:4px}
+.msg.thinking{color:var(--text-dim);font-style:italic}
+/* command bar */
+.cmd{display:flex;gap:8px;padding:12px}
+.cmd input{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--text);font-size:13.5px;outline:none;transition:border .3s}
+.cmd input:focus{border-color:rgba(224,112,0,.5)}
+.cmd .btn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s;flex-shrink:0}
+.cmd .btn:hover{background:rgba(224,112,0,.2);border-color:rgba(224,112,0,.4)}
+.cmd .btn:disabled{opacity:.4;cursor:not-allowed}
+.cmd #mic-btn.recording{background:rgba(224,112,0,.35);border-color:var(--amber);box-shadow:0 0 18px rgba(224,112,0,.5)}
+.cmd #send-btn{background:linear-gradient(135deg,var(--amber),#b05a00);border:none;color:#fff}
+/* status panel */
+.panel{padding:14px}
+.panel h2{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.panel h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.kv{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+.kv .k{color:var(--text-dim)}
+.kv .v{color:var(--text);text-align:right;word-break:break-all}
+.kv .v.ok{color:var(--ok)} .kv .v.warn{color:var(--warn)} .kv .v.err{color:var(--err)}
+.kv .v.big{font-size:15px;font-weight:600}
+/* tool feed */
+.tool-item{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);margin-bottom:6px;font-size:11.5px;animation:rise .3s ease}
+.tool-item .tname{color:var(--amber-bright);font-weight:600;margin-bottom:2px}
+.tool-item .targs{color:var(--text-dim);font-family:ui-monospace,Consolas,monospace;font-size:10.5px;word-break:break-all}
+.tool-item .tres{color:var(--teal-bright);margin-top:3px;font-size:10.5px;word-break:break-all}
+.tool-item.err{border-color:rgba(255,138,128,.4)}
+.tool-item.err .tres{color:var(--err)}
+/* registry list */
+#registry{max-height:150px;overflow-y:auto}
+.reg-item{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.04)}
+.reg-item .rid{color:var(--text)}
+.reg-item .rsafety{font-size:9.5px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--text-dim)}
+.reg-item .rsafety.ro{color:var(--teal-bright);border-color:rgba(158,207,211,.3)}
+.reg-item .rsafety.normal{color:var(--warn);border-color:rgba(224,182,74,.3)}
+#voice-bar{height:3px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:8px}
+#voice-bar span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal-bright),var(--amber-bright));transition:width .25s}
+.empty-hint{color:var(--text-faint);font-size:11.5px;text-align:center;padding:10px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+@media(max-width:900px){main{grid-template-columns:1fr}.right{display:none}}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div class="overlay">
+  <header class="glass">
+    <div class="brand">
+      <h1><span class="bc">B</span><span class="bc">R</span><span class="bc">I</span><span class="bc">D</span><span class="bc">G</span><span class="bc">E</span> 套件 <span class="t-sep">|</span> 座舱智能体</h1>
+    </div>
+    <div class="chips">
+      <div class="chip" id="chip-voice" data-s="idle"><span class="dot"></span><span class="chip-label">语音</span><span class="chip-val" id="chip-voice-val">—</span></div>
+      <div class="chip" id="chip-llm" data-s="idle"><span class="dot"></span><span class="chip-label">LLM</span><span class="chip-val" id="chip-llm-val">—</span></div>
+      <div class="chip" id="chip-tool" data-s="idle"><span class="dot"></span><span class="chip-label">工具</span><span class="chip-val" id="chip-tool-val">—</span></div>
+      <div class="chip" id="chip-car" data-s="idle"><span class="dot"></span><span class="chip-label">车机</span><span class="chip-val" id="chip-car-val">—</span></div>
+      <div class="chip" id="chip-gw" data-s="idle"><span class="dot"></span><span class="chip-label">网关</span><span class="chip-val" id="chip-gw-val">—</span></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: chat + command -->
+    <div class="left glass">
+      <div id="chat"></div>
+      <div class="cmd">
+        <button class="btn" id="mic-btn" title="语音输入：说“调音量到20”“切歌”“切换到K歌房”" aria-label="语音输入">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        </button>
+        <input id="cmd-input" placeholder="点击🎤说话，或输入指令 — 例如“把音量调到20”“切换到K歌房”" autocomplete="off"/>
+        <button class="btn" id="send-btn" title="发送">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: status panels -->
+    <div class="right">
+      <div class="panel glass">
+        <h2>语音</h2>
+        <div class="kv"><span class="k">状态</span><span class="v" id="st-voice">待机</span></div>
+        <div class="kv"><span class="k">识别文本</span><span class="v" id="st-voice-text">—</span></div>
+        <div class="kv"><span class="k">识别引擎</span><span class="v">Web Speech (zh-CN)</span></div>
+        <div id="voice-bar"><span id="voice-bar-fill"></span></div>
+      </div>
+
+      <div class="panel glass">
+        <h2>连接</h2>
+        <div class="kv"><span class="k">网关</span><span class="v" id="st-gw">检查中…</span></div>
+        <div class="kv"><span class="k">MCP 工具</span><span class="v big" id="st-tools">—</span></div>
+        <div class="kv"><span class="k">车机</span><span class="v" id="st-car">未知</span></div>
+      </div>
+
+      <div class="panel glass">
+        <h2>LLM</h2>
+        <div class="kv"><span class="k">模型</span><span class="v" id="st-model">—</span></div>
+        <div class="kv"><span class="k">轮次</span><span class="v" id="st-turns">0</span></div>
+        <div class="kv"><span class="k">Token 输入</span><span class="v" id="st-tin">0</span></div>
+        <div class="kv"><span class="k">Token 输出</span><span class="v" id="st-tout">0</span></div>
+      </div>
+
+      <div class="panel glass">
+        <h2>工具活动</h2>
+        <div id="tool-feed"><div class="empty-hint">暂无工具调用</div></div>
+      </div>
+
+      <div class="panel glass">
+        <h2>工具清单 <span class="mono" style="color:var(--text-faint)">(<span id="reg-count">0</span>)</span></h2>
+        <div id="registry"><div class="empty-hint">等待网关发现…</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ═══════════════ Originkit Dot-Matrix WebGL background (vanilla port) ═══════════════ */
+const PERLIN_VS=`#version 300 es
+in vec2 uv;in vec2 position;out vec2 vUv;
+void main(){vUv=uv;gl_Position=vec4(position,0.,1.);}`;
+const PERLIN_FS=`#version 300 es
+precision mediump float;
+uniform float uFrequency;uniform float uTime;uniform float uSpeed;uniform float uValue;uniform vec2 uResolution;
+in vec2 vUv;out vec4 fragColor;
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0);
+  const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.0-g;
+  vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=0.142857142857;vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z);
+  vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;
+  vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.0+1.0;vec4 s1=floor(b1)*2.0+1.0;
+  vec4 sh=-step(h,vec4(0.0));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0);
+  m=m*m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+vec3 hsv2rgb(vec3 c){
+  vec4 K=vec4(1.0,2.0/3.0,1.0/3.0,3.0);
+  vec3 p=abs(fract(c.xxx+K.xyz)*6.0-K.www);
+  return c.z*mix(K.xxx,clamp(p-K.xxx,0.0,1.0),c.y);
+}
+void main(){
+  vec2 uv=vUv;
+  float aspect=uResolution.x/max(uResolution.y,1.0);
+  uv=(uv-0.5)*vec2(aspect,1.0)+0.5;
+  float hue=abs(snoise(vec3(uv*uFrequency,uTime*uSpeed)));
+  vec3 rainbowColor=hsv2rgb(vec3(hue,1.0,uValue));
+  fragColor=vec4(rainbowColor,1.0);
+}`;
+const DOT_VS=`#version 300 es
+in vec2 uv;in vec2 position;out vec2 vUv;
+void main(){vUv=uv;gl_Position=vec4(position,0.,1.);}`;
+const DOT_FS=`#version 300 es
+precision highp float;
+uniform vec2 uResolution;uniform sampler2D uTexture;
+uniform int uPaletteCount;uniform vec3 uPalette[10];uniform float uPaletteA[10];
+uniform float uCellSize;uniform float uGamma;uniform float uPaletteBias;
+uniform int uUseGlyphAtlas;uniform sampler2D uGlyphAtlas;uniform ivec2 uGlyphGrid;uniform int uCharCount;
+out vec4 fragColor;
+void main(){
+  vec2 pix=gl_FragCoord.xy;
+  float cell=max(uCellSize,1.0);
+  vec2 cellIdx=floor(pix/cell);
+  vec2 cellCenter=(cellIdx+0.5)*cell;
+  vec3 col=texture(uTexture,cellCenter/uResolution.xy).rgb;
+  float gray=0.3*col.r+0.59*col.g+0.11*col.b;
+  gray=pow(clamp(gray,0.0001,1.0),uGamma);
+  float mark=0.0;
+  if(uUseGlyphAtlas==1&&uCharCount>0&&uGlyphGrid.x>0&&uGlyphGrid.y>0){
+    float g=clamp(gray+uPaletteBias,0.0,1.0);
+    int idx=int(clamp(floor(g*float(uCharCount-1)+0.5),0.0,float(uCharCount-1)));
+    vec2 cellUV=fract(pix/cell);vec2 grid=vec2(uGlyphGrid);vec2 tileSize=1.0/grid;
+    float colIdx=float(idx%uGlyphGrid.x);float rowIdx=floor(float(idx)/float(uGlyphGrid.x));
+    vec2 atlasUV=(vec2(colIdx,rowIdx)+cellUV)*tileSize;
+    vec3 glyphSample=texture(uGlyphAtlas,atlasUV).rgb;
+    mark=dot(glyphSample,vec3(0.299,0.587,0.114));
+  }else{
+    vec2 cellUV=fract(pix/cell)-0.5;
+    float dist=length(cellUV);
+    float radius=clamp(gray+uPaletteBias,0.0,1.0)*0.5;
+    float aa=fwidth(dist)+1e-4;
+    mark=1.0-smoothstep(radius-aa,radius+aa,dist);
+  }
+  float g2=clamp(gray+uPaletteBias,0.0,1.0);
+  int cnt=max(uPaletteCount,1);
+  vec3 dotCol;float dotOpacity;
+  if(cnt<=1){dotCol=uPalette[0];dotOpacity=uPaletteA[0];}
+  else{
+    float scaled=g2*float(cnt-1);
+    int i0=int(floor(scaled));i0=clamp(i0,0,cnt-2);
+    float f=scaled-float(i0);
+    dotCol=mix(uPalette[i0],uPalette[i0+1],f);
+    dotOpacity=mix(uPaletteA[i0],uPaletteA[i0+1],f);
+  }
+  fragColor=vec4(dotCol,mark*dotOpacity);
+}`;
+function map(a,i0,i1,o0,o1){return i0===i1?o0:o0+(a-i0)/(i1-i0)*(o1-o0);}
+function compile(gl,vs,fs){
+  const p=gl.createProgram();
+  const mk=(t,s)=>{const sh=gl.createShader(t);gl.shaderSource(sh,s);gl.compileShader(sh);gl.attachShader(p,sh);};
+  mk(gl.VERTEX_SHADER,vs);mk(gl.FRAGMENT_SHADER,fs);
+  gl.bindAttribLocation(p,0,'position');gl.bindAttribLocation(p,1,'uv');
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+(function(){
+  const host=document.getElementById('bg');
+  const cv=document.createElement('canvas');host.appendChild(cv);
+  const gl=cv.getContext('webgl2',{alpha:true,premultipliedAlpha:false});
+  if(!gl){host.innerHTML='<div style="color:#fff;padding:20px">WebGL2 不可用</div>';return;}
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  let W=0,H=0;
+  // fullscreen quad
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  const vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,0,0, 1,-1,1,0, -1,1,0,1, 1,1,1,1]),gl.STATIC_DRAW);
+  const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array([0,1,2,1,3,2]),gl.STATIC_DRAW);
+  const stride=16;
+  const posL=gl.getAttribLocation(compile(gl,PERLIN_VS,PERLIN_FS),'position');
+  gl.vertexAttribPointer(posL,2,gl.FLOAT,false,stride,0);gl.enableVertexAttribArray(posL);
+  gl.vertexAttribPointer(posL+1,2,gl.FLOAT,false,stride,8);gl.enableVertexAttribArray(posL+1);
+  gl.bindVertexArray(null);
+  const perlin=compile(gl,PERLIN_VS,PERLIN_FS);
+  const dot=compile(gl,DOT_VS,DOT_FS);
+  gl.useProgram(dot);
+  const uP=gl.getUniformLocation(dot,'uPalette');
+  const uPA=gl.getUniformLocation(dot,'uPaletteA');
+  gl.uniform3fv(uP,new Float32Array([1,1,1, 0.878,0.439,0, 0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
+  gl.uniform1fv(uPA,new Float32Array([1,1,1,0,0,0,0,0,0,0]));
+  gl.uniform1i(gl.getUniformLocation(dot,'uPaletteCount'),3);
+  gl.uniform1i(gl.getUniformLocation(dot,'uUseGlyphAtlas'),0);
+  gl.uniform1f(gl.getUniformLocation(dot,'uCellSize'),map(1,1,100,6,60));
+  gl.uniform1f(gl.getUniformLocation(dot,'uGamma'),map(4,1,20,0.5,8));
+  gl.uniform1f(gl.getUniformLocation(dot,'uPaletteBias'),10*0.05);
+  gl.useProgram(perlin);
+  gl.uniform1f(gl.getUniformLocation(perlin,'uFrequency'),map(1,1,10,0.3,6));
+  gl.uniform1f(gl.getUniformLocation(perlin,'uSpeed'),3*0.05);
+  gl.uniform1f(gl.getUniformLocation(perlin,'uValue'),1);
+  // ── 状态着色 + 运动 (待机灰/思考蓝/执行金/出错橙/成功绿), 900ms easeOutCubic 丝滑过渡 ──
+  const BG_STATES={
+    idle:{c:['#e8e8e8','#6b6b6b','#141414'],speed:0.018},
+    thinking:{c:['#e6f2ff','#82b6e6','#16324c'],speed:0.02},
+    executing:{c:['#fff0d2','#e0a54a','#3f2a0a'],speed:0.022},
+    error:{c:['#ffddc9','#e07a45','#4a160a'],speed:0.024},
+    success:{c:['#e2f7e6','#74c98c','#123a1c'],speed:0.02},
+  };
+  const hexRgb=h=>{const n=parseInt(h.slice(1),16);return[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];};
+  const buildPal=cs=>{const a=[];for(const h of cs)a.push(...hexRgb(h));while(a.length<30)a.push(0);return a;};
+  const speedLoc=gl.getUniformLocation(perlin,'uSpeed');
+  let curPal=buildPal(BG_STATES.idle.c),targetPal=curPal.slice(),dispPal=curPal.slice(),curSpeed=BG_STATES.idle.speed,targetSpeed=curSpeed,bgT0=0,bgAnim=false;
+  function stepBg(t){
+    const p=Math.min(1,(t-bgT0)/1500),e=p*p*(3-2*p); // smoothstep + 慢过渡, 减少状态切换跳变/闪烁
+    const pal=curPal.map((v,i)=>v+(targetPal[i]-v)*e);dispPal=pal;
+    gl.useProgram(dot);
+    gl.uniform3fv(uP,new Float32Array(pal));
+    gl.uniform1fv(uPA,new Float32Array([1,1,1,0,0,0,0,0,0,0]));
+    gl.useProgram(perlin);
+    gl.uniform1f(speedLoc,curSpeed+(targetSpeed-curSpeed)*e);
+    if(p<1)requestAnimationFrame(stepBg); else {curPal=targetPal.slice();curSpeed=targetSpeed;bgAnim=false;}
+  }
+  window.setBgState=function(name){
+    const s=BG_STATES[name]||BG_STATES.idle;
+    curPal=dispPal.slice(); // 从当前显示态出发, 避免状态快切时的回跳
+    targetPal=buildPal(s.c);targetSpeed=s.speed;bgT0=performance.now();
+    if(!bgAnim){bgAnim=true;requestAnimationFrame(stepBg);}
+  };
+  window.setBgState('idle');
+  // render target
+  let fbo,tex;
+  function resize(){
+    W=Math.max(2,Math.round(host.clientWidth||window.innerWidth));
+    H=Math.max(2,Math.round(host.clientHeight||window.innerHeight));
+    cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+    if(!fbo){
+      tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      fbo=gl.createFramebuffer();
+    }
+    gl.bindTexture(gl.TEXTURE_2D,tex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,cv.width,cv.height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
+  }
+  function quad(){
+    gl.bindVertexArray(vao);gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);
+  }
+  let last=0;
+  function render(t){
+    requestAnimationFrame(render);
+    if(t-last<1000/30)return;last=t;
+    gl.useProgram(perlin);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,cv.width,cv.height);
+    gl.uniform1f(gl.getUniformLocation(perlin,'uTime'),t*0.001);
+    gl.uniform2f(gl.getUniformLocation(perlin,'uResolution'),cv.width,cv.height);
+    quad();
+    gl.useProgram(dot);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,cv.width,cv.height);
+    gl.uniform2f(gl.getUniformLocation(dot,'uResolution'),cv.width,cv.height);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);
+    gl.uniform1i(gl.getUniformLocation(dot,'uTexture'),0);
+    quad();
+  }
+  resize();
+  const ro=new ResizeObserver(resize);ro.observe(host);
+  window.addEventListener('resize',resize);
+  requestAnimationFrame(render);
+})();
+
+/* ═══════════════ Gateway API + voice + status ═══════════════ */
+const $=id=>document.getElementById(id);
+const chat=$('chat'),input=$('cmd-input'),micBtn=$('mic-btn'),sendBtn=$('send-btn');
+const state={isRunning:false,sessionId:null,es:null};
+function chip(id,s,val){const el=$(id);el.dataset.s=s;$(id+'-val').textContent=val||'';}
+function kv(id,txt,cls){const el=$(id);el.textContent=txt;el.className='v'+(cls?' '+cls:'');}
+function addMsg(role,text){
+  const d=document.createElement('div');d.className='msg '+role;
+  const t=document.createElement('span');t.textContent=text;
+  const mt=document.createElement('span');mt.className='mtime';mt.textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  d.appendChild(t);d.appendChild(mt);chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+  return d;
+}
+function addToolItem(tool,args,res,isErr){
+  const feed=$('tool-feed');feed.querySelector('.empty-hint')?.remove();
+  const d=document.createElement('div');d.className='tool-item'+(isErr?' err':'');
+  d.innerHTML=`<div class="tname">⚙ ${tool||''}</div><div class="targs">${escapeHtml(JSON.stringify(args||{}))}</div><div class="tres">${isErr?'✗ ':'✓ '}${escapeHtml(String(res||'').slice(0,160))}</div>`;
+  feed.prepend(d);while(feed.children.length>4)feed.lastChild.remove();
+  chip('chip-tool',isErr?'err':'ok',tool);
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+/* 背景状态: idle灰/thinking蓝/executing金/error橙/success绿 + 自动回 idle */
+let bgTimer=null;
+function bg(name,keepMs){ if(window.setBgState)window.setBgState(name); if(bgTimer)clearTimeout(bgTimer); if(keepMs>0)bgTimer=setTimeout(()=>window.setBgState&&window.setBgState('idle'),keepMs); }
+async function health(){
+  try{const r=await fetch('/api/health');if(r.ok){kv('st-gw','在线','ok');chip('chip-gw','ok','在线');}else throw 0;}
+  catch{kv('st-gw','离线','err');chip('chip-gw','err','离线');}
+}
+async function runAgent(message){
+  if(state.isRunning)return;state.isRunning=true;micBtn.disabled=sendBtn.disabled=true;
+  chip('chip-llm','busy','思考中');kv('st-voice','处理中','warn');
+  addMsg('user',message);input.value='';
+  try{
+    const res=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+    if(!res.ok){const e=await res.json();addMsg('agent','错误: '+(e.error||res.status));reset();return;}
+    const{sessionId}=await res.json();state.sessionId=sessionId;
+    connectSSE(sessionId);
+  }catch(e){addMsg('agent','连接失败: '+e.message);reset();}
+}
+function connectSSE(sessionId){
+  const es=new EventSource('/api/events/'+encodeURIComponent(sessionId));state.es=es;
+  es.addEventListener('tools_discovered',e=>{const d=JSON.parse(e.data);renderRegistry(d.tools||[]);kv('st-tools',String((d.tools||[]).length),'ok');});
+  es.addEventListener('llm_request',e=>{const d=JSON.parse(e.data);kv('st-model',(d.provider||'?')+'/'+(d.model||'?'));chip('chip-llm','busy','思考中');bg('thinking',0);addMsg('thinking','LLM 正在思考…');});
+  es.addEventListener('llm_response',e=>{const d=JSON.parse(e.data);kv('st-tin',String(d.totalInputTokens??0));kv('st-tout',String(d.totalOutputTokens??0));});
+  es.addEventListener('tool_call_started',e=>{const d=JSON.parse(e.data);chip('chip-car','busy','调用中');kv('st-car','调用 '+d.toolName,'warn');bg('executing',0);});
+  es.addEventListener('tool_call_completed',e=>{const d=JSON.parse(e.data);const rp=String(d.resultPreview||d.result||'');const failed=/"ok"\s*:\s*false/.test(rp)||/"error"\s*:/.test(rp);addToolItem(d.toolName,d.arguments,rp,failed);if(failed){chip('chip-car','err','不可达');kv('st-car','不可达','err');bg('error',2200);}else{chip('chip-car','ok','可达');kv('st-car','可达','ok');bg('success',1800);}});
+  es.addEventListener('tool_call_error',e=>{const d=JSON.parse(e.data);addToolItem(d.toolName,d.arguments,d.error||'error',true);chip('chip-car','err','不可达');kv('st-car','不可达','err');bg('error',2200);});
+  es.addEventListener('turn_started',e=>{const d=JSON.parse(e.data);kv('st-turns',String(d.turn));});
+  es.addEventListener('session_completed',e=>{const d=JSON.parse(e.data);chat.querySelector('.msg.thinking:last-of-type')?.remove();addMsg('agent',d.finalText||'完成');chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
+  es.addEventListener('session_error',e=>{const d=JSON.parse(e.data);addMsg('agent','会话错误: '+d.error);bg('error',2500);es.close();reset();});
+  es.onerror=()=>{es.close();reset();};
+}
+function reset(){state.isRunning=false;micBtn.disabled=sendBtn.disabled=false;if(state.es){state.es.close();state.es=null;}chip('chip-llm','idle','空闲');}
+function renderRegistry(tools){
+  const box=$('registry');$('reg-count').textContent=tools.length;box.innerHTML='';
+  for(const t of tools){
+    const d=document.createElement('div');d.className='reg-item';
+    const s=document.createElement('span');s.className='rsafety '+(t.safetyLevel==='readonly'?'ro':'normal');s.textContent=t.safetyLevel;
+    d.innerHTML='<span class="rid">'+t.name+'</span>';d.appendChild(s);box.appendChild(d);
+  }
+}
+/* voice */
+// ═══ 语音: MediaRecorder(WebAudio PCM) → WAV → DashScope ASR (/api/asr) — 不依赖浏览器语音服务 ═══
+let mediaStream=null,audioCtx=null,recNode=null,pcmChunks=[],isRecording=false,lvlTimer=null,recRate=0;
+function setLevel(x){$('voice-bar-fill').style.width=Math.max(0,Math.min(100,x*100))+'%';}
+async function toggleVoice(){
+  if(isRecording){ await stopRecording(); return; } // 再点 → 停止 → 识别
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)(); // 用硬件原生采样率采集, 编码时再重采样到16k (避免浏览器忽略 sampleRate 限制导致音频变速/识别为空)
+    recRate=audioCtx.sampleRate;
+    const src=audioCtx.createMediaStreamSource(mediaStream);
+    const node=audioCtx.createScriptProcessor(4096,1,1);
+    const mute=audioCtx.createGain();mute.gain.value=0; // 静音监听, 防止扬声器回授/回声污染录音
+    src.connect(node);node.connect(mute);mute.connect(audioCtx.destination);
+    pcmChunks=[];recNode={src,node,mute};
+    node.onaudioprocess=e=>{pcmChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));};
+    isRecording=true;
+    micBtn.classList.add('recording');kv('st-voice','聆听中…（再点🎤结束）','warn');chip('chip-voice','busy','聆听');
+    lvlTimer=setInterval(()=>{const last=pcmChunks[pcmChunks.length-1];if(last){let s=0;for(let i=0;i<last.length;i++)s+=last[i]*last[i];setLevel(Math.sqrt(s/last.length));}},150);
+  }catch(err){
+    kv('st-voice','无法访问麦克风: '+err.message,'err');chip('chip-voice','err','拒绝');
+  }
+}
+async function stopRecording(){
+  isRecording=false;clearInterval(lvlTimer);
+  try{recNode.mute.disconnect();recNode.node.disconnect();recNode.src.disconnect();}catch(_){}
+  try{audioCtx.close();}catch(_){}
+  try{mediaStream.getTracks().forEach(t=>t.stop());}catch(_){}
+  micBtn.classList.remove('recording');setLevel(0);kv('st-voice','识别中…','warn');chip('chip-voice','busy','识别');
+  const wav=encodeWav16(pcmChunks,recRate||16000);
+  try{
+    const r=await fetch('/api/asr',{method:'POST',headers:{'Content-Type':'audio/wav'},body:wav});
+    const j=await r.json();
+    const text=(j.text||'').trim();
+    if(text){input.value=text;kv('st-voice-text',text);runAgent(text);}
+    else if(j.error){kv('st-voice','识别失败: '+j.error,'err');chip('chip-voice','err','失败');}
+    else{kv('st-voice','未识别到语音','');chip('chip-voice','idle','待机');}
+  }catch(e){kv('st-voice','识别失败: '+e.message,'err');chip('chip-voice','err','失败');}
+}
+function encodeWav16(chunks,inRate){
+  const total=chunks.reduce((n,c)=>n+c.length,0);
+  const flat=new Float32Array(total);let o=0;for(const c of chunks){flat.set(c,o);o+=c.length;}
+  const outRate=16000;let out;
+  if(inRate===outRate){
+    out=new Int16Array(total);
+    for(let i=0;i<total;i++){const s=Math.max(-1,Math.min(1,flat[i]));out[i]=s<0?s*0x8000:s*0x7fff;}
+  }else{ // 线性插值重采样到16k
+    const ratio=inRate/outRate,outLen=Math.max(1,Math.floor(total/ratio));
+    out=new Int16Array(outLen);
+    for(let i=0;i<outLen;i++){
+      const si=i*ratio,lo=Math.floor(si),hi=Math.min(lo+1,total-1),fr=si-lo;
+      const s=Math.max(-1,Math.min(1,flat[lo]*(1-fr)+flat[hi]*fr));
+      out[i]=s<0?s*0x8000:s*0x7fff;
+    }
+  }
+  const ab=new ArrayBuffer(44+out.byteLength),v=new DataView(ab);
+  const ws=(o2,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o2+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+out.byteLength,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,outRate,true);v.setUint32(28,outRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  ws(36,'data');v.setUint32(40,out.byteLength,true);
+  new Int16Array(ab,44,out.length).set(out);
+  return new Blob([ab],{type:'audio/wav'});
+}
+let cachedVoices=[];
+function refreshVoices(){try{cachedVoices=window.speechSynthesis.getVoices();}catch(_){}}
+if('speechSynthesis'in window)window.speechSynthesis.onvoiceschanged=refreshVoices;
+function speak(text,onEnd){
+  try{
+    if('speechSynthesis'in window&&text){
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(String(text).replace(/[{}[\]]/g,' '));
+      u.lang='zh-CN';u.rate=1.0;u.pitch=1.08;
+      if(cachedVoices.length===0)refreshVoices();
+      // 甜美自然的中文女声: 优先 晓晓/晓伊/美佳/女声/neural
+      const zh=cachedVoices.filter(v=>v.lang&&v.lang.toLowerCase().startsWith('zh'));
+      const sweet=zh.find(v=>/xiaoxiao|xiaoyi|meijia|huihui|tingting|yaoyao|female|neural|晓晓|晓伊|美佳|女/i.test(v.name))||zh[0];
+      if(sweet)u.voice=sweet;
+      if(onEnd)u.onend=onEnd;
+      window.speechSynthesis.speak(u);
+    }else if(onEnd){onEnd();}
+  }catch(_){if(onEnd)onEnd();}
+}
+micBtn.onclick=toggleVoice;
+sendBtn.onclick=()=>{const m=input.value.trim();if(m)runAgent(m);};
+input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const m=input.value.trim();if(m)runAgent(m);}});
+addMsg('agent','你好，我是座舱智能体。点击🎤说话，或输入指令：调音量 / 切歌 / 切音效 / 音效库…');
+health();
+</script>
+</body>
+</html>

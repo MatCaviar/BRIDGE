@@ -1,0 +1,344 @@
+[
+ {
+  "handler": "HotStoneMassageDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_HOT_STONE_MASSAGE",
+  "functionId": "seat_heat_stone_massage_driver"
+ },
+ {
+  "handler": "HotStoneMassageLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_HOT_STONE_MASSAGE",
+  "functionId": "seat_heat_stone_massage_left_rear"
+ },
+ {
+  "handler": "HotStoneMassagePassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_HOT_STONE_MASSAGE",
+  "functionId": "seat_heat_stone_massage_passenger"
+ },
+ {
+  "handler": "HotStoneMassageRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_HOT_STONE_MASSAGE",
+  "functionId": "seat_heat_stone_massage_right_rear"
+ },
+ {
+  "handler": "HudAngleHandler",
+  "constClass": "SeatFunctions",
+  "const": "HUD_ANGLE",
+  "functionId": "seat_hud_angle"
+ },
+ {
+  "handler": "HudHeightHandler",
+  "constClass": "SeatFunctions",
+  "const": "HUD_HEIGHT",
+  "functionId": "seat_hud_height"
+ },
+ {
+  "handler": "MassageModeDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE_MODE",
+  "functionId": "seat_massagemode_driver"
+ },
+ {
+  "handler": "MassageModeLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_MASSAGE_MODE",
+  "functionId": "seat_magmode_left_rear"
+ },
+ {
+  "handler": "MassageModePassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE_MODE",
+  "functionId": "seat_massagemode_passenger"
+ },
+ {
+  "handler": "MassageModeRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_MASSAGE_MODE",
+  "functionId": "seat_magmode_right_rear"
+ },
+ {
+  "handler": "MassagePartDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE_SITE",
+  "functionId": "seat_magsite_driver"
+ },
+ {
+  "handler": "MassagePartLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_MASSAGE_SITE",
+  "functionId": "seat_magsite_left_rear"
+ },
+ {
+  "handler": "MassagePartPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE_SITE",
+  "functionId": "seat_magsite_passenger"
+ },
+ {
+  "handler": "MassagePartRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_MASSAGE_SITE",
+  "functionId": "seat_magsite_right_rear"
+ },
+ {
+  "handler": "MassageTypeDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE_TYPE",
+  "functionId": "seat_massage_type_driver"
+ },
+ {
+  "handler": "MassageTypeLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_MASSAGE_TYPE",
+  "functionId": "seat_massage_type_left_rear"
+ },
+ {
+  "handler": "MassageTypePassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE_TYPE",
+  "functionId": "seat_massage_type_passenger"
+ },
+ {
+  "handler": "MassageTypeRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_MASSAGE_TYPE",
+  "functionId": "seat_massage_type_right_rear"
+ },
+ {
+  "handler": "SeatHeatDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_HEAT",
+  "functionId": "seat_heat_driver"
+ },
+ {
+  "handler": "SeatHeatLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_HEAT",
+  "functionId": "seat_heat_left_rear"
+ },
+ {
+  "handler": "SeatHeatLeftThirdHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_THIRD_HEAT",
+  "functionId": "seat_heat_left_third"
+ },
+ {
+  "handler": "SeatHeatPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_HEAT",
+  "functionId": "seat_heat_passenger"
+ },
+ {
+  "handler": "SeatHeatRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_HEAT",
+  "functionId": "seat_heat_right_rear"
+ },
+ {
+  "handler": "SeatHeatRightThirdHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_THIRD_HEAT",
+  "functionId": "seat_heat_right_third"
+ },
+ {
+  "handler": "SeatMassageDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE",
+  "functionId": "seat_massage_driver"
+ },
+ {
+  "handler": "SeatMassageLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "REAR_LEFT_MASSAGE",
+  "functionId": "seat_massage_left_rear"
+ },
+ {
+  "handler": "SeatMassagePassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE",
+  "functionId": "seat_massage_passenger"
+ },
+ {
+  "handler": "SeatMassageRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "REAR_RIGHT_MASSAGE",
+  "functionId": "seat_massage_right_rear"
+ },
+ {
+  "handler": "SeatMassageStrengthDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE_STRENGTH",
+  "functionId": "seat_massagestrength_driver"
+ },
+ {
+  "handler": "SeatMassageStrengthLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_MASSAGE_STRENGTH",
+  "functionId": "seat_magintst_left_rear"
+ },
+ {
+  "handler": "SeatMassageStrengthPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE_STRENGTH",
+  "functionId": "seat_massagestrength_passenger"
+ },
+ {
+  "handler": "SeatMassageStrengthRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_MASSAGE_STRENGTH",
+  "functionId": "seat_magintst_right_rear"
+ },
+ {
+  "handler": "SeatRestoreDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_RESTORE",
+  "functionId": "adjust.driver.restore"
+ },
+ {
+  "handler": "SeatSaveDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_SAVE",
+  "functionId": "adjust.driver.save"
+ },
+ {
+  "handler": "SeatVentDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_VENT",
+  "functionId": "seat_ventilation_driver"
+ },
+ {
+  "handler": "SeatVentLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_VENT",
+  "functionId": "seat_air_left_rear"
+ },
+ {
+  "handler": "SeatVentPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_VENT",
+  "functionId": "seat_ventilation_passenger"
+ },
+ {
+  "handler": "SeatVentRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_VENT",
+  "functionId": "seat_air_right_rear"
+ },
+ {
+  "handler": "HeatLevelListDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_HEAT_LEVEL_LIST",
+  "functionId": "seat_heat_level_driver"
+ },
+ {
+  "handler": "HeatLevelListLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_HEAT_LEVEL_LIST",
+  "functionId": "seat_heat_level_left_rear"
+ },
+ {
+  "handler": "HeatLevelListLeftThirdHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_THIRD_HEAT_LEVEL_LIST",
+  "functionId": "seat_heat_level_left_third"
+ },
+ {
+  "handler": "HeatLevelListPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_HEAT_LEVEL_LIST",
+  "functionId": "seat_heat_level_passenger"
+ },
+ {
+  "handler": "HeatLevelListRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_HEAT_LEVEL_LIST",
+  "functionId": "seat_heat_level_right_rear"
+ },
+ {
+  "handler": "HeatLevelListRightThirdHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_THIRD_HEAT_LEVEL_LIST",
+  "functionId": "seat_heat_level_right_third"
+ },
+ {
+  "handler": "MassageSiteLevelListDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE_SITE_LEVEL_LIST",
+  "functionId": "seat_magsite_level_driver"
+ },
+ {
+  "handler": "MassageSiteLevelListLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_MASSAGE_SITE_LEVEL_LIST",
+  "functionId": "seat_magsite_level_left_rear"
+ },
+ {
+  "handler": "MassageSiteLevelListPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE_SITE_LEVEL_LIST",
+  "functionId": "seat_magsite_level_passenger"
+ },
+ {
+  "handler": "MassageSiteLevelListRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_MASSAGE_SITE_LEVEL_LIST",
+  "functionId": "seat_magsite_level_right_rear"
+ },
+ {
+  "handler": "MassageStrengthLevelListDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_MASSAGE_STRENGTH_LEVEL_LIST",
+  "functionId": "seat_massagestrength_level_driver"
+ },
+ {
+  "handler": "MassageStrengthLevelListLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_MASSAGE_STRENGTH_LEVEL_LIST",
+  "functionId": "seat_magintst_level_left_rear"
+ },
+ {
+  "handler": "MassageStrengthLevelListPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_MASSAGE_STRENGTH_LEVEL_LIST",
+  "functionId": "seat_massagestrength_level_passenger"
+ },
+ {
+  "handler": "MassageStrengthLevelListRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_MASSAGE_STRENGTH_LEVEL_LIST",
+  "functionId": "seat_magintst_level_right_rear"
+ },
+ {
+  "handler": "StiffnessLevelListHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_STIFFNESS_LEVEL_LIST",
+  "functionId": "adjust.driver.stiffness_level"
+ },
+ {
+  "handler": "VentLevelListDriverHandler",
+  "constClass": "SeatFunctions",
+  "const": "DRIVER_VENT_LEVEL_LIST",
+  "functionId": "seat_ventilation_level_driver"
+ },
+ {
+  "handler": "VentLevelListLeftRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "LEFT_REAR_VENT_LEVEL_LIST",
+  "functionId": "seat_ventilation_level_left_rear"
+ },
+ {
+  "handler": "VentLevelListPassengerHandler",
+  "constClass": "SeatFunctions",
+  "const": "PASSENGER_VENT_LEVEL_LIST",
+  "functionId": "seat_ventilation_level_passenger"
+ },
+ {
+  "handler": "VentLevelListRightRearHandler",
+  "constClass": "SeatFunctions",
+  "const": "RIGHT_REAR_VENT_LEVEL_LIST",
+  "functionId": "seat_ventilation_level_right_rear"
+ }
+]

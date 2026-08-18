@@ -1,0 +1,1028 @@
+[
+ {
+  "id": "cc_seat_heat_stone_massage_driver",
+  "domain": "carcontrol",
+  "object": "seat_heat_stone_massage_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HotStoneMassageDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅加热(seat_heat_stone_massage_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_stone_massage_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_heat_stone_massage_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HotStoneMassageLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅加热(seat_heat_stone_massage_left_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_stone_massage_passenger",
+  "domain": "carcontrol",
+  "object": "seat_heat_stone_massage_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HotStoneMassagePassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅加热(seat_heat_stone_massage_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_stone_massage_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_heat_stone_massage_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HotStoneMassageRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅加热(seat_heat_stone_massage_right_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_hud_angle",
+  "domain": "carcontrol",
+  "object": "seat_hud_angle",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HudAngleHandler (逆向 2026-08-17)",
+  "description": "设置HUD(seat_hud_angle)。参数 value: 数值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_hud_height",
+  "domain": "carcontrol",
+  "object": "seat_hud_height",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HudHeightHandler (逆向 2026-08-17)",
+  "description": "设置HUD(seat_hud_height)。参数 value: 数值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massagemode_driver",
+  "domain": "carcontrol",
+  "object": "seat_massagemode_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageModeDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩(seat_massagemode_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magmode_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_magmode_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageModeLeftRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_magmode_left_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massagemode_passenger",
+  "domain": "carcontrol",
+  "object": "seat_massagemode_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageModePassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩(seat_massagemode_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magmode_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_magmode_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageModeRightRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_magmode_right_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_driver",
+  "domain": "carcontrol",
+  "object": "seat_magsite_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassagePartDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩部位(seat_magsite_driver)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_magsite_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassagePartLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅按摩部位(seat_magsite_left_rear)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_passenger",
+  "domain": "carcontrol",
+  "object": "seat_magsite_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassagePartPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩部位(seat_magsite_passenger)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_magsite_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassagePartRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅按摩部位(seat_magsite_right_rear)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_type_driver",
+  "domain": "carcontrol",
+  "object": "seat_massage_type_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageTypeDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩(seat_massage_type_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_type_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_massage_type_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageTypeLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅按摩(seat_massage_type_left_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_type_passenger",
+  "domain": "carcontrol",
+  "object": "seat_massage_type_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageTypePassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩(seat_massage_type_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_type_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_massage_type_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageTypeRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅按摩(seat_massage_type_right_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_driver",
+  "domain": "carcontrol",
+  "object": "seat_heat_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatHeatDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅加热(seat_heat_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_heat_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatHeatLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅加热(seat_heat_left_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_left_third",
+  "domain": "carcontrol",
+  "object": "seat_heat_left_third",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatHeatLeftThirdHandler (逆向 2026-08-17)",
+  "description": "设置左三排座椅加热(seat_heat_left_third)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_passenger",
+  "domain": "carcontrol",
+  "object": "seat_heat_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatHeatPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅加热(seat_heat_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_heat_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatHeatRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅加热(seat_heat_right_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_right_third",
+  "domain": "carcontrol",
+  "object": "seat_heat_right_third",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatHeatRightThirdHandler (逆向 2026-08-17)",
+  "description": "设置右三排座椅加热(seat_heat_right_third)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_driver",
+  "domain": "carcontrol",
+  "object": "seat_massage_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩(seat_massage_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_massage_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅按摩(seat_massage_left_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_passenger",
+  "domain": "carcontrol",
+  "object": "seat_massage_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassagePassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩(seat_massage_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massage_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_massage_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅按摩(seat_massage_right_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massagestrength_driver",
+  "domain": "carcontrol",
+  "object": "seat_massagestrength_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageStrengthDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩(seat_massagestrength_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magintst_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_magintst_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageStrengthLeftRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_magintst_left_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massagestrength_passenger",
+  "domain": "carcontrol",
+  "object": "seat_massagestrength_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageStrengthPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩(seat_massagestrength_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magintst_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_magintst_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatMassageStrengthRightRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_magintst_right_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_adjust_driver_restore",
+  "domain": "carcontrol",
+  "object": "adjust.driver.restore",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatRestoreDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅记忆恢复(adjust.driver.restore)。参数 无参。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_adjust_driver_save",
+  "domain": "carcontrol",
+  "object": "adjust.driver.save",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatSaveDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅记忆保存(adjust.driver.save)。参数 无参。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_ventilation_driver",
+  "domain": "carcontrol",
+  "object": "seat_ventilation_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatVentDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅通风(seat_ventilation_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_air_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_air_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatVentLeftRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_air_left_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_ventilation_passenger",
+  "domain": "carcontrol",
+  "object": "seat_ventilation_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatVentPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅通风(seat_ventilation_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_air_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_air_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=SeatVentRightRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_air_right_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_level_driver",
+  "domain": "carcontrol",
+  "object": "seat_heat_level_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HeatLevelListDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅加热(seat_heat_level_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_level_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_heat_level_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HeatLevelListLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅加热(seat_heat_level_left_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_level_left_third",
+  "domain": "carcontrol",
+  "object": "seat_heat_level_left_third",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HeatLevelListLeftThirdHandler (逆向 2026-08-17)",
+  "description": "设置左三排座椅加热(seat_heat_level_left_third)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_level_passenger",
+  "domain": "carcontrol",
+  "object": "seat_heat_level_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HeatLevelListPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅加热(seat_heat_level_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_level_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_heat_level_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HeatLevelListRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅加热(seat_heat_level_right_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_heat_level_right_third",
+  "domain": "carcontrol",
+  "object": "seat_heat_level_right_third",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=HeatLevelListRightThirdHandler (逆向 2026-08-17)",
+  "description": "设置右三排座椅加热(seat_heat_level_right_third)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_level_driver",
+  "domain": "carcontrol",
+  "object": "seat_magsite_level_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageSiteLevelListDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩部位(seat_magsite_level_driver)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_level_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_magsite_level_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageSiteLevelListLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅按摩部位(seat_magsite_level_left_rear)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_level_passenger",
+  "domain": "carcontrol",
+  "object": "seat_magsite_level_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageSiteLevelListPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩部位(seat_magsite_level_passenger)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magsite_level_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_magsite_level_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageSiteLevelListRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅按摩部位(seat_magsite_level_right_rear)。参数 site: 部位值。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massagestrength_level_driver",
+  "domain": "carcontrol",
+  "object": "seat_massagestrength_level_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageStrengthLevelListDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅按摩(seat_massagestrength_level_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magintst_level_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_magintst_level_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageStrengthLevelListLeftRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_magintst_level_left_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_massagestrength_level_passenger",
+  "domain": "carcontrol",
+  "object": "seat_massagestrength_level_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageStrengthLevelListPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅按摩(seat_massagestrength_level_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_magintst_level_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_magintst_level_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=MassageStrengthLevelListRightRearHandler (逆向 2026-08-17)",
+  "description": "车控功能 seat_magintst_level_right_rear。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_adjust_driver_stiffness_level",
+  "domain": "carcontrol",
+  "object": "adjust.driver.stiffness_level",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=StiffnessLevelListHandler (逆向 2026-08-17)",
+  "description": "设置主驾坐垫软硬度档位(adjust.driver.stiffness_level)。参数 level: 档位。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_ventilation_level_driver",
+  "domain": "carcontrol",
+  "object": "seat_ventilation_level_driver",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=VentLevelListDriverHandler (逆向 2026-08-17)",
+  "description": "设置主驾座椅通风(seat_ventilation_level_driver)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_ventilation_level_left_rear",
+  "domain": "carcontrol",
+  "object": "seat_ventilation_level_left_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=VentLevelListLeftRearHandler (逆向 2026-08-17)",
+  "description": "设置左后座椅通风(seat_ventilation_level_left_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_ventilation_level_passenger",
+  "domain": "carcontrol",
+  "object": "seat_ventilation_level_passenger",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=VentLevelListPassengerHandler (逆向 2026-08-17)",
+  "description": "设置副驾座椅通风(seat_ventilation_level_passenger)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ },
+ {
+  "id": "cc_seat_ventilation_level_right_rear",
+  "domain": "carcontrol",
+  "object": "seat_ventilation_level_right_rear",
+  "action": "set",
+  "safetyLevel": "normal",
+  "status": "candidate",
+  "sourceRef": "CarControlService handler=VentLevelListRightRearHandler (逆向 2026-08-17)",
+  "description": "设置右后座椅通风(seat_ventilation_level_right_rear)。参数 on: 1开 0关。",
+  "params": [
+   {
+    "name": "value",
+    "type": "int",
+    "optional": true,
+    "description": "功能值(开关用 on=1/0)"
+   }
+  ]
+ }
+]

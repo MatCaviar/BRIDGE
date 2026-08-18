@@ -1,0 +1,32 @@
+{
+  "name": "mcp-gateway",
+  "version": "1.0.0",
+  "description": "Multi-backend LLM Gateway for MCP ecosystem — bridges Agent APIs to MCP servers",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "demo": "tsx examples/aipet-demo.ts",
+    "dashboard": "tsc && node dist/web/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1",
+    "js-yaml": "^4.1.0",
+    "openai": "^4.100.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "license": "MIT"
+}
