@@ -1,6 +1,6 @@
 ---
 name: bridge-analyze
-description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力调用 schema(analysis.json)。用于 host codeagent: 自主分析一个应用, 产出可被 MCP serve 直接投影给 LLM agent 的工具 schema, 并完成验证。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。替代旧版 mcp-analyze(面向 scaffold 重流程, 与 E2E serve 规格不对齐)。
+description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力调用 schema(analysis.json)。用于 host codeagent: 自主分析一个应用, 产出可被 MCP serve 直接投影给 LLM agent 的工具 schema, 并完成验证。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。
 ---
 
 > 🌐 默认用中文与用户交互和输出；代码/命令/标识符/文件名保持英文。
@@ -94,7 +94,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 产出后按序验证, 每条都要过:
 
-1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>`(本 skill 自带的规格校验器, 对齐 E2E serve 规格; 旧插件 validate 面向 scaffold 流程, 与新规格不兼容, 勿用) — 零错误
+1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>` — 零错误
 2. **serve 加载**: `node <cli>/bin/mcp-pipeline.js serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
 3. **契约核对**(有源码时): `validate_aidl <registry.json> <aidlDir> <adapter> <types>` — 机制字段与 AIDL 一致
 4. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
@@ -119,6 +119,6 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 4. 产出 analysis.json(及可选 registry)
 5. 执行验证协议 → 修正 → 报告
 
-## 与旧版/生态的关系
+## 产物去向
 
-产物直接 `serve`(E2E 兼容)。旧 scaffold/generate/curate/test skill 保留给需要完整 server 生成的项目; 本 skill 只负责"分析 → schema → 验证"这一环, 不依赖其他 skill。
+产物直接 `serve`(E2E 兼容); 机制字段经 `analysis-to-registry` 生成车端 registry。

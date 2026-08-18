@@ -121,7 +121,7 @@ Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
 | **Fail-closed safety** | `p_gear_required` tools are blocked unless Park is verified; degenerate input (empty / unmatched) errors instead of passing vacuously. |
 | **Honest selection** | `--selection` with a missing file, unknown ids, or an empty list **errors loudly** rather than silently over- or under-generating. |
 | **Real bridge, no network** | A car-side RPC engine (delivered to a colleague) bridges host → device over adb / file / sendlink. |
-| **Self-contained** | CLI runs via a skill-base-relative path; `framework/` + `cli/` deps auto-install and build on first session. |
+| **Self-contained** | CLI runs via a skill-base-relative path; `cli/` deps auto-install and build on first session. |
 
 ## 📥 Install & run
 
@@ -132,13 +132,9 @@ Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
 /plugin install im-mcp-codeagent
 ```
 
-First session start auto-installs `framework/` + `cli/` and builds `cli/dist` (idempotent). Then start a pipeline run:
+First session start auto-installs `cli/` deps and builds `cli/dist` (idempotent).
 
-```
-/mcp-pipeline ./path/to/your-app
-```
-
-Entry points — `/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`.
+Entry points — the `bridge-analyze` skill (analysis) and the CLI (`validate` · `serve` · `invoke`). For the voice E2E loop (gateway + cockpit), see the 2026-08 section below.
 
 **Codex** reads the mirrored `.codex-plugin/plugin.json` (dual-end).
 
@@ -220,14 +216,13 @@ No device handy? Local verification always works: `mcp-pipeline verify --dir <se
 im-mcp-codeagent/
 ├── .claude-plugin/       Claude Code manifest + marketplace
 ├── .codex-plugin/        Codex manifest (dual-end mirror)
-├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test  (methodology, no model calls)
-├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
-├── hooks/                SessionStart → polyglot build (run-hook.cmd → session-init.sh)
+├── skills/               bridge-analyze (analyze → analysis.json, with validator)
+├── hooks/                SessionStart → build cli (run-hook.cmd → session-init.sh)
 ├── cli/                  @im/mcp-pipeline-cli — deterministic Node
-│   ├── src/generators/   tool-schema · rpc-bridge · car-rpc-engine · …
-│   ├── assets/           car-rpc-engine.ts.template (bundled, de-hardcoded)
+│   ├── src/commands/     validate · serve · invoke
 │   └── bin/mcp-pipeline.js
-├── framework/            @im/mcp-server-framework (shared dispatch core: constructDbusCall / …)
+│   └── bin/mcp-pipeline.js
+
 ├── tools/adb/            bundled adb (self-contained; see LICENSE note)
 └── schema/               analysis.schema.json + fixtures
 ```
@@ -252,7 +247,7 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 
 | 新增 | 位置 | 说明 |
 |---|---|---|
-| **bridge-analyze skill** | `skills/bridge-analyze/` | 面向现 E2E serve 规格的重构版分析 skill：任意 app(源码/PRD/APK/观察) → analysis.json。自带校验器 `validate-analysis.mjs`（对齐 serve 规格；旧插件 validate 面向 scaffold 流程）。取代 mcp-analyze 用于现 E2E 流程，二者并存。 |
+| **bridge-analyze skill** | `skills/bridge-analyze/` | 分析 skill：任意 app(源码/PRD/APK/观察) → analysis.json（MCP serve 直接投影）。自带校验器 `validate-analysis.mjs`。 |
 | **E2E 端到端测试** | `e2e/` | 语音→车 闭环：mcp-gateway 源码 + `bridge-analysis.json`(唯一真相源) + `bridge-serve-wrapper.mjs`(动态 IP 探测+断线自愈) + `bridge-ui-server.mjs`(App 型能力 ui_launch/ui_dump/ui_tap_text/geo_search) + `analysis-to-registry.mjs`(analysis→车端 registry 生成器)。38 工具面全绿实测。 |
 | **车端执行器源码** | `bridge-executor/` | `com.immotors.bridge.executor`：execmd/media/mapnav/carcontrol/intent 五机制分派，手写 binder 契约（事务码声明序、typed-parcelable）。 |
 | **工具脚本** | `tools/car_invoke.sh` `tools/probe_carcontrol.sh` + 车控 57 候选(handlers/candidates json) | 车端 invoke 助手 + 车控批量验证脚本 |
@@ -262,8 +257,6 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 **E2E 快速开始**：`cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`（先起 `asr/asr-whisper-server.py`），浏览器 `http://localhost:3000/cockpit` 点 🎤 说话。
 
 **规格对齐**：`schema/analysis.schema.json` 已扩展支持 mechanism 等新字段（sdkCalls/app.domain/entryFile 降为可选）——新旧 analysis 均可通过旧 `validate`；新流程推荐用 bridge-analyze 自带校验器。
-
-**0.1.23 清理说明**：旧 scaffold 流程已整体移除（`scaffold/generate/curate/build/register/verify/test/schema_preview/wire_check/validate_config/validate_aidl` 命令、`generators/`、`framework/` 包、`mcp-curate/mcp-generate/mcp-pipeline/mcp-test` skills、`commands/`、`docs/`）——它们面向"生成完整 MCP server 工程"的旧流水线，现 E2E 不再使用。当前有效链路：**bridge-analyze（分析+校验）→ analysis.json → serve（MCP 投影）/ invoke（车端执行）**，CLI 仅保留 `validate`/`serve`/`invoke` 三个子命令，formatResponse 已内联，依赖收敛为 `@modelcontextprotocol/sdk`/`zod`/`ajv`。测试保留并改写为对齐新规格（29 用例全绿）。README 主体为 0.1.8 原文，其中 pipeline 描述属旧流程，以本节为准。
 
 **工具规格流（唯一真相源）**：`e2e/bridge-analysis.json`(serve 字段+机制字段) → `node e2e/analysis-to-registry.mjs` 生成车端 registry → 校验 `node skills/bridge-analyze/validate-analysis.mjs e2e/bridge-analysis.json`。
 
