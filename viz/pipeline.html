@@ -61,6 +61,23 @@
   .btn.ghost { background:#fff; color:var(--primary-600); }
   .btn.ghost:hover { background:var(--primary-50); }
   .btn[disabled] { opacity:.45; cursor:default; }
+  .mode-toggle { display:inline-flex; border:1px solid var(--primary-200); border-radius:8px; overflow:hidden; }
+  .mode-btn { font-family:var(--sans); font-size:.88rem; padding:.42rem 1.05rem; cursor:pointer;
+              border:none; background:#fff; color:var(--primary-600); font-weight:500; }
+  .mode-btn.on { background:var(--primary-500); color:#fff; }
+  select#op-select { font-family:var(--mono); font-size:12.5px; border:1px solid var(--n200); border-radius:7px;
+                     padding:.34rem .5rem; color:var(--t1); background:#fff; outline:none; max-width:280px; }
+  select#op-select:focus { border-color:var(--primary-500); }
+  .chk { display:inline-flex; align-items:center; gap:.35rem; font-size:.82rem; color:var(--t2); cursor:pointer; user-select:none; }
+  .chk input { accent-color:var(--primary-500); }
+  .serve-chip { font-size:.78rem; font-family:var(--mono); padding:.2rem .6rem; border-radius:6px;
+                color:var(--success); border:1px solid #c4e7cd; background:var(--success-50); }
+  .serve-chip.off { color:var(--t3); border-color:var(--n200); background:var(--n50); }
+  .fnode.skipped { opacity:.55; border-style:dashed; border-color:var(--n300); filter:none; }
+  .fnode.skipped .fico { color:var(--n400); }
+  .fnode.skipped .state-badge { display:inline-flex; color:var(--t3); border:1px dashed var(--n300); background:#fff; }
+  .plog .warn { color:var(--gold); }
+  .plog .err { color:var(--danger); }
   .stage-now { font-size:.88rem; color:var(--t2); margin-left:.3rem; }
   .stage-now b { color:var(--primary-700); }
   .speed { font-family:var(--mono); }
@@ -246,11 +263,20 @@
         <span class="section-sub">只读快照的过程重演 -- 节点计数皆为真实产物数值</span>
       </div>
       <div class="console">
+        <span class="mode-toggle">
+          <button class="mode-btn on" id="mode-replay">重演</button>
+          <button class="mode-btn" id="mode-live">实时</button>
+        </span>
         <button class="btn" id="btn-play">▶ 播放</button>
         <button class="btn ghost" id="btn-replay">⟳ 重播</button>
         <button class="btn ghost speed" id="btn-speed">速度 1×</button>
+        <button class="btn" id="btn-run" style="display:none">▶ 执行管线</button>
+        <button class="btn ghost" id="btn-abort" style="display:none">■ 中止</button>
+        <select id="op-select" style="display:none" title="实测工具（默认只读）"></select>
+        <label class="chk" id="serve-chk-wrap" style="display:none"><input type="checkbox" id="serve-chk" checked> 启动并保持 serve</label>
+        <span class="serve-chip off" id="serve-chip" style="display:none">serve · 未启动</span>
         <span class="stage-now" id="stage-now">待命</span>
-        <span class="replay-note">重演为对已录管线各阶段的顺序展示，非实时执行</span>
+        <span class="replay-note" id="mode-note">重演为对已录管线各阶段的顺序展示，非实时执行</span>
       </div>
       <div class="pbar-wrap"><div class="progress-fill" id="pbar"></div></div>
       <div class="pbar-meta"><span>管线进度</span><span><b id="pbar-pct">0%</b>　·　<b id="pbar-stage">0 / 6</b> 阶段</span></div>
@@ -691,6 +717,136 @@ async function replay(auto) {
   setTimeout(() => { $("btn-play").disabled = false; }, 400);
 }
 
+/* ---------- 实时模式（经 viz/run.mjs 执行真实命令） ---------- */
+let mode = "replay", serverOk = false, carOk = false;
+const CONN_MAP = { n1: [], n2: ["n2"], n3: ["n3"], n4: ["n4"], n4a: ["n4", "n4a"], n4b: ["n4", "n4b"], n5: ["n5"], n6: ["n6"] };
+function setConnFor(id, cls) {
+  (CONN_MAP[id] || []).forEach((c) =>
+    document.querySelectorAll(`[data-for="${c}"]`).forEach((el) => {
+      el.classList.remove("flowing", "traversed");
+      if (cls) el.classList.add(cls);
+    }));
+}
+function nodeState(id, state) {
+  const el = nodeEl(id);
+  if (!el) return;
+  el.classList.remove("pending", "active", "done", "skipped");
+  el.classList.add(state);
+  el.querySelector(".state-badge").textContent =
+    state === "done" ? "✓ 完成" : state === "skipped" ? "— 跳过" : state === "active" ? "执行中" : "进行中";
+  if (state === "done") el.querySelectorAll(".cnt[data-count]").forEach((c) => countUp(c, +c.dataset.count, 450));
+  else if (state === "skipped") el.querySelectorAll(".cnt[data-count]").forEach((c) => (c.textContent = c.dataset.count));
+}
+function liveLog(line, cls) {
+  const el = $("plog");
+  const t = ((performance.now() - t0) / 1000).toFixed(1);
+  const div = document.createElement("div");
+  div.innerHTML = `<span class="ts">t+${t}s</span><span class="${cls || ""}">${line}</span>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+async function apiStage(stage, args) {
+  if (!serverOk) { liveLog(`　· 未连接实时后端，跳过 ${stage}`, "warn"); return { ok: false, skipped: true }; }
+  liveLog(`　· 执行 ${stage} …`);
+  let j;
+  try {
+    const r = await fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage, args: args || {} }) });
+    j = await r.json();
+  } catch (e) { liveLog(`　· 请求失败：${esc(e.message)}`, "err"); return { ok: false, skipped: true }; }
+  (j.output || "").split("\n").filter(Boolean).forEach((l) => liveLog(`　  ${esc(l)}`));
+  if (j.ok) liveLog(`✓ ${esc(stage)} 完成（${j.durationMs ?? "?"}ms）`, "ok");
+  else liveLog(`✗ ${esc(stage)} 失败：${esc(j.error || "")}`, "err");
+  return j;
+}
+async function runLive() {
+  const tk = ++runToken;
+  serverOk = false; carOk = false;
+  document.querySelectorAll(".fnode").forEach((el) => { el.classList.remove("active", "done", "skipped"); el.classList.add("pending"); el.querySelector(".state-badge").textContent = "进行中"; });
+  document.querySelectorAll(".conn,.forkbar").forEach((el) => el.classList.remove("flowing", "traversed"));
+  document.querySelectorAll(".cnt[data-count]").forEach((c) => (c.textContent = "0"));
+  $("plog").innerHTML = "";
+  t0 = performance.now();
+  const total = 7;
+  const update = (done, name) => updateProgress(done, total, name);
+
+  try { const h = await fetch("/api/health", { cache: "no-store" }); serverOk = (await h.json()).ok === true; } catch (e) { serverOk = false; }
+  if (!serverOk) liveLog("⚠ 未连接实时后端 —— 请先运行 node viz/run.mjs，并以 http://127.0.0.1:8650/pipeline.html 打开本页", "warn");
+  liveLog(`▶ 开始实时执行管线（BRIDGE-${D.version}）`);
+
+  let done = 0;
+  const plan = [
+    { id: "n1", name: "① 输入素材", run: async () => { liveLog("　· 概念阶段：app 源码 / PRD / APK / adb 观察（无需执行）"); return { ok: true }; } },
+    { id: "n2", name: "② bridge-analyze", run: async () => { liveLog("　· agent skill（本页不执行）；使用现有 analysis 产物", "warn"); return { ok: true, note: "agent" }; } },
+    { id: "n3", name: "③ 唯一真相源 · schema 校验", run: () => apiStage("validate") },
+    { id: "n4b", name: "④乙 registry 生成", run: async () => {
+        const a = await apiStage("registry");
+        if (a.ok) return apiStage("deploy");
+        return a;
+    } },
+    { id: "n4a", name: "④甲 serve 投影", run: async () => {
+        if (!$("serve-chk").checked) { liveLog("　· 跳过：未勾选「启动并保持 serve」", "warn"); return { ok: false, skipped: true }; }
+        return apiStage("serve:start");
+    } },
+    { id: "n5", name: "⑤ 车端执行器", run: async () => { const r = await apiStage("carcheck"); carOk = r.ok; return r; } },
+    { id: "n6", name: "⑥ 真实车机结果 · invoke", run: async () => {
+        if (!carOk) { liveLog("　· 跳过：车离线（未通过 carcheck）", "warn"); return { ok: false, skipped: true }; }
+        return apiStage("invoke", { op: $("op-select").value, args: {} });
+    } },
+  ];
+
+  for (const p of plan) {
+    if (tk !== runToken) return;
+    nodeState(p.id, "active");
+    setConnFor(p.id, "flowing");
+    update(done, p.name);
+    liveLog(`<span class="st">${esc(p.name)}</span>　开始`);
+    let r;
+    try { r = await p.run(); } catch (e) { liveLog(`　· 异常：${esc(e.message)}`, "err"); r = { ok: false }; }
+    if (tk !== runToken) return;
+    nodeState(p.id, r.ok ? "done" : "skipped");
+    setConnFor(p.id, r.ok ? "traversed" : "");
+    done += 1;
+    update(done, "");
+  }
+  if (tk !== runToken) return;
+  update(7, "");
+  liveLog(`<span class="fin">■ 实时执行结束</span>`);
+  refreshServeChip();
+}
+async function refreshServeChip() {
+  if (mode !== "live") return;
+  let running = false;
+  try { const h = await fetch("/api/health", { cache: "no-store" }); running = (await h.json()).serveRunning === true; } catch (e) {}
+  const chip = $("serve-chip");
+  chip.textContent = running ? "serve · 运行中" : "serve · 未启动";
+  chip.classList.toggle("off", !running);
+}
+function setMode(m) {
+  if (mode === m) return;
+  runToken++;
+  mode = m;
+  $("mode-replay").classList.toggle("on", m === "replay");
+  $("mode-live").classList.toggle("on", m === "live");
+  const r = m === "replay";
+  ["btn-play", "btn-replay", "btn-speed"].forEach((id) => ($(id).style.display = r ? "" : "none"));
+  ["btn-run", "btn-abort", "op-select", "serve-chk-wrap", "serve-chip"].forEach((id) => ($(id).style.display = r ? "none" : ""));
+  $("mode-note").textContent = r
+    ? "重演为对已录管线各阶段的顺序展示，非实时执行"
+    : "实时模式：逐阶段执行真实命令（需 node viz/run.mjs 起服务；deploy/invoke 会真动车）";
+  if (m === "live") {
+    refreshServeChip();
+    if (location.protocol === "file:") liveLog("⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）", "warn");
+  }
+}
+function populateOps() {
+  const ops = D.capabilities.filter((c) => c.safetyLevel === "readonly" && c.status !== "broken");
+  $("op-select").innerHTML =
+    `<option value="">— 选择实测工具 —</option>` +
+    ops.map((c) => `<option value="${esc(c.id)}">${esc(c.id)}（只读）</option>`).join("") +
+    `<option value="media_next">media_next（切歌，非只读）</option>`;
+  $("op-select").value = ops[0] ? ops[0].id : "";
+}
+
 /* ---------- 渲染入口（置于所有 let/const 声明之后，避免暂时性死区） ---------- */
 function render() {
   const S = D.stats;
@@ -729,8 +885,25 @@ function render() {
     $("btn-speed").textContent = `速度 ${speed}×`;
   };
 
-  /* 载入即自动重演一次 */
-  setTimeout(() => replay(), 350);
+  /* 实时模式 */
+  populateOps();
+  $("mode-replay").onclick = () => setMode("replay");
+  $("mode-live").onclick = () => setMode("live");
+  $("btn-run").onclick = () => runLive();
+  $("btn-abort").onclick = () => { runToken++; $("stage-now").textContent = "已中止"; };
+  $("serve-chk").onchange = () => refreshServeChip();
+  window.addEventListener("beforeunload", () => {
+    if (mode === "live") fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "serve:stop" }), keepalive: true }).catch(() => {});
+  });
+
+  /* 载入即自动重演一次（?mode=live&run=1 则直接进实时模式并执行） */
+  const q = new URLSearchParams(location.search);
+  if (q.get("mode") === "live") {
+    setMode("live");
+    if (q.get("run") === "1") setTimeout(() => runLive(), 350);
+  } else {
+    setTimeout(() => replay(), 350);
+  }
 }
 
 if (!D) {
