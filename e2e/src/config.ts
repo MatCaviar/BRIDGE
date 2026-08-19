@@ -13,10 +13,18 @@ export interface TaskConfig {
   readonly maxTurns: number;
 }
 
+export interface UiSyncRule {
+  readonly tool: string;
+  readonly argKey: string;
+  readonly map: Readonly<Record<string, string>>;
+}
+
 export interface GatewayConfig {
   readonly llm: LLMConfig;
   readonly mcpServers: readonly McpServerConfig[];
   readonly task: TaskConfig;
+  /** 状态类 app UI 同步: 工具执行成功后自动点击"当前状态"对应控件(走 app 交互路径刷新, 无感)。 */
+  readonly uiSync?: readonly UiSyncRule[];
 }
 
 /**
@@ -94,6 +102,11 @@ export function loadConfig(configPath: string): GatewayConfig {
       maxTokens: llm.max_tokens ? Number(llm.max_tokens) : undefined,
     },
     mcpServers: (parsed.mcp_servers as McpServerConfig[]),
+    uiSync: (parsed.ui_sync as Array<Record<string, unknown>> | undefined)?.map((r) => ({
+      tool: String(r.tool),
+      argKey: String(r.arg_key ?? r.argKey ?? ""),
+      map: (r.map ?? {}) as Record<string, string>,
+    })),
     task: {
       systemPrompt: task.system_prompt != null ? String(task.system_prompt) : null,
       userMessage: String(task.user_message ?? ""),

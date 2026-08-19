@@ -116,6 +116,9 @@ export async function run(
           content: resultStr,
           toolCallId: call.id,
         });
+
+        // 状态类 app UI 同步: 执行成功后自动点"当前状态"控件(走 app 交互路径, UI 无感刷新)
+        await syncUiAfterTool(config, call, connector);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         logger.error("orchestrator", `Tool error: ${errorMsg}`);
@@ -130,4 +133,26 @@ export async function run(
   }
 
   throw new Error(`Exceeded max turns (${config.task.maxTurns}) without completion`);
+}
+
+/** 状态类 app UI 同步(ui_sync 规则): 工具执行成功后, 按 args[argKey] 查 map → bridge-ui.ui_tap_text 点击。
+ *  失败静默(控件不在当前屏/UI 未开时无副作用); 对 LLM 透明。 */
+async function syncUiAfterTool(
+  config: GatewayConfig,
+  call: { serverName: string; toolName: string; arguments: Record<string, unknown> },
+  connector: McpConnector,
+): Promise<void> {
+  const rules = config.uiSync ?? [];
+  const rule = rules.find((r) => r.tool === call.toolName);
+  if (!rule) return;
+  const raw = call.arguments?.[rule.argKey];
+  if (raw === undefined || raw === null) return;
+  const text = rule.map[String(raw)];
+  if (!text) return;
+  try {
+    logger.info("orchestrator", `ui_sync: ${call.toolName}=${raw} -> tap "${text}"`);
+    await connector.executeTool("bridge-ui", "ui_tap_text", { text });
+  } catch (e) {
+    logger.warn("orchestrator", `ui_sync tap failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
+  }
 }

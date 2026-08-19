@@ -19,6 +19,26 @@ mcp_servers:
     # app 型能力: adb 驱动车机 UI (ui_launch/ui_dump/ui_tap_text/...), 任何 app 通用
     args: ["D:/IM/mcp-gateway/bridge-ui-server.mjs"]
 
+# 状态类 app 的 UI 同步: 工具执行成功后, 自动点击"当前状态"对应控件(走 app 交互路径刷新 UI, 无感)
+# arg_key = 从工具 args 取状态值; map = 状态值 -> 控件文本(bridge-ui ui_tap_text)
+ui_sync:
+  - tool: set_sound_stage
+    arg_key: mode
+    map:
+      "0": "至臻原声"
+      "1": "专业听音室"
+      "2": "小型演奏会"
+      "3": "音乐剧场"
+      "4": "沉浸影院"
+      "7": "主驾优先"
+      "8": "后排优先"
+      "9": "全车均衡"
+      "10": "全景影院"
+      "235": "AI莱茵之声"
+      "236": "AI极光暖调"
+      "237": "AI英伦格调"
+      "238": "AI美式金属"
+
 task:
   system_prompt: |
     你是座舱语音智能体，用中文简短回复用户。你可以通过 MCP 工具控制车机。工具族：

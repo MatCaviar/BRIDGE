@@ -222,6 +222,9 @@ export async function runObservable(
           toolCallId: call.id,
         });
 
+        // 状态类 app UI 同步: 执行成功后自动点"当前状态"控件(走 app 交互路径, UI 无感刷新)
+        await syncUiAfterTool(config, call, connector, emitter, turn);
+
         emit(emitter, {
           type: "tool_call_completed",
           timestamp: ts(),
@@ -276,4 +279,46 @@ export async function runObservable(
   } satisfies SessionErrorEvent);
 
   return maxTurnsError;
+}
+
+/** 状态类 app UI 同步(ui_sync 规则): 工具执行成功后, 按 args[argKey] 查 map → bridge-ui.ui_tap_text 点击。
+ *  失败静默(控件不在当前屏/UI 未开时无副作用); 对 LLM 透明, 事件流可见为额外一次 ui_tap_text 调用。 */
+async function syncUiAfterTool(
+  config: GatewayConfig,
+  call: { serverName: string; toolName: string; arguments: Record<string, unknown> },
+  connector: McpConnector,
+  emitter: EventEmitter,
+  turn: number,
+): Promise<void> {
+  const rules = config.uiSync ?? [];
+  const rule = rules.find((r) => r.tool === call.toolName);
+  if (!rule) return;
+  const raw = call.arguments?.[rule.argKey];
+  if (raw === undefined || raw === null) return;
+  const text = rule.map[String(raw)];
+  if (!text) return;
+  emit(emitter, {
+    type: "tool_call_started",
+    timestamp: ts(),
+    turn: turn + 1,
+    callId: `ui-sync-${Date.now()}`,
+    serverName: "bridge-ui",
+    toolName: "ui_tap_text",
+    arguments: { text },
+  } satisfies ToolCallStartedEvent);
+  try {
+    await connector.executeTool("bridge-ui", "ui_tap_text", { text });
+    emit(emitter, {
+      type: "tool_call_completed",
+      timestamp: ts(),
+      turn: turn + 1,
+      callId: `ui-sync-${Date.now()}`,
+      serverName: "bridge-ui",
+      toolName: "ui_tap_text",
+      resultPreview: `ui_sync: tapped "${text}"`,
+      durationMs: 0,
+    });
+  } catch {
+    // 非致命: 控件不在当前屏/UI 未开时静默
+  }
 }
