@@ -315,6 +315,10 @@
           "ccFunction": {
             "type": "string",
             "description": "carcontrol: functionId(以服务端 handler 注册为准)"
+          },
+          "interfaceClass": {
+            "type": "string",
+            "description": "aidl 机制: 接口全类名(须编译进执行器 APK), 如 com.x.app.IService"
           }
         }
       }

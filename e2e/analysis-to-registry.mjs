@@ -67,6 +67,7 @@ for (const cap of analysis.capabilities ?? []) {
       t.mechanism = m;
   }
   // bind 目标 (有值才写; 缺省执行器回退顶层默认)
+  if (cap.interfaceClass) t.interfaceClass = cap.interfaceClass;
   if (cap.servicePackage) t.servicePackage = cap.servicePackage;
   if (cap.serviceClass) t.serviceClass = cap.serviceClass;
   if (cap.bindAction) t.bindAction = cap.bindAction;

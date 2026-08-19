@@ -103,16 +103,30 @@ class ExecutorActivity : Activity() {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 Log.i(TAG, "onServiceConnected (CROSS-APP reflect): ${tool.methodName}")
                 try {
-                    if (tool.mechanism == "mapnav") {
-                        val msvc = IMapCommonService.Stub.asInterface(binder)
-                        done(cmd.reqId, true, null, dispatchMapCommon(msvc, tool, cmd.args))
-                    } else if (tool.mechanism == "carcontrol") {
-                        val csvc = ICustomService.Stub.asInterface(binder)
-                        done(cmd.reqId, true, null, dispatchCarControl(csvc, tool, cmd.args))
-                    } else {
-                        val service = IIMAudioService.Stub.asInterface(binder)
-                        val response = dispatch(service, tool, cmd.args)
-                        done(cmd.reqId, true, null, response)
+                    when (tool.mechanism) {
+                        "mapnav" -> {
+                            val msvc = IMapCommonService.Stub.asInterface(binder)
+                            done(cmd.reqId, true, null, dispatchMapCommon(msvc, tool, cmd.args))
+                        }
+                        "carcontrol" -> {
+                            val csvc = ICustomService.Stub.asInterface(binder)
+                            done(cmd.reqId, true, null, dispatchCarControl(csvc, tool, cmd.args))
+                        }
+                        "aidl" -> {
+                            // 通用反射: 接口类由 registry 的 interfaceClass 声明(任意 AIDL 多方法接口, 需编译进本 APK)
+                            val iface = rawTool?.optString("interfaceClass", "") ?: ""
+                            if (iface.isEmpty()) {
+                                done(cmd.reqId, false, "NO_INTERFACE_CLASS", null)
+                            } else {
+                                val proxy = reflectAsInterface(iface, binder ?: throw IllegalStateException("null binder"))
+                                done(cmd.reqId, true, null, dispatchReflect(proxy, tool, cmd.args))
+                            }
+                        }
+                        else -> {
+                            val service = IIMAudioService.Stub.asInterface(binder)
+                            val response = dispatch(service, tool, cmd.args)
+                            done(cmd.reqId, true, null, response)
+                        }
                     }
                 } catch (e: Exception) {
                     done(cmd.reqId, false, "RPC_ERROR: ${e.message}", null)
@@ -436,6 +450,32 @@ class ExecutorActivity : Activity() {
         } catch (e: Exception) {
             Log.e(TAG, "carcontrol $function failed", e)
             JSONObject().apply { put("code", 500); put("message", "CC_FAIL: ${e.message}"); put("data", JSONObject.NULL) }
+        }
+    }
+
+    /** 通用 AIDL 反射: 按 registry interfaceClass 反射 Stub.asInterface(binder) 得到代理。
+     *  支持任意 AIDL 多方法接口(契约 .aidl 编译进本 APK 即可, 无需改本类)。 */
+    private fun reflectAsInterface(iface: String, binder: IBinder): Any {
+        val stubCls = Class.forName(iface + "\$Stub")
+        val m = stubCls.getMethod("asInterface", IBinder::class.java)
+        return m.invoke(null, binder) ?: throw IllegalStateException("asInterface returned null")
+    }
+
+    /** 通用反射分派: 按 methodName 反射调代理方法(String 参数或无参), 返回 JSON 字符串。 */
+    private fun dispatchReflect(proxy: Any, tool: Tool, args: JSONObject): JSONObject {
+        val paramJson: String? = when (tool.pattern) {
+            "none" -> null
+            else -> args.toString()
+        }
+        val m = if (paramJson == null) proxy.javaClass.getMethod(tool.methodName)
+                else proxy.javaClass.getMethod(tool.methodName, String::class.java)
+        val raw = m.invoke(proxy) as? String
+        Log.i(TAG, "aidl-reflect ${tool.methodName}(${tool.pattern}) -> ${if (raw.isNullOrEmpty()) "NULL" else raw.take(180)}")
+        if (raw.isNullOrEmpty()) return JSONObject().apply {
+            put("code", 501); put("message", "NULL_RETURN ${tool.methodName}"); put("data", JSONObject.NULL)
+        }
+        return try { JSONObject(raw) } catch (e: Exception) {
+            JSONObject().apply { put("code", 1000); put("message", "SUCCESS"); put("data", raw) }
         }
     }
 

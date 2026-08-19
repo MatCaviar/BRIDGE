@@ -58,11 +58,11 @@ description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 }
 ```
 
-**机制选择**（从 app 对外形态判断；拿不准 → 选最可能 + status=probe）：
+**机制选择**（从 app 对外形态判断；拿不准 → 选最可能 + status=probe）。执行通道是**通用底座**：aidl(多方法AIDL反射)/execmd(单入口)/media/mapnav/carcontrol/intent + UI 驱动(ui_* 兜底, 任何 app 可操作)。**新形态的执行端适配由你(执行 codeagent)自行完成**（改执行器/写适配器），套件不自动生成执行代码——分析产物(schema)是唯一的自动交付物：
 
 | mechanism | 适用形态 | 关键字段 |
 |---|---|---|
-| `aidl` | AIDL 多方法反射(每个能力一个方法, 参数为 JSON 字符串; 执行器需携带匹配的接口契约) | methodName/pattern/dataClass/form |
+| `aidl` | AIDL 多方法反射(每个能力一个方法, 参数为 JSON 字符串) | interfaceClass(接口全类名, 须编译进执行器 APK) / methodName/pattern/form |
 | `execmd` | AIDL 单入口 executeCommand 式(命令名+参数JSON) | methodName/pattern/dataClass/devicePaths |
 | `media` | 媒体会话控制(切歌/播放/暂停, 任意媒体 app) | 内置 media_* 工具, 不进 analysis |
 | `mapnav` | 地图/导航类 AI 接口(设目的地+起导航) | bindAction + 目的地参数(name/lat/lon) |
