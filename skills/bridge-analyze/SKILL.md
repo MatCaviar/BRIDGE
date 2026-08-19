@@ -20,7 +20,7 @@ description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 **输出**：`analysis.json`（必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
 - serve 投影：`capabilities[].id/description/params/status` → MCP 工具 + inputSchema（LLM 直接可见）
 - 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
-- CLI 基准：`node <插件>/cli/bin/mcp-pipeline.js <subcmd>`（`validate`/`serve`/`invoke`/`validate_aidl`；${CLAUDE_PLUGIN_ROOT} 可作插件根）
+- 套件根 = 本 skill 的 `../../`（仓库根: cli/schema/e2e/...）。CLI: `node ../../cli/bin/mcp-pipeline.js <subcmd>`（`validate`/`serve`/`invoke`）
 
 ## 输出规格
 
@@ -96,7 +96,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 产出后按序验证, 每条都要过:
 
 1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>` — 零错误
-2. **serve 加载**: `node <cli>/bin/mcp-pipeline.js serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
+2. **serve 加载**: `node ../../cli/bin/mcp-pipeline.js serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
 3. **契约核对**(有源码时): `validate_aidl <registry.json> <aidlDir> <adapter> <types>` — 机制字段与 AIDL 一致
 4. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
 5. **报告**: 向用户说明 — 工具数、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
