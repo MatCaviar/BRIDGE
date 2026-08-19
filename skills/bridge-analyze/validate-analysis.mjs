@@ -28,7 +28,7 @@ const warns = [];
 const VALID_TYPES = new Set(["string", "int", "long", "number", "boolean", "array", "object", "float", "double", "byte", "short"]);
 const VALID_STATUS = new Set(["verified", "probe", "broken"]);
 const VALID_SAFETY = new Set(["readonly", "normal", "broken", "p_gear_required", "p_gear_and_confirm", "p_gear_and_network"]);
-const VALID_MECH = new Set(["execmd", "media", "mapnav", "carcontrol", "intent"]);
+const VALID_MECH = new Set(["aidl", "execmd", "media", "mapnav", "carcontrol", "intent"]);
 const BUILTIN_MEDIA = new Set(["media_next", "media_prev", "media_play", "media_pause"]);
 
 // app

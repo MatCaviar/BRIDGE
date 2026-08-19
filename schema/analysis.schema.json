@@ -123,6 +123,18 @@
               }
             }
           }
+        },
+        "servicePackage": {
+          "type": "string",
+          "description": "app 级默认 bind 目标包名(capability 可覆盖)"
+        },
+        "serviceClass": {
+          "type": "string",
+          "description": "app 级默认 bind 服务类名(capability 可覆盖)"
+        },
+        "bindAction": {
+          "type": "string",
+          "description": "app 级默认 bind action(capability 可覆盖)"
         }
       }
     },
@@ -271,13 +283,14 @@
           "mechanism": {
             "type": "string",
             "enum": [
+              "aidl",
               "execmd",
               "media",
               "mapnav",
               "carcontrol",
               "intent"
             ],
-            "description": "车端执行机制(serve 忽略; 车端 registry 消费): execmd=executeCommand单入口, media=媒体会话, mapnav=地图AI导航, carcontrol=CustomService functionId, intent=页面跳转"
+            "description": "车端执行机制(serve 忽略; 车端 registry 消费): aidl=多方法AIDL反射, execmd=executeCommand单入口, media=媒体会话, mapnav=地图AI导航, carcontrol=CustomService functionId, intent=页面跳转"
           },
           "methodName": {
             "type": "string",

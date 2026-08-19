@@ -44,20 +44,15 @@ describe("validateAnalysis (aligned to E2E serve spec)", () => {
     }
   });
 
-  it("rejects when app is missing", () => {
+  it("rejects missing app or capabilities", () => {
     expect(validateAnalysis({ capabilities: [] }).valid).toBe(false);
-  });
-
-  it("rejects when capabilities is missing", () => {
     expect(validateAnalysis({ app: { name: "x", framework: "android-kotlin" } }).valid).toBe(false);
   });
 
-  it("rejects unknown safetyLevel", () => {
-    const input = {
-      ...VALID_ANALYSIS,
-      capabilities: [{ ...VALID_ANALYSIS.capabilities[0], safetyLevel: "dangerous" }],
-    };
-    expect(validateAnalysis(input).valid).toBe(false);
+  it("rejects unknown safetyLevel or missing required fields", () => {
+    const badSafety = { ...VALID_ANALYSIS, capabilities: [{ ...VALID_ANALYSIS.capabilities[0], safetyLevel: "dangerous" }] };
+    expect(validateAnalysis(badSafety).valid).toBe(false);
+    expect(validateAnalysis({ ...VALID_ANALYSIS, capabilities: [{ id: "x" }] }).valid).toBe(false);
   });
 
   it("rejects duplicate capability ids (MCP tool name collision)", () => {
@@ -79,11 +74,6 @@ describe("validateAnalysis (aligned to E2E serve spec)", () => {
         ],
       }],
     };
-    expect(validateAnalysis(input).valid).toBe(false);
-  });
-
-  it("rejects capability missing required fields", () => {
-    const input = { ...VALID_ANALYSIS, capabilities: [{ id: "x" }] };
     expect(validateAnalysis(input).valid).toBe(false);
   });
 

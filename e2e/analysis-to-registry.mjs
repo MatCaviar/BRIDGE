@@ -29,6 +29,16 @@ for (const cap of analysis.capabilities ?? []) {
   };
   const m = cap.mechanism ?? "execmd";
   switch (m) {
+    case "aidl":
+      Object.assign(t, {
+        mechanism: "aidl",
+        methodName: cap.methodName ?? cap.id,
+        pattern: cap.pattern ?? "scalar",
+        devicePaths: cap.devicePaths ?? [],
+        dataClass: cap.dataClass,
+        form: cap.form ?? "binder",
+      });
+      break;
     case "execmd":
       Object.assign(t, {
         mechanism: "execmd",
