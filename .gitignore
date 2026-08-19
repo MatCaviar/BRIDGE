@@ -39,3 +39,8 @@ Thumbs.db
 screen_*.png
 ui.xml
 cmd.json
+
+# 会话产物（本地备份/截图/probe 记录/运行期临时文件，不入库）
+.zcode/
+tmp/
+viz/.cmd.json
