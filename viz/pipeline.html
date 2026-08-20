@@ -269,12 +269,8 @@
         <button class="btn" id="btn-play">▶ 播放</button>
         <button class="btn ghost" id="btn-replay">⟳ 重播</button>
         <button class="btn ghost speed" id="btn-speed">速度 1×</button>
-        <button class="btn" id="btn-run" style="display:none">▶ 执行管线</button>
-        <button class="btn ghost" id="btn-abort" style="display:none">■ 中止</button>
-        <select id="op-select" style="display:none" title="实测工具（默认只读）"></select>
-        <label class="chk" id="serve-chk-wrap" style="display:none"><input type="checkbox" id="serve-chk" checked> 启动并保持 serve</label>
-        <span class="serve-chip off" id="serve-chip" style="display:none">serve · 未启动</span>
         <span class="stage-now" id="stage-now">待命</span>
+        <span class="serve-chip off" id="serve-chip" style="display:none">serve · 未启动</span>
         <span class="replay-note" id="mode-note">重演为对已录管线各阶段的顺序展示，非实时执行</span>
       </div>
       <div class="pbar-wrap"><div class="progress-fill" id="pbar"></div></div>
@@ -714,6 +710,7 @@ async function replay(auto) {
 /* ---------- 实时模式（会话订阅式：进度在服务端，刷新页面不丢） ---------- */
 let mode = "replay", serverOk = false, pollTimer = null;
 const SESSION_IDS = ["n1", "n2", "n3", "n4a", "n4b", "n5", "n6"];
+const STAGE_NAMES = { n1: "① 输入素材", n2: "② bridge-analyze 分析", n3: "③ schema 校验", n4a: "④甲 serve 投影", n4b: "④乙 registry 生成", n5: "⑤ 车端部署·自检", n6: "⑥ 真实车机 invoke" };
 const CONN_MAP = { n1: [], n2: ["n2"], n3: ["n3"], n4: ["n4"], n4a: ["n4", "n4a"], n4b: ["n4", "n4b"], n5: ["n5"], n6: ["n6"] };
 function setConnFor(id, cls) {
   (CONN_MAP[id] || []).forEach((c) =>
@@ -750,7 +747,10 @@ function applySession(s) {
   $("pbar").style.width = (p.pct ?? 0) + "%";
   $("pbar-pct").textContent = (p.pct ?? 0) + "%";
   $("pbar-stage").textContent = `${p.done ?? 0} / ${p.total ?? 7}`;
-  $("stage-now").innerHTML = s.name ? `会话：<b>${esc(s.name)}</b>` : "待命";
+  const runningId = SESSION_IDS.find((id) => s.stages[id] === "running");
+  $("stage-now").innerHTML = runningId
+    ? `执行中：<b>${STAGE_NAMES[runningId] || runningId}</b>`
+    : (s.name ? `会话：<b>${esc(s.name)}</b> · ${p.done ?? 0}/${p.total ?? 7}` : "待命");
 }
 async function refreshSession() {
   if (mode !== "live") return;
@@ -766,7 +766,7 @@ async function refreshSession() {
 function startPolling() {
   stopPolling();
   refreshSession();
-  pollTimer = setInterval(refreshSession, 1500);
+  pollTimer = setInterval(refreshSession, 1000);
 }
 function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -781,11 +781,6 @@ async function applyTargetFromUrl() {
     await fetch("/api/session/event", { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ cls: "st", msg: `　· 分析目标: ${(t.analysis || "").split("/").pop()} ｜ 被分析源码: ${(t.adapter || "").split("/").pop()} ｜ 契约面: ${(t.srcDir || "").split("/").slice(-2).join("/")}` }) });
   } catch (e) { /* 忽略 */ }
-}
-function triggerRun() {
-  fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ op: $("op-select").value, serve: $("serve-chk").checked }) }).catch(() => {});
-  refreshSession();
 }
 async function refreshServeChip() {
   if (mode !== "live") return;
@@ -802,28 +797,20 @@ function setMode(m) {
   $("mode-live").classList.toggle("on", m === "live");
   const r = m === "replay";
   ["btn-play", "btn-replay", "btn-speed"].forEach((id) => ($(id).style.display = r ? "" : "none"));
-  ["btn-run", "btn-abort", "op-select", "serve-chk-wrap", "serve-chip"].forEach((id) => ($(id).style.display = r ? "none" : ""));
+  ["serve-chip"].forEach((id) => ($(id).style.display = r ? "none" : ""));
   $("mode-note").textContent = r
     ? "重演为对已录管线各阶段的顺序展示，非实时执行"
-    : "实时模式：会话订阅式 -- 刷新页面不丢进度；②→④甲 无需车，⑤⑥ 车端需车在线";
+    : "跟随 agent 会话：skill 执行到哪一步即显示到哪一步 · 刷新不丢进度";
   $("gen-title").textContent = r ? "生成过程 · 重演" : "生成过程 · 实时";
   $("gen-sub").textContent = r
     ? "只读快照的过程重演 -- 节点计数皆为真实产物数值"
-    : "服务端会话实时推送 -- 支持 skill 执行过程同步展示，刷新不丢进度";
+    : "服务端会话实时推送 -- 由 skill 执行驱动，页面纯跟随展示";
   if (m === "live") {
     if (location.protocol === "file:") renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）" }]);
     applyTargetFromUrl();
     startPolling();
     refreshServeChip();
   } else stopPolling();
-}
-function populateOps() {
-  const ops = D.capabilities.filter((c) => c.safetyLevel === "readonly" && c.status !== "broken");
-  $("op-select").innerHTML =
-    `<option value="">— 选择实测工具 —</option>` +
-    ops.map((c) => `<option value="${esc(c.id)}">${esc(c.id)}（只读）</option>`).join("") +
-    `<option value="media_next">media_next（切歌，非只读）</option>`;
-  $("op-select").value = ops[0] ? ops[0].id : "";
 }
 
 /* ---------- 渲染入口（置于所有 let/const 声明之后，避免暂时性死区） ---------- */
@@ -863,22 +850,17 @@ function render() {
     $("btn-speed").textContent = `速度 ${speed}×`;
   };
 
-  /* 实时模式（会话订阅式） */
-  populateOps();
+  /* 实时模式（纯跟随 agent 会话） */
   $("mode-replay").onclick = () => setMode("replay");
   $("mode-live").onclick = () => setMode("live");
-  $("btn-run").onclick = triggerRun;
-  $("btn-abort").onclick = () => { fetch("/api/abort", { method: "POST" }).catch(() => {}); };
-  $("serve-chk").onchange = () => refreshServeChip();
   window.addEventListener("beforeunload", () => {
     if (mode === "live") fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "serve:stop" }), keepalive: true }).catch(() => {});
   });
 
-  /* 载入即自动重演一次（?mode=live&run=1 则直接进实时模式并执行） */
+  /* 载入即自动重演一次（?mode=live 则直接进实时跟随模式） */
   const q = new URLSearchParams(location.search);
   if (q.get("mode") === "live") {
     setMode("live");
-    if (q.get("run") === "1") setTimeout(triggerRun, 350);
   } else {
     setTimeout(() => replay(), 350);
   }
