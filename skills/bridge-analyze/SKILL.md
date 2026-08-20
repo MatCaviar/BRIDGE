@@ -120,16 +120,15 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 4. 产出 analysis.json(及可选 registry)
 5. 执行验证协议 → 修正 → 报告
 
-## 可视化同步（可选 · 适配层，不影响执行流程）
+## 可视化同步（适配层，默认开启；不影响执行流程）
 
-若环境设置了 `BRIDGE_VIZ_URL`（如 `http://127.0.0.1:8650`），在执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）：
+执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**（本机可视化后端，`node viz/run.mjs` 启动）；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）：
 
 - 会话开始：`POST $BRIDGE_VIZ_URL/api/session/start` `{"name":"bridge-analyze · <app>"}`
 - 每步开始/结束：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
 - 节点映射：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry 生成 / `n5` 车端部署·自检 / `n6` 实测
 - `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不要写台本；`skipped` 用于车离线等留待有环境的步骤并写明原因。
-
-未设置 `BRIDGE_VIZ_URL` 时**完全跳过本节**——skill 的执行流程与产物不受任何影响。
+- 上报失败（后端未启动等）**静默忽略**——不阻断执行，skill 流程与产物不受影响。
 
 ## 产物去向
 
