@@ -769,7 +769,7 @@ async function runLive() {
 
   let done = 0;
   const plan = [
-    { id: "n1", name: "① 输入素材", run: async () => { liveLog("　· 概念阶段：app 源码 / PRD / APK / adb 观察（无需执行）"); return { ok: true }; } },
+    { id: "n1", name: "① 输入素材", run: () => apiStage("inputs") },
     { id: "n2", name: "② bridge-analyze · 分析", run: () => apiStage("analyze") },
     { id: "n3", name: "③ 唯一真相源 · schema 校验", run: () => apiStage("validate") },
     { id: "n4b", name: "④乙 registry 生成", run: () => apiStage("registry") },

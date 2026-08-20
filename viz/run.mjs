@@ -19,7 +19,7 @@
  */
 import { createServer } from "http";
 import { spawn, execFile } from "child_process";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -113,6 +113,7 @@ async function currentUser(ip) {
 
 /* ---------- 阶段执行 ---------- */
 const read = (p) => { try { return readFileSync(p, "utf-8"); } catch { return ""; } };
+const stat = (p) => { try { return statSync(p); } catch { return null; } };
 const extractMethods = (src) =>
   [...src.matchAll(/(?:oneway\s+)?[\w<>\[\].,\s]+\s(\w+)\s*\([^)]*\)\s*(?:throws[\s\w.]*)?;/g)]
     .map((m) => m[1]).filter((v, i, arr) => arr.indexOf(v) === i);
@@ -120,6 +121,33 @@ const interfaceMethods = (src) => {
   const m = src.match(/interface\s+\w+[^{]*\{([\s\S]*?)(?:abstract class|$)/);
   return extractMethods(m ? m[1] : src);
 };
+
+/** inputs: 盘点 bridge-analyze 的真实输入素材（源码/逆向产物/分析产物） */
+async function stageInputs() {
+  const items = [
+    ["适配器源码（分析落地产物，sourceRef 指向）", join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt")],
+    ["适配器契约（同目录）", join(ROOT, "cli", "tests", "fixtures", "imaudio", "IIMAudioService.aidl")],
+    ["类型定义（同目录）", join(ROOT, "cli", "tests", "fixtures", "imaudio", "Types.kt")],
+    ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
+    ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
+    ["唯一真相源（分析产物）", ANALYSIS],
+    ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
+  ];
+  const out = [
+    `【输入素材盘点】bridge-analyze 输入形态：源码 / PRD / APK / adb 观察`,
+    ...items.map(([name, p]) => {
+      const s = stat(p);
+      if (!s) return `  ${name}: ${p.replace(/\\/g, "/")}（缺失）`;
+      const size = s.size > 1024 ? `${(s.size / 1024).toFixed(1)}KB` : `${s.size}B`;
+      return `  ${name}: ${p.replace(/\\/g, "/")}（${size}）`;
+    }),
+    ``,
+    `【说明】`,
+    `  完整逆向 dex dump（imaudio-dex / map-dex / ccs-dex 等，~1.7GB）不入库，在交接机 D:/IM/bridge_test/reverse/`,
+    `  本阶段为输入盘点（bridge-analyze 输入契约：任意形态）；真正"吃"这些原料的是 ② analyze（源码扫描 + 契约核对）`,
+  ].join("\n");
+  return { ok: true, output: out };
+}
 
 /** analyze: 真源码扫描 + 契约交叉核对（确定性部分；描述撰写为 agent 判断） */
 async function stageAnalyze() {
@@ -268,7 +296,7 @@ async function stageInvoke(args) {
 }
 
 const STAGES = {
-  analyze: stageAnalyze, validate: stageValidate, registry: stageRegistry, deploy: stageDeploy,
+  inputs: stageInputs, analyze: stageAnalyze, validate: stageValidate, registry: stageRegistry, deploy: stageDeploy,
   "serve:start": stageServeStart, "serve:stop": stageServeStop,
   carcheck: stageCarcheck, invoke: stageInvoke,
 };
