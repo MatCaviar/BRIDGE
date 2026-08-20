@@ -711,8 +711,9 @@ async function replay(auto) {
   setTimeout(() => { $("btn-play").disabled = false; }, 400);
 }
 
-/* ---------- 实时模式（经 viz/run.mjs 执行真实命令） ---------- */
-let mode = "replay", serverOk = false, carOk = false;
+/* ---------- 实时模式（会话订阅式：进度在服务端，刷新页面不丢） ---------- */
+let mode = "replay", serverOk = false, pollTimer = null;
+const SESSION_IDS = ["n1", "n2", "n3", "n4a", "n4b", "n5", "n6"];
 const CONN_MAP = { n1: [], n2: ["n2"], n3: ["n3"], n4: ["n4"], n4a: ["n4", "n4a"], n4b: ["n4", "n4b"], n5: ["n5"], n6: ["n6"] };
 function setConnFor(id, cls) {
   (CONN_MAP[id] || []).forEach((c) =>
@@ -727,87 +728,64 @@ function nodeState(id, state) {
   el.classList.remove("pending", "active", "done", "skipped");
   el.classList.add(state);
   el.querySelector(".state-badge").textContent =
-    state === "done" ? "✓ 完成" : state === "skipped" ? "— 跳过" : state === "active" ? "执行中" : "进行中";
+    state === "done" ? "✓ 完成" : state === "skipped" ? "— 跳过" : state === "active" ? "执行中" : "待行";
   if (state === "done") el.querySelectorAll(".cnt[data-count]").forEach((c) => countUp(c, +c.dataset.count, 450));
   else if (state === "skipped") el.querySelectorAll(".cnt[data-count]").forEach((c) => (c.textContent = c.dataset.count));
 }
-function liveLog(line, cls) {
+function renderLog(entries) {
   const el = $("plog");
-  const t = ((performance.now() - t0) / 1000).toFixed(1);
-  const div = document.createElement("div");
-  div.innerHTML = `<span class="ts">t+${t}s</span><span class="${cls || ""}">${line}</span>`;
-  el.appendChild(div);
+  el.innerHTML = (entries || []).map((e) =>
+    `<div><span class="ts">t+${esc(e.t)}s</span><span class="${e.cls || ""}">${esc(e.msg)}</span></div>`).join("");
   el.scrollTop = el.scrollHeight;
 }
-async function apiStage(stage, args) {
-  if (!serverOk) { liveLog(`　· 未连接实时后端，跳过 ${stage}`, "warn"); return { ok: false, skipped: true }; }
-  liveLog(`　· 执行 ${stage} …`);
-  let j;
-  try {
-    const r = await fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage, args: args || {} }) });
-    j = await r.json();
-  } catch (e) { liveLog(`　· 请求失败：${esc(e.message)}`, "err"); return { ok: false, skipped: true }; }
-  (j.output || "").split("\n").filter(Boolean).forEach((l) => liveLog(`　  ${esc(l)}`));
-  if (j.ok) liveLog(`✓ ${esc(stage)} 完成（${j.durationMs ?? "?"}ms）`, "ok");
-  else liveLog(`✗ ${esc(stage)} 失败：${esc(j.error || "")}`, "err");
-  return j;
-}
-async function runLive() {
-  const tk = ++runToken;
-  serverOk = false; carOk = false;
-  document.querySelectorAll(".fnode").forEach((el) => { el.classList.remove("active", "done", "skipped"); el.classList.add("pending"); el.querySelector(".state-badge").textContent = "进行中"; });
-  document.querySelectorAll(".conn,.forkbar").forEach((el) => el.classList.remove("flowing", "traversed"));
-  document.querySelectorAll(".cnt[data-count]").forEach((c) => (c.textContent = "0"));
-  $("plog").innerHTML = "";
-  t0 = performance.now();
-  const total = 7;
-  const update = (done, name) => updateProgress(done, total, name);
-
-  try { const h = await fetch("/api/health", { cache: "no-store" }); serverOk = (await h.json()).ok === true; } catch (e) { serverOk = false; }
-  if (!serverOk) liveLog("⚠ 未连接实时后端 —— 请先运行 node viz/run.mjs，并以 http://127.0.0.1:8650/pipeline.html 打开本页", "warn");
-  liveLog(`▶ 开始实时执行管线（BRIDGE-${D.version}）`);
-
-  let done = 0;
-  const plan = [
-    { id: "n1", name: "① 输入素材", run: () => apiStage("inputs") },
-    { id: "n2", name: "② bridge-analyze · 分析", run: () => apiStage("analyze") },
-    { id: "n3", name: "③ 唯一真相源 · schema 校验", run: () => apiStage("validate") },
-    { id: "n4b", name: "④乙 registry 生成", run: () => apiStage("registry") },
-    { id: "n4a", name: "④甲 serve 投影（MCP Server）", run: async () => {
-        if (!$("serve-chk").checked) { liveLog("　· 跳过：未勾选「启动并保持 serve」", "warn"); return { ok: false, skipped: true }; }
-        return apiStage("serve:start", { device: "viz-no-car" });
-    } },
-    { id: "n5", name: "⑤ 车端执行器 · 部署 + 自检", run: async () => {
-        const d = await apiStage("deploy");
-        if (!d.ok) return d;
-        const c = await apiStage("carcheck");
-        carOk = c.ok;
-        return c;
-    } },
-    { id: "n6", name: "⑥ 真实车机结果 · invoke", run: async () => {
-        if (!carOk) { liveLog("　· 跳过：车离线（未通过车端自检）", "warn"); return { ok: false, skipped: true }; }
-        return apiStage("invoke", { op: $("op-select").value, args: {} });
-    } },
-  ];
-
-  for (const p of plan) {
-    if (tk !== runToken) return;
-    nodeState(p.id, "active");
-    setConnFor(p.id, "flowing");
-    update(done, p.name);
-    liveLog(`<span class="st">${esc(p.name)}</span>　开始`);
-    let r;
-    try { r = await p.run(); } catch (e) { liveLog(`　· 异常：${esc(e.message)}`, "err"); r = { ok: false }; }
-    if (tk !== runToken) return;
-    nodeState(p.id, r.ok ? "done" : "skipped");
-    setConnFor(p.id, r.ok ? "traversed" : "");
-    done += 1;
-    update(done, "");
+function applySession(s) {
+  if (!s) return;
+  for (const id of SESSION_IDS) {
+    const st = s.stages[id] || "pending";
+    nodeState(id, st === "running" ? "active" : st);
+    setConnFor(id, st === "running" ? "flowing" : st === "done" ? "traversed" : "");
   }
-  if (tk !== runToken) return;
-  update(7, "");
-  liveLog(`<span class="fin">■ 实时执行结束</span>`);
-  refreshServeChip();
+  renderLog(s.log);
+  const p = s.progress || {};
+  $("pbar").style.width = (p.pct ?? 0) + "%";
+  $("pbar-pct").textContent = (p.pct ?? 0) + "%";
+  $("pbar-stage").textContent = `${p.done ?? 0} / ${p.total ?? 7}`;
+  $("stage-now").innerHTML = s.name ? `会话：<b>${esc(s.name)}</b>` : "待命";
+}
+async function refreshSession() {
+  if (mode !== "live") return;
+  try {
+    const r = await fetch("/api/session", { cache: "no-store" });
+    serverOk = true;
+    applySession(await r.json());
+  } catch (e) {
+    if (!serverOk) renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 未连接实时后端 — 请运行 node viz/run.mjs，并以 http://127.0.0.1:8650/pipeline.html 打开" }]);
+    serverOk = false;
+  }
+}
+function startPolling() {
+  stopPolling();
+  refreshSession();
+  pollTimer = setInterval(refreshSession, 1500);
+}
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+async function applyTargetFromUrl() {
+  const q2 = new URLSearchParams(location.search);
+  if (!(q2.get("analysis") || q2.get("src") || q2.get("adapter"))) return;
+  try {
+    const r = await fetch("/api/target", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ analysis: q2.get("analysis") || undefined, src: q2.get("src") || undefined, adapter: q2.get("adapter") || undefined }) });
+    const t = await r.json();
+    await fetch("/api/session/event", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cls: "st", msg: `　· 分析目标: ${(t.analysis || "").split("/").pop()} ｜ 被分析源码: ${(t.adapter || "").split("/").pop()} ｜ 契约面: ${(t.srcDir || "").split("/").slice(-2).join("/")}` }) });
+  } catch (e) { /* 忽略 */ }
+}
+function triggerRun() {
+  fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ op: $("op-select").value, serve: $("serve-chk").checked }) }).catch(() => {});
+  refreshSession();
 }
 async function refreshServeChip() {
   if (mode !== "live") return;
@@ -819,7 +797,6 @@ async function refreshServeChip() {
 }
 function setMode(m) {
   if (mode === m) return;
-  runToken++;
   mode = m;
   $("mode-replay").classList.toggle("on", m === "replay");
   $("mode-live").classList.toggle("on", m === "live");
@@ -828,15 +805,17 @@ function setMode(m) {
   ["btn-run", "btn-abort", "op-select", "serve-chk-wrap", "serve-chip"].forEach((id) => ($(id).style.display = r ? "none" : ""));
   $("mode-note").textContent = r
     ? "重演为对已录管线各阶段的顺序展示，非实时执行"
-    : "实时模式：②→④甲 为真实命令（analyze/validate/registry/serve，无需车）；⑤⑥ 车端需车在线";
+    : "实时模式：会话订阅式 -- 刷新页面不丢进度；②→④甲 无需车，⑤⑥ 车端需车在线";
   $("gen-title").textContent = r ? "生成过程 · 重演" : "生成过程 · 实时";
   $("gen-sub").textContent = r
     ? "只读快照的过程重演 -- 节点计数皆为真实产物数值"
-    : "逐阶段执行真实命令 -- ②→④甲 无需车，⑤⑥ 车端需车在线";
+    : "服务端会话实时推送 -- 支持 skill 执行过程同步展示，刷新不丢进度";
   if (m === "live") {
+    if (location.protocol === "file:") renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）" }]);
+    applyTargetFromUrl();
+    startPolling();
     refreshServeChip();
-    if (location.protocol === "file:") liveLog("⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）", "warn");
-  }
+  } else stopPolling();
 }
 function populateOps() {
   const ops = D.capabilities.filter((c) => c.safetyLevel === "readonly" && c.status !== "broken");
@@ -884,12 +863,12 @@ function render() {
     $("btn-speed").textContent = `速度 ${speed}×`;
   };
 
-  /* 实时模式 */
+  /* 实时模式（会话订阅式） */
   populateOps();
   $("mode-replay").onclick = () => setMode("replay");
   $("mode-live").onclick = () => setMode("live");
-  $("btn-run").onclick = () => runLive();
-  $("btn-abort").onclick = () => { runToken++; $("stage-now").textContent = "已中止"; };
+  $("btn-run").onclick = triggerRun;
+  $("btn-abort").onclick = () => { fetch("/api/abort", { method: "POST" }).catch(() => {}); };
   $("serve-chk").onchange = () => refreshServeChip();
   window.addEventListener("beforeunload", () => {
     if (mode === "live") fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "serve:stop" }), keepalive: true }).catch(() => {});
@@ -899,7 +878,7 @@ function render() {
   const q = new URLSearchParams(location.search);
   if (q.get("mode") === "live") {
     setMode("live");
-    if (q.get("run") === "1") setTimeout(() => runLive(), 350);
+    if (q.get("run") === "1") setTimeout(triggerRun, 350);
   } else {
     setTimeout(() => replay(), 350);
   }

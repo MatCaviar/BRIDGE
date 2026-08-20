@@ -19,20 +19,26 @@
  */
 import { createServer } from "http";
 import { spawn, execFile } from "child_process";
-import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname, join, basename } from "path";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const VIZ = join(ROOT, "viz");
 const ADB = join(ROOT, "tools", "adb", process.platform === "win32" ? "adb.exe" : "adb");
 const CLI = join(ROOT, "cli", "bin", "mcp-pipeline.js");
-const ANALYSIS = join(ROOT, "e2e", "bridge-analysis.json");
-const REGISTRY = join(ROOT, "bridge-executor", "registries", "registry.json");
 const VALIDATE = join(ROOT, "skills", "bridge-analyze", "validate-analysis.mjs");
 const GEN_REG = join(ROOT, "e2e", "analysis-to-registry.mjs");
 const EXEC_PKG = "com.immotors.bridge.executor";
 const EXEC_ACT = ".ExecutorActivity";
+
+// 分析目标（可经 POST /api/target 切换；默认 imaudio fixture 链路）
+let TARGET = {
+  analysis: join(ROOT, "e2e", "bridge-analysis.json"),
+  registry: join(ROOT, "bridge-executor", "registries", "registry.json"),
+  srcDir: join(ROOT, "bridge-executor", "src"),                                                          // 执行器契约面
+  adapter: join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt"),                 // 被分析目标源码
+};
 
 const argPort = process.argv.indexOf("--port");
 const PORT = Number(argPort > 0 ? process.argv[argPort + 1] : process.env.PORT || 8650);
@@ -125,12 +131,11 @@ const interfaceMethods = (src) => {
 /** inputs: 盘点 bridge-analyze 的真实输入素材（源码/逆向产物/分析产物） */
 async function stageInputs() {
   const items = [
-    ["适配器源码（分析落地产物，sourceRef 指向）", join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt")],
-    ["适配器契约（同目录）", join(ROOT, "cli", "tests", "fixtures", "imaudio", "IIMAudioService.aidl")],
-    ["类型定义（同目录）", join(ROOT, "cli", "tests", "fixtures", "imaudio", "Types.kt")],
+    ["被分析源码（适配器）", TARGET.adapter],
+    ["唯一真相源（分析产物）", TARGET.analysis],
+    ["执行器契约面", TARGET.srcDir],
     ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
     ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
-    ["唯一真相源（分析产物）", ANALYSIS],
     ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
   ];
   const out = [
@@ -151,7 +156,7 @@ async function stageInputs() {
 
 /** analyze: 真源码扫描 + 契约交叉核对（确定性部分；描述撰写为 agent 判断） */
 async function stageAnalyze() {
-  const a = JSON.parse(readFileSync(ANALYSIS, "utf-8"));
+  const a = JSON.parse(readFileSync(TARGET.analysis, "utf-8"));
   const caps = a.capabilities || [];
   const byStatus = {}, byMech = {};
   for (const c of caps) {
@@ -161,13 +166,31 @@ async function stageAnalyze() {
   }
   const active = caps.filter((c) => c.status !== "broken").length;
 
-  const SRC = join(ROOT, "bridge-executor", "src");
-  const FIX = join(ROOT, "cli", "tests", "fixtures", "imaudio");
-  const aidlMethods = extractMethods(read(join(SRC, "main", "aidl", "com", "immotors", "aidl", "IIMAudioService.aidl")));
-  const customMethods = interfaceMethods(read(join(SRC, "main", "java", "com", "banma", "custom", "ICustomService.java")));
-  const mapMethods = interfaceMethods(read(join(SRC, "main", "java", "com", "ebanma", "map", "openapi", "basicclass", "IMapCommonService.java")));
-  // 被分析目标源码（bridge-analyze 的 sourceRef 指向处）: imaudio 适配器
-  const adapterKt = read(join(FIX, "IMAudioServiceAdapter.kt"));
+  const SRC = TARGET.srcDir;
+  // 契约文件在目标源码树内定向查找（跳过 build/.gradle 等，兼容 executor 布局与真实 app 布局）
+  const findIn = (name) => {
+    const hits = [];
+    const walk = (d) => {
+      let entries;
+      try { entries = readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+      for (const en of entries) {
+        if (["build", ".gradle", ".git", "node_modules", ".cxx"].includes(en.name)) continue;
+        const p = join(d, en.name);
+        if (en.isDirectory()) walk(p);
+        else if (en.name === name) hits.push(p);
+      }
+    };
+    try { walk(SRC); } catch (e) {}
+    return hits[0] ? read(hits[0]) : "";
+  };
+  const aidlSrc = findIn("IIMAudioService.aidl");
+  const customSrc = findIn("ICustomService.java");
+  const mapSrc = findIn("IMapCommonService.java");
+  const aidlMethods = extractMethods(aidlSrc);
+  const customMethods = interfaceMethods(customSrc);
+  const mapMethods = interfaceMethods(mapSrc);
+  // 被分析目标源码（bridge-analyze 的 sourceRef 指向处）: 适配器
+  const adapterKt = read(TARGET.adapter);
   const adapterMethods = [...adapterKt.matchAll(/fun\s+(\w+)\s*\(/g)].map((m) => m[1]);
   let handlers = [];
   try { handlers = JSON.parse(read(join(ROOT, "tools", "carcontrol_handlers.json"))); } catch (e) {}
@@ -187,22 +210,21 @@ async function stageAnalyze() {
   const brokenInAdapter = brokenCaps.filter((c) => adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
 
   const out = [
-    `【载入真相源】${ANALYSIS.replace(/\\/g, "/")}`,
+    `【载入真相源】${TARGET.analysis.replace(/\\/g, "/")}`,
     `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
     `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
     ``,
-    `【被分析目标源码（sourceRef 指向）】${FIX.replace(/\\/g, "/")}`,
-    `  IMAudioServiceAdapter.kt → ${adapterMethods.length} 个 fun（含 ${execmdCaps.length} 个 capability 对应的方法）`,
-    `  IIMAudioService.aidl / Types.kt（同目录契约与类型）`,
+    `【被分析目标源码（sourceRef 指向）】${TARGET.adapter.replace(/\\/g, "/")}`,
+    `  → ${adapterMethods.length} 个 fun（含 ${execmdCaps.length} 个 capability 对应的方法）`,
     ``,
     `【源码契约扫描】${SRC.replace(/\\/g, "/")}`,
-    `  IIMAudioService.aidl   → ${aidlMethods.length} 方法: ${aidlMethods.join(" / ")}`,
-    `  ICustomService.java    → ${customMethods.length} 方法: ${customMethods.join(" / ")}（JSON functionId 路由）`,
-    `  IMapCommonService.java → ${mapMethods.length} 方法: ${mapMethods.join(" / ")}`,
+    `  IIMAudioService.aidl   → ${aidlMethods.length ? `${aidlMethods.length} 方法: ${aidlMethods.join(" / ")}` : "未找到（目标源码中无此契约）"}`,
+    `  ICustomService.java    → ${customMethods.length ? `${customMethods.length} 方法: ${customMethods.join(" / ")}（JSON functionId 路由）` : "未找到（执行器侧契约，目标源码无）"}`,
+    `  IMapCommonService.java → ${mapMethods.length ? `${mapMethods.length} 方法: ${mapMethods.join(" / ")}` : "未找到（执行器侧契约，目标源码无）"}`,
     `  carcontrol_handlers.json → ${handlerIds.size} functionId 映射（逆向产物）`,
     ``,
     `【交叉核对】${caps.length} capabilities`,
-    `  execmd ${execmdCaps.length}: methodName ∈ IMAudioServiceAdapter.kt — ${execmdCaps.length - execmdUnmatched.length}/${execmdCaps.length} ✓${execmdUnmatched.length ? ` ✗ ${execmdUnmatched.join("、")}` : ""}（逐名核对源码）`,
+    `  execmd ${execmdCaps.length}: methodName ∈ 适配器源码 — ${execmdCaps.length - execmdUnmatched.length}/${execmdCaps.length} ✓${execmdUnmatched.length ? ` ✗ ${execmdUnmatched.join("、")}` : ""}（逐名核对源码）`,
     `  carcontrol ${ccCaps.length}: ccFunction ∈ ${handlerIds.size} handlers — ${ccCaps.length - ccUnmatched.length}/${ccCaps.length} ✓${ccUnmatched.length ? ` ✗ ${ccUnmatched.join("、")}` : ""}`,
     `  mapnav ${mapCaps.length}: navigateToForAI ∈ IMapCommonService — ${mapCaps.length - mapUnmatched.length}/${mapCaps.length} ✓`,
     `  broken ${brokenCaps.length}: 方法存在于源码但标记 broken（stub）${brokenInAdapter.length ? `— ${brokenInAdapter.join("、")}` : ""}`,
@@ -217,10 +239,10 @@ async function stageAnalyze() {
   return { ok: true, output: out };
 }
 async function stageValidate() {
-  return run(process.execPath, [VALIDATE, ANALYSIS]);
+  return run(process.execPath, [VALIDATE, TARGET.analysis]);
 }
 async function stageRegistry() {
-  return run(process.execPath, [GEN_REG, ANALYSIS, REGISTRY]);
+  return run(process.execPath, [GEN_REG, TARGET.analysis, TARGET.registry]);
 }
 async function stageDeploy() {
   const car = await requireCar();
@@ -228,7 +250,7 @@ async function stageDeploy() {
   const U = await currentUser(car.carIp);
   const owner = `u${U}_a206`;
   const fdir = `/data/user/${U}/${EXEC_PKG}/files`;
-  const a = await adbRun(["push", REGISTRY, "/data/local/tmp/__reg.json"]);
+  const a = await adbRun(["push", TARGET.registry, "/data/local/tmp/__reg.json"]);
   if (!a.ok) return { ok: false, error: `adb push 失败: ${a.output.slice(-160)}` };
   const b = await adbRun(["-s", `${car.carIp}:5555`, "shell",
     `cp /data/local/tmp/__reg.json ${fdir}/registry.json && chown ${owner}:${owner} ${fdir}/registry.json && chmod 666 ${fdir}/registry.json && echo deployed`]);
@@ -240,7 +262,7 @@ async function stageServeStart(args) {
   // serve 启动只注册工具面（31 tools），--device 仅在 tools/call 时才连车；
   // 故 MCP server 生成不依赖车在线。默认用占位设备串。
   const device = (args && args.device) || "viz-no-car";
-  const p = spawn(process.execPath, [CLI, "serve", "--analysis", ANALYSIS, "--device", device],
+  const p = spawn(process.execPath, [CLI, "serve", "--analysis", TARGET.analysis, "--device", device],
     { cwd: ROOT, windowsHide: true });
   state.serveProc = p;
   state.serveLog = [];
@@ -301,6 +323,70 @@ const STAGES = {
   carcheck: stageCarcheck, invoke: stageInvoke,
 };
 
+/* ---------- 运行会话（服务端持有，刷新页面不丢进度） ---------- */
+const SESSION_STAGES = ["n1", "n2", "n3", "n4a", "n4b", "n5", "n6"];
+const session = { name: "", startedAt: 0, stages: {}, log: [], runToken: 0 };
+function sessReset(name) {
+  session.name = name || "";
+  session.startedAt = Date.now();
+  session.stages = {};
+  session.log = [];
+  for (const s of SESSION_STAGES) session.stages[s] = "pending";
+}
+function sessLog(stage, cls, msg) {
+  const t = session.startedAt ? ((Date.now() - session.startedAt) / 1000).toFixed(1) : "0.0";
+  session.log.push({ t, stage: stage || "", cls: cls || "", msg });
+  if (session.log.length > 600) session.log.splice(0, session.log.length - 600);
+}
+function sessStage(id, status) { if (session.stages[id] !== undefined) session.stages[id] = status; }
+function sessProgress() {
+  const total = SESSION_STAGES.length;
+  const done = SESSION_STAGES.filter((s) => session.stages[s] === "done" || session.stages[s] === "skipped").length;
+  return { total, done, pct: Math.round((done / total) * 100) };
+}
+
+/** 服务端确定性执行（后台跑，写会话；页面轮询 /api/session 展示） */
+async function runPipeline(args) {
+  const tk = ++session.runToken;
+  sessReset(`实时执行 ${new Date().toLocaleTimeString()}`);
+  const op = args.op || "";
+  const serveOn = args.serve !== false;
+  const logOut = (out) => (out || "").split("\n").filter(Boolean).forEach((l) => sessLog("", "", l));
+  const step = async (id, name, fn) => {
+    if (tk !== session.runToken) return;
+    sessStage(id, "running");
+    sessLog(id, "st", `${name}　开始`);
+    const r = await fn();
+    if (tk !== session.runToken) return;
+    if (r && r.ok) { sessStage(id, "done"); sessLog(id, "ok", `✓ ${name} 完成`); }
+    else { sessStage(id, "skipped"); sessLog(id, "err", `— ${name} 跳过：${(r && r.error) || "失败"}`); }
+  };
+  await step("n1", "① 输入素材", async () => { const r = await stageInputs(); logOut(r.output); return r; });
+  await step("n2", "② bridge-analyze", async () => { const r = await stageAnalyze(); logOut(r.output); return r; });
+  await step("n3", "③ schema 校验", async () => { const r = await stageValidate(); logOut(r.output); return r; });
+  await step("n4b", "④乙 registry 生成", async () => { const r = await stageRegistry(); logOut(r.output); return r; });
+  await step("n4a", "④甲 serve 投影", async () => {
+    if (!serveOn) { sessLog("n4a", "warn", "　· 跳过：未勾选「启动并保持 serve」"); return { ok: false, error: "未勾选 serve" }; }
+    const r = await stageServeStart({ device: "viz-no-car" });
+    logOut(r.output);
+    return r;
+  });
+  await step("n5", "⑤ 车端 · 部署+自检", async () => {
+    const d = await stageDeploy();
+    if (!d.ok) { logOut(d.output || d.error); return d; }
+    const c = await stageCarcheck();
+    logOut(c.output || c.error);
+    return c;
+  });
+  await step("n6", "⑥ 真实车机 · invoke", async () => {
+    if (!state.carIp) { sessLog("n6", "warn", "　· 跳过：车离线（未通过车端自检）"); return { ok: false, error: "车离线" }; }
+    const r = await stageInvoke({ op });
+    logOut(r.output || r.error);
+    return r;
+  });
+  if (tk === session.runToken) sessLog("", "fin", "■ 执行结束");
+}
+
 /* ---------- HTTP ---------- */
 function serveFile(res, path) {
   const norm = join(VIZ, path);
@@ -328,6 +414,66 @@ createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ carIp: state.carIp, carModel: state.carModel,
         serveRunning: !!state.serveProc, serveLogTail: state.serveLog.slice(-8) }));
+    }
+    if (url.pathname === "/api/target") {
+      if (req.method === "POST") {
+        let body = "";
+        for await (const c of req) body += c;
+        const t = JSON.parse(body || "{}");
+        if (t.analysis) {
+          TARGET.analysis = join(ROOT, String(t.analysis));
+          const stem = basename(TARGET.analysis, ".json").replace(/^analysis-/, "");
+          TARGET.registry = join(dirname(TARGET.analysis), `registry-${stem}.json`);
+        }
+        if (t.src) TARGET.srcDir = String(t.src);
+        if (t.adapter) TARGET.adapter = String(t.adapter);
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({
+        analysis: TARGET.analysis.replace(/\\/g, "/"),
+        registry: TARGET.registry.replace(/\\/g, "/"),
+        srcDir: TARGET.srcDir.replace(/\\/g, "/"),
+        adapter: TARGET.adapter.replace(/\\/g, "/"),
+      }));
+    }
+    if (url.pathname === "/api/session" && req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({
+        name: session.name, startedAt: session.startedAt,
+        stages: session.stages, log: session.log, progress: sessProgress(),
+        running: session.log.length > 0 && session.stages.n6 !== "done" && session.stages.n6 !== "skipped",
+      }));
+    }
+    if (url.pathname === "/api/session/start" && req.method === "POST") {
+      let body = "";
+      for await (const c of req) body += c;
+      const { name } = JSON.parse(body || "{}");
+      sessReset(name || `skill 会话 ${new Date().toLocaleTimeString()}`);
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ ok: true, name: session.name }));
+    }
+    if (url.pathname === "/api/session/event" && req.method === "POST") {
+      let body = "";
+      for await (const c of req) body += c;
+      const { stage, status, cls, msg } = JSON.parse(body || "{}");
+      if (status) sessStage(stage, status);
+      if (msg) sessLog(stage, cls || "", msg);
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ ok: true, progress: sessProgress() }));
+    }
+    if (url.pathname === "/api/run" && req.method === "POST") {
+      let body = "";
+      for await (const c of req) body += c;
+      const args = JSON.parse(body || "{}");
+      runPipeline(args); // 后台执行，页面轮询会话
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    if (url.pathname === "/api/abort" && req.method === "POST") {
+      session.runToken++;
+      sessLog("", "warn", "■ 已中止");
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ ok: true }));
     }
     if (url.pathname === "/api/stage" && req.method === "POST") {
       let body = "";

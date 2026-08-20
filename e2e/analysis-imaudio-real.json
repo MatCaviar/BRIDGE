@@ -1,0 +1,811 @@
+{
+ "app": {
+  "name": "imaudio",
+  "framework": "android-kotlin",
+  "deviceSources": [
+   "vin"
+  ]
+ },
+ "capabilities": [
+  {
+   "id": "get_sound_stage",
+   "domain": "imaudio",
+   "object": "sound_stage",
+   "action": "get",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:getSoundStage",
+   "description": "查询当前音场模式(主驾优先/沉浸环绕等)、fade 前后声场偏移、balance 左右平衡。用户问'现在是什么音场'时用。",
+   "params": [],
+   "mechanism": "execmd",
+   "methodName": "getSoundStage",
+   "pattern": "none",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "set_sound_stage",
+   "domain": "imaudio",
+   "object": "sound_stage",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:setSoundStage",
+   "description": "切换音场模式: 0=至臻原声(自定义) 1=专业听音室 2=小型演奏会 3=音乐剧场 4=沉浸影院 7=主驾优先 8=后排优先 9=全车均衡 10=全景影院 235=AI莱茵之声 236=AI极光暖调 237=AI英伦格调 238=AI美式金属。用户说'把音场调到XX/切换音场'时用。",
+   "params": [
+    {
+     "name": "mode",
+     "type": "int",
+     "optional": false,
+     "description": "音场模式编号(见描述)",
+     "enum": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "7",
+      "8",
+      "9",
+      "10",
+      "235",
+      "236",
+      "237",
+      "238"
+     ]
+    },
+    {
+     "name": "fade",
+     "type": "int",
+     "optional": true,
+     "description": "前后声场偏移, 省略保持当前"
+    },
+    {
+     "name": "balance",
+     "type": "int",
+     "optional": true,
+     "description": "左右平衡, 省略保持当前"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "setSoundStage",
+   "pattern": "dataclass",
+   "dataClass": "EffectModeAndFB",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "set_beosonic_point",
+   "domain": "imaudio",
+   "object": "beosonic",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:setBeosonicPoint",
+   "description": "设置 Beosonic 三维均衡点(x 0-20 亮音-暖音, y 0-20 柔和-活力, z 0-10 空间感)。用户调均衡器/音质时用。",
+   "params": [
+    {
+     "name": "x",
+     "type": "int",
+     "optional": false,
+     "description": "x 轴 0-20(亮音→暖音)"
+    },
+    {
+     "name": "y",
+     "type": "int",
+     "optional": false,
+     "description": "y 轴 0-20(柔和→活力)"
+    },
+    {
+     "name": "z",
+     "type": "int",
+     "optional": false,
+     "description": "z 轴 0-10(空间感)"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "setBeosonicPoint",
+   "pattern": "dataclass",
+   "dataClass": "BeosonicPoint",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "get_mic_vocal",
+   "domain": "imaudio",
+   "object": "mic",
+   "action": "get",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:getMicVocal",
+   "description": "查询当前麦克风音量。用户问\"麦克风音量多少\"时用。",
+   "params": [],
+   "mechanism": "execmd",
+   "methodName": "getMicVocal",
+   "pattern": "none",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "set_mic_vocal",
+   "domain": "imaudio",
+   "object": "mic",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:setMicVocal",
+   "description": "设置麦克风音量(vol 0-31)。用户说\"把麦克风音量调到X\"时用。",
+   "params": [
+    {
+     "name": "vol",
+     "type": "int",
+     "optional": false,
+     "description": "麦克风音量 0-31"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "setMicVocal",
+   "pattern": "scalar",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "get_fast_audio_mode",
+   "domain": "imaudio",
+   "object": "fast_audio",
+   "action": "get",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:getFastAudioMode",
+   "description": "查询当前 K歌混响模式(普通/录音棚/K歌房)。用户问\"现在是什么K歌模式\"时用。",
+   "params": [],
+   "mechanism": "execmd",
+   "methodName": "getFastAudioMode",
+   "pattern": "none",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "set_fast_audio_mode",
+   "domain": "imaudio",
+   "object": "fast_audio",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:setFastAudioMode",
+   "description": "设置 K歌混响模式: 0=普通 1=录音棚 2=K歌房。用户说'开录音棚模式/K歌房模式'时用。",
+   "params": [
+    {
+     "name": "mode",
+     "type": "int",
+     "optional": false,
+     "description": "0=普通 1=录音棚 2=K歌房",
+     "enum": [
+      "0",
+      "1",
+      "2"
+     ]
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "setFastAudioMode",
+   "pattern": "scalar",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "set_car_and_headrest_volume",
+   "domain": "imaudio",
+   "object": "volume",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:setCarAndHeadrestVolume",
+   "description": "设置整车+头枕音量(volume 音量值, streamType 0=媒体流)。用户说'音量调到XX'时用, 这是调音量的核心工具。",
+   "params": [
+    {
+     "name": "volume",
+     "type": "int",
+     "optional": false,
+     "description": "音量值(建议 0-31)"
+    },
+    {
+     "name": "streamType",
+     "type": "int",
+     "optional": true,
+     "description": "音频流类型, 默认 0(媒体)"
+    },
+    {
+     "name": "zoneId",
+     "type": "int",
+     "optional": true,
+     "description": "区域, 省略默认"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "setCarAndHeadrestVolume",
+   "pattern": "scalar",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "get_last_volume_data",
+   "domain": "imaudio",
+   "object": "volume",
+   "action": "get",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:getLastVolumeData",
+   "description": "查询上次设置的音量数据(streamType 默认0=媒体)。用户问\"现在音量多少\"时用。",
+   "params": [
+    {
+     "name": "streamType",
+     "type": "int",
+     "optional": true,
+     "description": "音频流类型, 默认 0"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "getLastVolumeData",
+   "pattern": "scalar",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "query_current_active_sound",
+   "domain": "imaudio",
+   "object": "sound",
+   "action": "query_active",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:queryCurrentActiveSound",
+   "description": "查询当前激活的解闭锁声音(默认/自定义)。",
+   "params": [],
+   "mechanism": "execmd",
+   "methodName": "queryCurrentActiveSound",
+   "pattern": "none",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "query_sound_library",
+   "domain": "imaudio",
+   "object": "sound",
+   "action": "query_library",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:querySoundLibrary",
+   "description": "查询解闭锁音效库列表(分页 pageNum/pageSize)。用户说\"看看有哪些音效/音效库\"时用。",
+   "params": [
+    {
+     "name": "pageNum",
+     "type": "int",
+     "optional": true,
+     "description": "页码, 默认1"
+    },
+    {
+     "name": "pageSize",
+     "type": "int",
+     "optional": true,
+     "description": "每页数量, 默认5"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "querySoundLibrary",
+   "pattern": "envelope",
+   "devicePaths": [
+    "body.vin"
+   ],
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "install_sound_library",
+   "domain": "imaudio",
+   "object": "sound",
+   "action": "install",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:installSoundLibrary",
+   "description": "下载安装音效资源(resourceCode, 如 default)。用户说\"下载/安装这个音效\"时用。",
+   "params": [
+    {
+     "name": "resourceCode",
+     "type": "string",
+     "optional": false,
+     "description": "音效资源 code"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "installSoundLibrary",
+   "pattern": "envelope",
+   "devicePaths": [
+    "body.vin"
+   ],
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "preview_sound",
+   "domain": "imaudio",
+   "object": "sound",
+   "action": "preview",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:previewSound",
+   "description": "预览音效(resourceCode; voiceType 0=解锁 1=闭锁)。用户说\"试听这个音效\"时用。",
+   "params": [
+    {
+     "name": "resourceCode",
+     "type": "string",
+     "optional": false,
+     "description": "音效资源 code"
+    },
+    {
+     "name": "voiceType",
+     "type": "int",
+     "optional": true,
+     "description": "0=解锁 1=闭锁"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "previewSound",
+   "pattern": "envelope",
+   "devicePaths": [
+    "body.vin"
+   ],
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "query_effect_library",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "query",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:queryEffectLibrary",
+   "description": "查询均衡器效果库(sourceType 0=官方 1=自定义)。用户说\"有哪些均衡器效果\"时用。",
+   "params": [
+    {
+     "name": "sourceType",
+     "type": "int",
+     "optional": false,
+     "description": "0=官方 1=自定义",
+     "enum": [
+      "0",
+      "1"
+     ]
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "queryEffectLibrary",
+   "pattern": "dataclass",
+   "dataClass": "EffectRequest",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "add_effect",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "add",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:addEffect",
+   "description": "添加自定义均衡器效果(name 名称 + effectValues 均衡值数组)。用户说\"新建一个均衡器效果\"时用。",
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "optional": false,
+     "description": "效果名称"
+    },
+    {
+     "name": "effectValues",
+     "type": "array",
+     "optional": true,
+     "description": "均衡值数组"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "addEffect",
+   "pattern": "envelope",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "update_effect",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "update",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:updateEffect",
+   "description": "更新自定义均衡器效果(effectId + name)。用户说\"修改均衡器效果\"时用。",
+   "params": [
+    {
+     "name": "effectId",
+     "type": "string",
+     "optional": false,
+     "description": "效果 id"
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "optional": true,
+     "description": "效果名称"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "updateEffect",
+   "pattern": "envelope",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "delete_effect",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "delete",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:deleteEffect",
+   "description": "删除自定义均衡器效果(effectId)。用户说\"删除这个均衡器效果\"时用。",
+   "params": [
+    {
+     "name": "effectId",
+     "type": "string",
+     "optional": false,
+     "description": "效果 id"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "deleteEffect",
+   "pattern": "envelope",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "get_effect_share_code",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "get_share_code",
+   "safetyLevel": "readonly",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:getEffectShareCode",
+   "description": "获取均衡器效果的分享码(effectId)。用户说\"分享这个均衡器\"时用。",
+   "params": [
+    {
+     "name": "effectId",
+     "type": "string",
+     "optional": false,
+     "description": "效果 id"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "getEffectShareCode",
+   "pattern": "envelope",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "add_effect_by_share_code",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "add_by_share_code",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:addEffectByShareCode",
+   "description": "通过分享码添加均衡器效果(shareCode)。用户说\"用分享码添加均衡器\"时用。",
+   "params": [
+    {
+     "name": "shareCode",
+     "type": "string",
+     "optional": false,
+     "description": "分享码"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "addEffectByShareCode",
+   "pattern": "envelope",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "save_current_effect_data",
+   "domain": "imaudio",
+   "object": "effect",
+   "action": "save",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:saveCurrentEffectData",
+   "description": "保存当前均衡器效果数据。用户说\"保存当前音效设置\"时用。",
+   "params": [],
+   "mechanism": "execmd",
+   "methodName": "saveCurrentEffectData",
+   "pattern": "envelope",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "nav_start",
+   "domain": "banmamap",
+   "object": "navigation",
+   "action": "start",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "BanmaMap openapi common navigateToForAI (逆向 2026-08-17)",
+   "description": "车机地图导航到指定地点。用户说'导航去XX/导航到XX'时用。name 目的地名称必填。若你能确定经纬度则给出 lat/lon; 不确定时先调用 geo_search(name) 获取坐标再传入。",
+   "params": [
+    {
+     "name": "name",
+     "type": "string",
+     "optional": false,
+     "description": "目的地名称, 如'同济大学'"
+    },
+    {
+     "name": "lat",
+     "type": "number",
+     "optional": true,
+     "description": "目的地纬度(可选)"
+    },
+    {
+     "name": "lon",
+     "type": "number",
+     "optional": true,
+     "description": "目的地经度(可选)"
+    }
+   ],
+   "mechanism": "mapnav",
+   "servicePackage": "com.ebanma.map.main",
+   "serviceClass": "com.ebanma.map.main.service.MapExternalService",
+   "bindAction": "com.ebanma.map.service.common"
+  },
+  {
+   "id": "get_speed_volume_status",
+   "domain": "imaudio",
+   "object": "vnc",
+   "action": "get",
+   "safetyLevel": "readonly",
+   "status": "broken",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:getSpeedVolumeStatus",
+   "description": "VNC 随速音量补偿状态(当前为 stub, 不可用)。",
+   "params": [],
+   "mechanism": "execmd",
+   "methodName": "getSpeedVolumeStatus",
+   "pattern": "none",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "set_speed_volume_status",
+   "domain": "imaudio",
+   "object": "vnc",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "broken",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:setSpeedVolumeStatus",
+   "description": "设置 VNC 随速音量补偿(当前为 stub, 不可用)。",
+   "params": [
+    {
+     "name": "status",
+     "type": "string",
+     "optional": false,
+     "description": "off/low/mid/high"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "setSpeedVolumeStatus",
+   "pattern": "scalar",
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "cc_seat_heat_driver",
+   "domain": "carcontrol",
+   "object": "seat_heat",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "CarControlService CustomService seat_heat_driver",
+   "description": "打开/关闭主驾座椅加热(on 1=开 0=关)。用户说\"打开/关闭座椅加热\"时用。",
+   "params": [
+    {
+     "name": "on",
+     "type": "int",
+     "optional": false,
+     "description": "1=开 0=关",
+     "enum": [
+      "0",
+      "1"
+     ]
+    }
+   ],
+   "mechanism": "carcontrol",
+   "ccDomain": "002",
+   "ccFunction": "seat_heat_driver",
+   "servicePackage": "com.banma.carcontrolservice",
+   "serviceClass": "com.banma.carcontrolservice.service.CustomService",
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+  },
+  {
+   "id": "cc_seat_heat_level_driver",
+   "domain": "carcontrol",
+   "object": "seat_heat_level",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "CarControlService seat_heat_level_driver",
+   "description": "设置主驾座椅加热档位(level 1-3)。用户说\"座椅加热调到X档\"时用。",
+   "params": [
+    {
+     "name": "level",
+     "type": "int",
+     "optional": false,
+     "description": "加热档位 1-3"
+    }
+   ],
+   "mechanism": "carcontrol",
+   "ccDomain": "002",
+   "ccFunction": "seat_heat_level_driver",
+   "servicePackage": "com.banma.carcontrolservice",
+   "serviceClass": "com.banma.carcontrolservice.service.CustomService",
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+  },
+  {
+   "id": "cc_seat_ventilation_driver",
+   "domain": "carcontrol",
+   "object": "seat_ventilation",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "CarControlService seat_ventilation_driver",
+   "description": "打开/关闭主驾座椅通风(on 1=开 0=关)。用户说\"打开座椅通风\"时用。",
+   "params": [
+    {
+     "name": "on",
+     "type": "int",
+     "optional": false,
+     "description": "1=开 0=关",
+     "enum": [
+      "0",
+      "1"
+     ]
+    }
+   ],
+   "mechanism": "carcontrol",
+   "ccDomain": "002",
+   "ccFunction": "seat_ventilation_driver",
+   "servicePackage": "com.banma.carcontrolservice",
+   "serviceClass": "com.banma.carcontrolservice.service.CustomService",
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+  },
+  {
+   "id": "cc_seat_massage_driver",
+   "domain": "carcontrol",
+   "object": "seat_massage",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "CarControlService seat_massage_driver",
+   "description": "打开/关闭主驾座椅按摩(on 1=开 0=关)。用户说\"打开座椅按摩\"时用。",
+   "params": [
+    {
+     "name": "on",
+     "type": "int",
+     "optional": false,
+     "description": "1=开 0=关",
+     "enum": [
+      "0",
+      "1"
+     ]
+    }
+   ],
+   "mechanism": "carcontrol",
+   "ccDomain": "002",
+   "ccFunction": "seat_massage_driver",
+   "servicePackage": "com.banma.carcontrolservice",
+   "serviceClass": "com.banma.carcontrolservice.service.CustomService",
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+  },
+  {
+   "id": "cc_seat_heat_stone_massage_driver",
+   "domain": "carcontrol",
+   "object": "seat_heat_stone_massage",
+   "action": "set",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "CarControlService seat_heat_stone_massage_driver",
+   "description": "打开/关闭主驾座椅热石按摩(on 1=开 0=关)。用户说\"打开热石按摩\"时用。",
+   "params": [
+    {
+     "name": "on",
+     "type": "int",
+     "optional": false,
+     "description": "1=开 0=关",
+     "enum": [
+      "0",
+      "1"
+     ]
+    }
+   ],
+   "mechanism": "carcontrol",
+   "ccDomain": "002",
+   "ccFunction": "seat_heat_stone_massage_driver",
+   "servicePackage": "com.banma.carcontrolservice",
+   "serviceClass": "com.banma.carcontrolservice.service.CustomService",
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+  },
+  {
+   "id": "delete_sound_library",
+   "domain": "imaudio",
+   "object": "sound",
+   "action": "delete",
+   "safetyLevel": "normal",
+   "status": "verified",
+   "sourceRef": "imaudio_service/src/main/java/com/immotors/imaudio_service/adapter/IMAudioServiceAdapter.kt:deleteSoundLibrary",
+   "description": "删除音效资源(resourceCode)。用户说\"删除这个音效\"时用。",
+   "params": [
+    {
+     "name": "resourceCode",
+     "type": "string",
+     "optional": false,
+     "description": "音效资源 code"
+    }
+   ],
+   "mechanism": "execmd",
+   "methodName": "deleteSoundLibrary",
+   "pattern": "envelope",
+   "devicePaths": [],
+   "form": "binder",
+   "servicePackage": "com.immotors.imaudio",
+   "serviceClass": "com.immotors.imaudio_service.IMAudioService",
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  }
+ ]
+}
