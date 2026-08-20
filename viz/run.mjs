@@ -134,9 +134,13 @@ async function stageAnalyze() {
   const active = caps.filter((c) => c.status !== "broken").length;
 
   const SRC = join(ROOT, "bridge-executor", "src");
+  const FIX = join(ROOT, "cli", "tests", "fixtures", "imaudio");
   const aidlMethods = extractMethods(read(join(SRC, "main", "aidl", "com", "immotors", "aidl", "IIMAudioService.aidl")));
   const customMethods = interfaceMethods(read(join(SRC, "main", "java", "com", "banma", "custom", "ICustomService.java")));
   const mapMethods = interfaceMethods(read(join(SRC, "main", "java", "com", "ebanma", "map", "openapi", "basicclass", "IMapCommonService.java")));
+  // 被分析目标源码（bridge-analyze 的 sourceRef 指向处）: imaudio 适配器
+  const adapterKt = read(join(FIX, "IMAudioServiceAdapter.kt"));
+  const adapterMethods = [...adapterKt.matchAll(/fun\s+(\w+)\s*\(/g)].map((m) => m[1]);
   let handlers = [];
   try { handlers = JSON.parse(read(join(ROOT, "tools", "carcontrol_handlers.json"))); } catch (e) {}
   const handlerIds = new Set(handlers.map((h) => h.functionId).filter(Boolean));
@@ -144,14 +148,24 @@ async function stageAnalyze() {
   const execmdCaps = caps.filter((c) => c.status !== "broken" && (c.mechanism || "execmd") === "execmd");
   const ccCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "carcontrol");
   const mapCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "mapnav");
+  const brokenCaps = caps.filter((c) => c.status === "broken");
+  const execmdUnmatched = execmdCaps.filter((c) => !adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
   const ccUnmatched = ccCaps.filter((c) => !handlerIds.has(c.ccFunction)).map((c) => `${c.id}(${c.ccFunction})`);
   const mapUnmatched = mapCaps.filter(() => !mapMethods.includes("navigateToForAI")).map((c) => c.id);
   const uncoveredMap = mapMethods.filter((m) => m !== "navigateToForAI");
+  const helperFuns = new Set(["registerCallback", "unregisterCallback", "parseRequest", "parseJsonObject", "intArg", "optionalIntArg", "buildResponse"]);
+  const analyzedNames = new Set(caps.map((c) => c.methodName).filter(Boolean));
+  const uncoveredAdapter = adapterMethods.filter((m) => !analyzedNames.has(m) && !helperFuns.has(m));
+  const brokenInAdapter = brokenCaps.filter((c) => adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
 
   const out = [
     `【载入真相源】${ANALYSIS.replace(/\\/g, "/")}`,
     `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
     `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
+    ``,
+    `【被分析目标源码（sourceRef 指向）】${FIX.replace(/\\/g, "/")}`,
+    `  IMAudioServiceAdapter.kt → ${adapterMethods.length} 个 fun（含 ${execmdCaps.length} 个 capability 对应的方法）`,
+    `  IIMAudioService.aidl / Types.kt（同目录契约与类型）`,
     ``,
     `【源码契约扫描】${SRC.replace(/\\/g, "/")}`,
     `  IIMAudioService.aidl   → ${aidlMethods.length} 方法: ${aidlMethods.join(" / ")}`,
@@ -160,15 +174,16 @@ async function stageAnalyze() {
     `  carcontrol_handlers.json → ${handlerIds.size} functionId 映射（逆向产物）`,
     ``,
     `【交叉核对】${caps.length} capabilities`,
-    `  execmd ${execmdCaps.length}: 契约单一派发点 executeCommand(command) — ${execmdCaps.length}/${execmdCaps.length} 经此路由（methodName 为 command 载荷，契约内无法逐名静态核对）`,
+    `  execmd ${execmdCaps.length}: methodName ∈ IMAudioServiceAdapter.kt — ${execmdCaps.length - execmdUnmatched.length}/${execmdCaps.length} ✓${execmdUnmatched.length ? ` ✗ ${execmdUnmatched.join("、")}` : ""}（逐名核对源码）`,
     `  carcontrol ${ccCaps.length}: ccFunction ∈ ${handlerIds.size} handlers — ${ccCaps.length - ccUnmatched.length}/${ccCaps.length} ✓${ccUnmatched.length ? ` ✗ ${ccUnmatched.join("、")}` : ""}`,
     `  mapnav ${mapCaps.length}: navigateToForAI ∈ IMapCommonService — ${mapCaps.length - mapUnmatched.length}/${mapCaps.length} ✓`,
-    `  broken ${byStatus.broken || 0}: serve 不暴露，跳过`,
+    `  broken ${brokenCaps.length}: 方法存在于源码但标记 broken（stub）${brokenInAdapter.length ? `— ${brokenInAdapter.join("、")}` : ""}`,
     ``,
-    `【潜在能力面（契约方法未被 analysis 覆盖）】`,
+    `【潜在能力面（源码方法未被 analysis 覆盖）】`,
     `  IMapCommonService: ${uncoveredMap.join(" / ") || "（无）"} → 可经 bridge-analyze onboarding`,
-    `  IIMAudioService: registerCallback / unregisterCallback（内部回调机制，非用户能力）`,
-    `  ICustomService: sendMessage / isServiceReady（执行器基础设施，非用户能力）`,
+    `  IMAudioServiceAdapter: ${uncoveredAdapter.join(" / ") || "（无）"}`,
+    `  IIMAudioService: registerCallback / unregisterCallback（内部回调机制）`,
+    `  ICustomService: sendMessage / isServiceReady（执行器基础设施）`,
     `（描述撰写为 agent 判断；本阶段执行的是源码扫描 + 契约交叉核对的确定性部分）`,
   ].join("\n");
   return { ok: true, output: out };
