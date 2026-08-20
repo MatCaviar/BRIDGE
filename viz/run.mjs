@@ -112,6 +112,16 @@ async function currentUser(ip) {
 }
 
 /* ---------- 阶段执行 ---------- */
+const read = (p) => { try { return readFileSync(p, "utf-8"); } catch { return ""; } };
+const extractMethods = (src) =>
+  [...src.matchAll(/(?:oneway\s+)?[\w<>\[\].,\s]+\s(\w+)\s*\([^)]*\)\s*(?:throws[\s\w.]*)?;/g)]
+    .map((m) => m[1]).filter((v, i, arr) => arr.indexOf(v) === i);
+const interfaceMethods = (src) => {
+  const m = src.match(/interface\s+\w+[^{]*\{([\s\S]*?)(?:abstract class|$)/);
+  return extractMethods(m ? m[1] : src);
+};
+
+/** analyze: 真源码扫描 + 契约交叉核对（确定性部分；描述撰写为 agent 判断） */
 async function stageAnalyze() {
   const a = JSON.parse(readFileSync(ANALYSIS, "utf-8"));
   const caps = a.capabilities || [];
@@ -122,15 +132,46 @@ async function stageAnalyze() {
     byMech[m] = (byMech[m] || 0) + 1;
   }
   const active = caps.filter((c) => c.status !== "broken").length;
-  return {
-    ok: true,
-    output: `载入 ${ANALYSIS.replace(/\\/g, "/")}\n` +
-      `app: ${JSON.stringify(a.app || {})}\n` +
-      `capabilities: ${caps.length} (verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0})\n` +
-      `机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")}\n` +
-      `serve 工具面: ${active + 4} = ${active} + 4 media\n` +
-      `（描述撰写为 agent 判断；此处载入已产出之真相源并结构化检视）`,
-  };
+
+  const SRC = join(ROOT, "bridge-executor", "src");
+  const aidlMethods = extractMethods(read(join(SRC, "main", "aidl", "com", "immotors", "aidl", "IIMAudioService.aidl")));
+  const customMethods = interfaceMethods(read(join(SRC, "main", "java", "com", "banma", "custom", "ICustomService.java")));
+  const mapMethods = interfaceMethods(read(join(SRC, "main", "java", "com", "ebanma", "map", "openapi", "basicclass", "IMapCommonService.java")));
+  let handlers = [];
+  try { handlers = JSON.parse(read(join(ROOT, "tools", "carcontrol_handlers.json"))); } catch (e) {}
+  const handlerIds = new Set(handlers.map((h) => h.functionId).filter(Boolean));
+
+  const execmdCaps = caps.filter((c) => c.status !== "broken" && (c.mechanism || "execmd") === "execmd");
+  const ccCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "carcontrol");
+  const mapCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "mapnav");
+  const ccUnmatched = ccCaps.filter((c) => !handlerIds.has(c.ccFunction)).map((c) => `${c.id}(${c.ccFunction})`);
+  const mapUnmatched = mapCaps.filter(() => !mapMethods.includes("navigateToForAI")).map((c) => c.id);
+  const uncoveredMap = mapMethods.filter((m) => m !== "navigateToForAI");
+
+  const out = [
+    `【载入真相源】${ANALYSIS.replace(/\\/g, "/")}`,
+    `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
+    `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
+    ``,
+    `【源码契约扫描】${SRC.replace(/\\/g, "/")}`,
+    `  IIMAudioService.aidl   → ${aidlMethods.length} 方法: ${aidlMethods.join(" / ")}`,
+    `  ICustomService.java    → ${customMethods.length} 方法: ${customMethods.join(" / ")}（JSON functionId 路由）`,
+    `  IMapCommonService.java → ${mapMethods.length} 方法: ${mapMethods.join(" / ")}`,
+    `  carcontrol_handlers.json → ${handlerIds.size} functionId 映射（逆向产物）`,
+    ``,
+    `【交叉核对】${caps.length} capabilities`,
+    `  execmd ${execmdCaps.length}: 契约单一派发点 executeCommand(command) — ${execmdCaps.length}/${execmdCaps.length} 经此路由（methodName 为 command 载荷，契约内无法逐名静态核对）`,
+    `  carcontrol ${ccCaps.length}: ccFunction ∈ ${handlerIds.size} handlers — ${ccCaps.length - ccUnmatched.length}/${ccCaps.length} ✓${ccUnmatched.length ? ` ✗ ${ccUnmatched.join("、")}` : ""}`,
+    `  mapnav ${mapCaps.length}: navigateToForAI ∈ IMapCommonService — ${mapCaps.length - mapUnmatched.length}/${mapCaps.length} ✓`,
+    `  broken ${byStatus.broken || 0}: serve 不暴露，跳过`,
+    ``,
+    `【潜在能力面（契约方法未被 analysis 覆盖）】`,
+    `  IMapCommonService: ${uncoveredMap.join(" / ") || "（无）"} → 可经 bridge-analyze onboarding`,
+    `  IIMAudioService: registerCallback / unregisterCallback（内部回调机制，非用户能力）`,
+    `  ICustomService: sendMessage / isServiceReady（执行器基础设施，非用户能力）`,
+    `（描述撰写为 agent 判断；本阶段执行的是源码扫描 + 契约交叉核对的确定性部分）`,
+  ].join("\n");
+  return { ok: true, output: out };
 }
 async function stageValidate() {
   return run(process.execPath, [VALIDATE, ANALYSIS]);
