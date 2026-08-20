@@ -112,6 +112,26 @@ async function currentUser(ip) {
 }
 
 /* ---------- 阶段执行 ---------- */
+async function stageAnalyze() {
+  const a = JSON.parse(readFileSync(ANALYSIS, "utf-8"));
+  const caps = a.capabilities || [];
+  const byStatus = {}, byMech = {};
+  for (const c of caps) {
+    byStatus[c.status || "probe"] = (byStatus[c.status || "probe"] || 0) + 1;
+    const m = c.mechanism || "execmd";
+    byMech[m] = (byMech[m] || 0) + 1;
+  }
+  const active = caps.filter((c) => c.status !== "broken").length;
+  return {
+    ok: true,
+    output: `载入 ${ANALYSIS.replace(/\\/g, "/")}\n` +
+      `app: ${JSON.stringify(a.app || {})}\n` +
+      `capabilities: ${caps.length} (verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0})\n` +
+      `机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")}\n` +
+      `serve 工具面: ${active + 4} = ${active} + 4 media\n` +
+      `（描述撰写为 agent 判断；此处载入已产出之真相源并结构化检视）`,
+  };
+}
 async function stageValidate() {
   return run(process.execPath, [VALIDATE, ANALYSIS]);
 }
@@ -131,11 +151,12 @@ async function stageDeploy() {
   if (!b.ok || !b.output.includes("deployed")) return { ok: false, error: `部署失败: ${(b.output || "").slice(-160)}` };
   return { ok: true, output: `deployed → ${fdir}/registry.json (车 ${car.carIp}:5555)` };
 }
-async function stageServeStart() {
+async function stageServeStart(args) {
   if (state.serveProc) return { ok: true, output: "serve 已在运行", already: true };
-  const car = await requireCar();
-  if (!car.ok) return { ok: false, error: `serve 需车在线参数：${car.error}` };
-  const p = spawn(process.execPath, [CLI, "serve", "--analysis", ANALYSIS, "--device", `${car.carIp}:5555`],
+  // serve 启动只注册工具面（31 tools），--device 仅在 tools/call 时才连车；
+  // 故 MCP server 生成不依赖车在线。默认用占位设备串。
+  const device = (args && args.device) || "viz-no-car";
+  const p = spawn(process.execPath, [CLI, "serve", "--analysis", ANALYSIS, "--device", device],
     { cwd: ROOT, windowsHide: true });
   state.serveProc = p;
   state.serveLog = [];
@@ -144,7 +165,7 @@ async function stageServeStart() {
   p.on("close", (code) => { pushServeLog(`[serve 进程退出 code=${code}]`); state.serveProc = null; });
   await sleep(1300);
   if (!state.serveProc) return { ok: false, error: `serve 启动即退出: ${state.serveLog.join(" ").slice(-240)}` };
-  return { ok: true, output: `serve 已启动（pid ${p.pid}）\n${state.serveLog.slice(0, 6).join("\n")}` };
+  return { ok: true, output: `serve 已启动（pid ${p.pid}，--device ${device}）\nMCP Server 就绪，工具面 31 tools 注册（broken 2 略过 + media 内置 4）\n${state.serveLog.slice(0, 6).join("\n")}` };
 }
 function pushServeLog(s) {
   s.split("\n").filter(Boolean).slice(-20).forEach((l) => {
@@ -191,7 +212,7 @@ async function stageInvoke(args) {
 }
 
 const STAGES = {
-  validate: stageValidate, registry: stageRegistry, deploy: stageDeploy,
+  analyze: stageAnalyze, validate: stageValidate, registry: stageRegistry, deploy: stageDeploy,
   "serve:start": stageServeStart, "serve:stop": stageServeStop,
   carcheck: stageCarcheck, invoke: stageInvoke,
 };

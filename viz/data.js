@@ -1,6 +1,6 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-08-19T07:59:54.613Z",
+ "generatedAt": "2026-08-20T02:43:38.840Z",
  "version": "0.1.23",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",

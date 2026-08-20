@@ -776,20 +776,22 @@ async function runLive() {
   let done = 0;
   const plan = [
     { id: "n1", name: "① 输入素材", run: async () => { liveLog("　· 概念阶段：app 源码 / PRD / APK / adb 观察（无需执行）"); return { ok: true }; } },
-    { id: "n2", name: "② bridge-analyze", run: async () => { liveLog("　· agent skill（本页不执行）；使用现有 analysis 产物", "warn"); return { ok: true, note: "agent" }; } },
+    { id: "n2", name: "② bridge-analyze · 分析", run: () => apiStage("analyze") },
     { id: "n3", name: "③ 唯一真相源 · schema 校验", run: () => apiStage("validate") },
-    { id: "n4b", name: "④乙 registry 生成", run: async () => {
-        const a = await apiStage("registry");
-        if (a.ok) return apiStage("deploy");
-        return a;
-    } },
-    { id: "n4a", name: "④甲 serve 投影", run: async () => {
+    { id: "n4b", name: "④乙 registry 生成", run: () => apiStage("registry") },
+    { id: "n4a", name: "④甲 serve 投影（MCP Server）", run: async () => {
         if (!$("serve-chk").checked) { liveLog("　· 跳过：未勾选「启动并保持 serve」", "warn"); return { ok: false, skipped: true }; }
-        return apiStage("serve:start");
+        return apiStage("serve:start", { device: "viz-no-car" });
     } },
-    { id: "n5", name: "⑤ 车端执行器", run: async () => { const r = await apiStage("carcheck"); carOk = r.ok; return r; } },
+    { id: "n5", name: "⑤ 车端执行器 · 部署 + 自检", run: async () => {
+        const d = await apiStage("deploy");
+        if (!d.ok) return d;
+        const c = await apiStage("carcheck");
+        carOk = c.ok;
+        return c;
+    } },
     { id: "n6", name: "⑥ 真实车机结果 · invoke", run: async () => {
-        if (!carOk) { liveLog("　· 跳过：车离线（未通过 carcheck）", "warn"); return { ok: false, skipped: true }; }
+        if (!carOk) { liveLog("　· 跳过：车离线（未通过车端自检）", "warn"); return { ok: false, skipped: true }; }
         return apiStage("invoke", { op: $("op-select").value, args: {} });
     } },
   ];
@@ -832,7 +834,7 @@ function setMode(m) {
   ["btn-run", "btn-abort", "op-select", "serve-chk-wrap", "serve-chip"].forEach((id) => ($(id).style.display = r ? "none" : ""));
   $("mode-note").textContent = r
     ? "重演为对已录管线各阶段的顺序展示，非实时执行"
-    : "实时模式：逐阶段执行真实命令（需 node viz/run.mjs 起服务；deploy/invoke 会真动车）";
+    : "实时模式：②→④甲 为真实命令（analyze/validate/registry/serve，无需车）；⑤⑥ 车端需车在线";
   if (m === "live") {
     refreshServeChip();
     if (location.protocol === "file:") liveLog("⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）", "warn");
