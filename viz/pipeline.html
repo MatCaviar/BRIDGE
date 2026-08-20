@@ -735,22 +735,31 @@ function renderLog(entries) {
     `<div><span class="ts">t+${esc(e.t)}s</span><span class="${e.cls || ""}">${esc(e.msg)}</span></div>`).join("");
   el.scrollTop = el.scrollHeight;
 }
+let lastStages = {}, lastLogLen = -1;
 function applySession(s) {
   if (!s) return;
   for (const id of SESSION_IDS) {
     const st = s.stages[id] || "pending";
-    nodeState(id, st === "running" ? "active" : st);
-    setConnFor(id, st === "running" ? "flowing" : st === "done" ? "traversed" : "");
+    const mapped = st === "running" ? "active" : st;
+    if (lastStages[id] !== mapped) {          // 仅在状态变化时更新（避免轮询导致重动画/闪烁）
+      nodeState(id, mapped);
+      setConnFor(id, st === "running" ? "flowing" : st === "done" ? "traversed" : "");
+      lastStages[id] = mapped;
+    }
   }
-  renderLog(s.log);
+  const log = s.log || [];
+  if (log.length !== lastLogLen) { renderLog(log); lastLogLen = log.length; }
   const p = s.progress || {};
-  $("pbar").style.width = (p.pct ?? 0) + "%";
-  $("pbar-pct").textContent = (p.pct ?? 0) + "%";
-  $("pbar-stage").textContent = `${p.done ?? 0} / ${p.total ?? 7}`;
+  const pct = (p.pct ?? 0) + "%";
+  if ($("pbar").style.width !== pct) $("pbar").style.width = pct;
+  if (($("pbar-pct").textContent || "") !== pct) $("pbar-pct").textContent = pct;
+  const cnt = `${p.done ?? 0} / ${p.total ?? 7}`;
+  if (($("pbar-stage").textContent || "") !== cnt) $("pbar-stage").textContent = cnt;
   const runningId = SESSION_IDS.find((id) => s.stages[id] === "running");
-  $("stage-now").innerHTML = runningId
+  const html = runningId
     ? `执行中：<b>${STAGE_NAMES[runningId] || runningId}</b>`
     : (s.name ? `会话：<b>${esc(s.name)}</b> · ${p.done ?? 0}/${p.total ?? 7}` : "待命");
+  if ($("stage-now").innerHTML !== html) $("stage-now").innerHTML = html;
 }
 async function refreshSession() {
   if (mode !== "live") return;
