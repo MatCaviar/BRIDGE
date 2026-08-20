@@ -258,8 +258,8 @@
 
     <div class="section">
       <div class="section-header">
-        <span class="section-number">PART 02</span><span class="section-title">生成过程 · 重演</span>
-        <span class="section-sub">只读快照的过程重演 -- 节点计数皆为真实产物数值</span>
+        <span class="section-number">PART 02</span><span class="section-title" id="gen-title">生成过程 · 重演</span>
+        <span class="section-sub" id="gen-sub">只读快照的过程重演 -- 节点计数皆为真实产物数值</span>
       </div>
       <div class="console">
         <span class="mode-toggle">
@@ -829,6 +829,10 @@ function setMode(m) {
   $("mode-note").textContent = r
     ? "重演为对已录管线各阶段的顺序展示，非实时执行"
     : "实时模式：②→④甲 为真实命令（analyze/validate/registry/serve，无需车）；⑤⑥ 车端需车在线";
+  $("gen-title").textContent = r ? "生成过程 · 重演" : "生成过程 · 实时";
+  $("gen-sub").textContent = r
+    ? "只读快照的过程重演 -- 节点计数皆为真实产物数值"
+    : "逐阶段执行真实命令 -- ②→④甲 无需车，⑤⑥ 车端需车在线";
   if (m === "live") {
     refreshServeChip();
     if (location.protocol === "file:") liveLog("⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）", "warn");
