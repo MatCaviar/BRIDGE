@@ -58,7 +58,7 @@ description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 }
 ```
 
-**机制选择**（从 app 对外形态判断；拿不准 → 选最可能 + status=probe）。执行通道是**通用底座**：aidl(多方法AIDL反射)/execmd(单入口)/media/mapnav/carcontrol/intent + UI 驱动(ui_* 兜底, 任何 app 可操作)。**新形态的执行端适配由你(执行 codeagent)自行完成**（改执行器/写适配器），套件不自动生成执行代码——分析产物(schema)是唯一的自动交付物：
+**机制选择**（从 app 对外形态判断；拿不准 → 选最可能 + status=probe）。注意**源码形态与实机部署版本可能不同**（如源码是多方法 AIDL、实机是 executeCommand 单入口）——以源码判断机制, 但涉及实机行为的 status 谨慎标 verified; 有实机时用 invoke 复核后升级。执行通道是**通用底座**：aidl(多方法AIDL反射)/execmd(单入口)/media/mapnav/carcontrol/intent + UI 驱动(ui_* 兜底, 任何 app 可操作)。**新形态的执行端适配由你(执行 codeagent)自行完成**（改执行器/写适配器），套件不自动生成执行代码——分析产物(schema)是唯一的自动交付物：
 
 | mechanism | 适用形态 | 关键字段 |
 |---|---|---|
@@ -122,7 +122,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 ## 可视化同步（适配层，默认开启；不影响执行流程）
 
-执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**（本机可视化后端，插件 hook 已自动拉起 `node viz/run.mjs`）；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。
+执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。**上报前先探测**后端是否在（GET 该地址）——不在则尝试 `node <套件根>/viz/run.mjs` 自行拉起（后台）；拉不起则静默跳过上报（不阻断）。
 
 **开始执行 skill 时（必做）**：先告知用户可视化地址——"可视化已同步：`$BRIDGE_VIZ_URL/pipeline.html`"（默认 `http://127.0.0.1:8650/pipeline.html`），让用户能打开页面实时观看。然后按下列协议上报：
 
