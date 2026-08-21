@@ -67,7 +67,7 @@ description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 | `media` | 媒体会话控制(切歌/播放/暂停, 任意媒体 app) | 内置 media_* 工具, 不进 analysis |
 | `mapnav` | 地图/导航类 AI 接口(设目的地+起导航) | bindAction + 目的地参数(name/lat/lon) |
 | `carcontrol` | 车控服务 JSON functionId 契约 | ccDomain/ccFunction/bindAction |
-| `intent` | 页面跳转(Form 1 startActivity) | component/intentScreens |
+| `intent` | 任意 app 页面直达(Form 1 startActivity; 组件/deep link uri/extras 皆可, 多屏可选) | component{pkg,cls} 或 intentScreens{byDisplay}; extras[{key,value/fromArgs}]; defaultArgs |
 
 ## 分析规范（判断标准 — 你的责任）
 

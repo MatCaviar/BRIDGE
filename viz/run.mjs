@@ -402,9 +402,38 @@ function serveFile(res, path) {
   } catch (e) { res.writeHead(404); res.end("not found"); }
 }
 
+async function fetchJson(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   try {
+    if (url.pathname === "/api/e2e") {
+      // 聚合 gateway(:3000) 端到端状态: 健康度 + 最近会话事件摘要(工具调用/最终回复)
+      const out = { gateway: null, sessions: [] };
+      try {
+        const h = await fetchJson("http://localhost:3000/api/health", 2500);
+        out.gateway = { ok: true, ...h };
+      } catch {
+        out.gateway = { ok: false };
+      }
+      try {
+        const sess = state.session;
+        if (sess && sess.id) {
+          const ev = await fetchJson(`http://localhost:3000/api/events/${sess.id}`, 2500).catch(() => null);
+          if (ev) out.sessions.push({ id: sess.id, note: "cockpit 会话(事件流摘要)" });
+        }
+      } catch { /* optional */ }
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(JSON.stringify(out));
+      return;
+    }
     if (url.pathname === "/api/health") {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: true, name: "bridge-viz-run", port: PORT,

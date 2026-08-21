@@ -32,6 +32,10 @@ header{display:flex;align-items:center;gap:14px;padding:12px 18px}
 .bc:nth-child(5){background-image:linear-gradient(180deg,#34D399,#047857)} /* G emerald */
 .bc:nth-child(6){background-image:linear-gradient(180deg,#A78BFA,#6D28D9)} /* E purple */
 .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.view-tabs{display:flex;gap:.4rem;margin-right:1rem;align-items:center}
+.vtab{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#eaf3ff;padding:.35rem .9rem;border-radius:999px;font-size:.85rem;cursor:pointer;transition:.2s;font-family:inherit}
+.vtab:hover{background:rgba(255,255,255,.18)}
+.vtab.active{background:#fff;color:#1a365d;border-color:#fff;font-weight:600}
 .chip{display:flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
 .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);transition:background .3s}
 .chip[data-s=ok] .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
@@ -98,6 +102,10 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
     <div class="brand">
       <h1><span class="bc">B</span><span class="bc">R</span><span class="bc">I</span><span class="bc">D</span><span class="bc">G</span><span class="bc">E</span> 套件 <span class="t-sep">|</span> 座舱智能体</h1>
     </div>
+    <nav class="view-tabs">
+      <button class="vtab active" data-v="cockpit">座舱</button>
+      <button class="vtab" data-v="pipeline">管线</button>
+    </nav>
     <div class="chips">
       <div class="chip" id="chip-voice" data-s="idle"><span class="dot"></span><span class="chip-label">语音</span><span class="chip-val" id="chip-voice-val">—</span></div>
       <div class="chip" id="chip-llm" data-s="idle"><span class="dot"></span><span class="chip-label">LLM</span><span class="chip-val" id="chip-llm-val">—</span></div>
@@ -160,7 +168,22 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
   </main>
 </div>
 
+<div id="pipeline-view" style="display:none;position:fixed;inset:0;z-index:5;background:#f5f6f9;">
+  <iframe src="http://127.0.0.1:8650/pipeline.html" style="width:100%;height:100%;border:0;"></iframe>
+</div>
+
 <script>
+// 视图分页: 座舱(语音/车控) ⇄ 管线(bridge-analyze 可视化, 同源 viz 后端)
+document.querySelectorAll('.vtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.vtab').forEach(b => b.classList.toggle('active', b === btn));
+    const pv = document.getElementById('pipeline-view');
+    const isPipe = btn.dataset.v === 'pipeline';
+    pv.style.display = isPipe ? 'block' : 'none';
+    document.querySelector('.overlay').style.display = isPipe ? 'none' : '';
+    document.getElementById('bg').style.display = isPipe ? 'none' : 'block';
+  });
+});
 /* ═══════════════ Originkit Dot-Matrix WebGL background (vanilla port) ═══════════════ */
 const PERLIN_VS=`#version 300 es
 in vec2 uv;in vec2 position;out vec2 vUv;

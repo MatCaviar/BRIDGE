@@ -236,6 +236,19 @@ class ExecutorActivity : Activity() {
         intent.setClassName(pkg, cls)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+        // Deep-link 页面路由 (如 imaudio://soundeffects/official): registry tool 可声明固定 dataUri,
+        // 调用 args 全部以 query 参数拼到 URI 上 (例如 mode=custom&customEq=true)。
+        val dataUri = raw?.optString("dataUri", "") ?: ""
+        if (dataUri.isNotEmpty()) {
+            val uri = android.net.Uri.parse(dataUri).buildUpon()
+            for (k in args.keys()) if (k != displayArg) {
+                val v = args.opt(k)
+                uri.appendQueryParameter(k, if (v != null) v.toString() else "")
+            }
+            intent.data = uri.build()
+            intent.action = Intent.ACTION_VIEW
+        }
+
         val extras = raw?.optJSONArray("extras")
         if (extras != null && extras.length() > 0) {
             val merged = JSONObject()
@@ -461,10 +474,13 @@ class ExecutorActivity : Activity() {
         return m.invoke(null, binder) ?: throw IllegalStateException("asInterface returned null")
     }
 
-    /** 通用反射分派: 按 methodName 反射调代理方法(String 参数或无参), 返回 JSON 字符串。 */
+    /** 通用反射分派: 按 methodName 反射调代理方法(String 参数或无参), 返回 JSON 字符串。
+     *  pattern 语义与 dispatch() 一致: none=无参, envelope={body,headers,options}+设备值注入,
+     *  其余(scalar/dataclass)=args 原样作为 paramJson。 */
     private fun dispatchReflect(proxy: Any, tool: Tool, args: JSONObject): JSONObject {
         val paramJson: String? = when (tool.pattern) {
             "none" -> null
+            "envelope" -> buildEnvelope(tool, args).toString()
             else -> args.toString()
         }
         val m = if (paramJson == null) proxy.javaClass.getMethod(tool.methodName)

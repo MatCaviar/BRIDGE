@@ -80,6 +80,21 @@ function runAdbExecOut(args) {
   });
 }
 
+/** 屏名(DRIVER/PASSENGER/REAR 等)→ displayId(DisplayManager 按名包含匹配; 失败 -1 回退当前屏) */
+async function resolveDisplay(name) {
+  try {
+    const out = await runAdb(["shell", "dumpsys display 2>/dev/null"]);
+    const ents = out.match(/DisplayDeviceInfo\{[^}]*\}/g) ?? [];
+    for (const ent of ents) {
+      if (ent.toUpperCase().includes(name.toUpperCase())) {
+        const idm = ent.match(/displayId=(\d+)/) ?? ent.match(/mDisplayId=(\d+)/);
+        if (idm) return Number(idm[1]);
+      }
+    }
+  } catch { /* ignore */ }
+  return -1;
+}
+
 /** MCP 标准返回: { content: [{type:"text", text}] } — 裸对象会让客户端 content 为空 */
 function mcpResult(data) {
   return { content: [{ type: "text", text: typeof data === "string" ? data : JSON.stringify(data) }] };
@@ -157,25 +172,47 @@ server.registerTool(
 server.registerTool(
   "ui_launch",
   {
-    description: "在前台启动车机 app。用户说'打开XX/启动XX'时先用它。pkg 必填, activity 可省略(自动解析主入口)。",
+    description: "启动车机 app 或直达其页面(deep link)。用户说'打开XX'时用。三种方式: pkg+uri(deep link, 如 imaudio://soundeffects/boeffects) / pkg+activity(组件) / 仅 pkg(主入口)。可选 extras 传附加字符串参数。",
     inputSchema: {
       pkg: z.string().describe("app 包名, 如 com.immotors.imaudio / com.ebanma.map.main / cn.alios.audioapp.qq"),
-      activity: z.string().optional().describe("Activity 全名, 省略则用主入口"),
+      activity: z.string().optional().describe("Activity 全名, 省略则解析主入口"),
+      uri: z.string().optional().describe("deep link URI(优先于 activity), 如 imaudio://soundeffects/boeffects"),
+      action: z.string().optional().describe("intent action(目标服务要求匹配 action 时传, 优先于 uri)"),
+      extras: z.record(z.string()).optional().describe("附加字符串 extras, 如 {\"ToCarControl\": \"{\\\"type\\\":\\\"air\\\"}\"}"),
+      display: z.string().optional().describe("目标屏 DRIVER/PASSENGER/REAR(按 DisplayManager 名匹配, 失败回退当前屏)"),
     },
   },
-  async ({ pkg, activity }) => {
-    // 无 activity 时解析主入口: am start -n <pkg> 不会真正启动(需要完整组件)
-    let comp = activity ? `${pkg}/${activity}` : pkg;
-    if (!activity) {
-      try {
-        const out = await runAdb(["shell", `cmd package resolve-activity --brief ${pkg}`]);
-        const line = out.trim().split(/\r?\n/).filter((l) => l.includes("/")).pop();
-        if (line) comp = line.trim();
-      } catch { /* keep pkg form */ }
+  async ({ pkg, activity, uri, action, extras, display }) => {
+    let am = "am start --user 10";
+    if (action) {
+      am += ` -a ${action}`;
+      if (uri) am += ` -d ${uri}`;
+      if (pkg && activity) am += ` -n ${pkg}/${activity}`;
+    } else if (uri) {
+      // deep link: ACTION_VIEW + uri (+包限定)
+      am += ` -a android.intent.action.VIEW -d ${uri}`;
+      if (pkg) am += ` -p ${pkg}`;
+    } else {
+      let comp = activity ? `${pkg}/${activity}` : pkg;
+      if (!activity) {
+        try {
+          const out = await runAdb(["shell", `cmd package resolve-activity --brief ${pkg}`]);
+          const line = out.trim().split(/\r?\n/).filter((l) => l.includes("/")).pop();
+          if (line) comp = line.trim();
+        } catch { /* keep pkg form */ }
+      }
+      am += ` -n ${comp}`;
     }
-    await runAdb(["shell", `am start --user 10 -n ${comp}`]).catch(() => {});
+    if (extras) {
+      for (const [k, v] of Object.entries(extras)) am += ` --es ${k} ${JSON.stringify(String(v))}`;
+    }
+    if (display) {
+      const dispId = await resolveDisplay(display);
+      if (dispId >= 0) am += ` --display ${dispId}`;
+    }
+    await runAdb(["shell", am]).catch(() => {});
     await sleep(2500);
-    return mcpResult({ ok: true, launched: comp });
+    return mcpResult({ ok: true, launched: am });
   }
 );
 
