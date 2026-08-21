@@ -65,7 +65,6 @@
   .stage-now { font-size:.88rem; color:var(--t2); margin-left:.3rem; }
   .stage-now b { color:var(--primary-700); }
   .speed { font-family:var(--mono); }
-  .replay-note { font-size:.76rem; color:var(--t3); margin-left:auto; }
 
   .pbar-wrap { height:9px; background:var(--n100); border-radius:6px; overflow:hidden; border:1px solid var(--n200); }
   .progress-fill { height:100%; width:0%; background:linear-gradient(90deg,#b9d8ff 0%,#3f86e8 100%);
@@ -234,7 +233,6 @@
     <div class="section">
       <div class="section-header">
         <span class="section-number">PART 01</span><span class="section-title">数量总览</span>
-        <span class="section-sub">计数与 validate-analysis.mjs 口径一致</span>
       </div>
       <div class="metrics" id="stats"></div>
       <div class="mechrow" id="mechrow"></div>
@@ -243,12 +241,10 @@
     <div class="section">
       <div class="section-header">
         <span class="section-number">PART 02</span><span class="section-title">生成过程 · 实时跟随</span>
-        <span class="section-sub">跟随 agent 会话：skill 执行到哪一步即显示到哪一步 · 刷新不丢进度</span>
       </div>
       <div class="console">
         <span class="stage-now" id="stage-now">待命</span>
         <span class="serve-chip off" id="serve-chip">serve · 未启动</span>
-        <span class="replay-note" id="mode-note">可视化地址：http://127.0.0.1:8650/pipeline.html（BRIDGE_VIZ_URL，插件已自动拉起后端）</span>
       </div>
       <div class="pbar-wrap"><div class="progress-fill" id="pbar"></div></div>
       <div class="pbar-meta"><span>管线进度</span><span><b id="pbar-pct">0%</b>　·　<b id="pbar-stage">0 / 6</b> 阶段</span></div>
