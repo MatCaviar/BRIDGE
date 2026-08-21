@@ -200,50 +200,27 @@
   #no-data { display:none; margin:2.5rem 0; padding:1.4rem; border:1px dashed var(--danger);
              color:var(--danger); text-align:center; background:#fff; border-radius:10px; }
 
-  /* ===== Atelier 嫁接：状态脸 + 布局切换器（保留蓝色主题） ===== */
+  /* ===== Atelier 嫁接：状态脸（居中 · dock 单列布局 · 保留蓝色主题） ===== */
   .container { padding-bottom: 3rem; }
-  .shell { align-items:start; display:grid; grid-template-columns:minmax(260px,.8fr) minmax(0,1.35fr); gap:1.25rem; }
-  .preview-rail { min-width:0; position:sticky; top:1rem; z-index:5; }
+  .shell { display:block; }
+  .preview-rail { min-width:0; margin:0 0 1.1rem; }
   .content-rail { min-width:0; }
-  .preview { background:#fff; border:1px solid var(--n200); border-radius:14px; padding:1rem; display:grid; gap:.8rem; }
-  .preview-head { display:flex; justify-content:space-between; align-items:center; }
+  .preview { background:#fff; border:1px solid var(--n200); border-radius:14px; padding:1rem; display:grid; gap:.6rem; justify-items:center; text-align:center; }
+  .preview-head { display:flex; justify-content:center; align-items:center; gap:.5rem; }
   .preview-head strong { font-size:.92rem; color:var(--primary-900); }
   #face-state { font-family:var(--mono); font-size:.76rem; color:var(--primary-700); background:var(--primary-50); border:1px solid var(--primary-100); padding:.15rem .55rem; border-radius:6px; }
-  .preview svg { width:100%; height:auto; display:block; }
+  .preview svg { width:84px; height:84px; display:block; margin:0 auto; }
   .preview .body { fill:var(--primary-500); }
   .preview .eye { fill:var(--bg); }
-  .preview .status-line { display:flex; justify-content:space-between; font-size:.78rem; color:var(--t3); }
+  .preview .status-line { display:flex; justify-content:center; gap:1rem; font-size:.78rem; color:var(--t3); }
   .preview .status-line strong { color:var(--primary-700); font-family:var(--mono); }
 
-  .layout-switcher { position:fixed; bottom:12px; right:14px; z-index:30;
-    display:flex; gap:2px; padding:3px; background:var(--t1); border-radius:999px;
-    box-shadow:0 6px 18px rgba(0,0,0,.18); opacity:.9; transition:opacity .15s; }
-  .layout-switcher:hover { opacity:1; }
-  .layout-switcher button { background:transparent; border:0; border-radius:999px; color:#fff;
-    font-family:var(--mono); font-size:.66rem; padding:.22rem .5rem; cursor:pointer; white-space:nowrap; transition:background .15s; }
-  .layout-switcher button:hover { background:rgba(255,255,255,.12); }
-  .layout-switcher button[aria-pressed="true"] { background:var(--primary-700); color:#fff; }
-  .layout-switcher button[aria-pressed="true"]:hover { background:var(--primary-900); }
-
-  body[data-variant="dock"] .shell { display:block; }
-  body[data-variant="dock"] .preview-rail { position:static; }
-  body[data-variant="dock"] .preview { grid-template-columns:160px 1fr; align-items:center; }
-  body[data-variant="dock"] .preview svg { max-height:150px; }
-  body[data-variant="dock"] .content-rail { margin-top:1.1rem; }
-  body[data-variant="focus"] .shell { grid-template-columns:minmax(360px,1.1fr) minmax(0,.95fr); }
-  body[data-variant="focus"] .preview svg { max-height:560px; }
-
   @media (max-width:860px) {
-    .shell { display:block; }
-    .preview-rail { position:static; }
-    .preview { grid-template-columns:140px 1fr; align-items:center; }
-    .preview svg { max-height:130px; }
-    .layout-switcher { bottom:8px; right:8px; }
-    .layout-switcher button { padding:.2rem .42rem; font-size:.62rem; }
+    .preview svg { width:72px; height:72px; }
   }
 </style>
 </head>
-<body data-variant="split">
+<body>
 
 <header>
   <div class="deco">
@@ -339,12 +316,6 @@
       </main>
     </div>
   </div>
-</div>
-
-<div class="layout-switcher" aria-label="布局切换">
-  <button type="button" data-layout="split" aria-pressed="true">Split</button>
-  <button type="button" data-layout="dock">Dock</button>
-  <button type="button" data-layout="focus">Focus</button>
 </div>
 
 <script src="data.js"></script>
@@ -892,27 +863,6 @@ if (!D) {
   render(performance.now());
   requestAnimationFrame(animate);
   setState("idle");
-
-  /* ===== 布局切换器（split / dock / focus 三态变形） ===== */
-  const allowed = ["split", "dock", "focus"];
-  const params = new URLSearchParams(location.search);
-  const initial = allowed.includes(params.get("variant")) ? params.get("variant") : "split";
-  const buttons = document.querySelectorAll(".layout-switcher [data-layout]");
-  const apply = variant => {
-    document.body.dataset.variant = variant;
-    buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === variant)));
-    try { const u = new URL(location.href); u.searchParams.set("variant", variant); history.replaceState(null, "", u); } catch (e) {}
-  };
-  buttons.forEach(b => b.addEventListener("click", () => apply(b.dataset.layout)));
-  addEventListener("keydown", e => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
-    const cur = allowed.indexOf(document.body.dataset.variant);
-    if (cur < 0) return;
-    apply(allowed[(cur + (e.key === "ArrowRight" ? 1 : -1) + allowed.length) % allowed.length]);
-  });
-  apply(initial);
 })();
 </script>
 </body>
