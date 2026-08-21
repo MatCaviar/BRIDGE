@@ -44,4 +44,27 @@ if needs_build "$ROOT/cli" "$ROOT/cli/dist/cli.js"; then
   echo "[im-mcp] building cli/dist"
   (cd "$ROOT/cli" && npx tsc) || { echo "[im-mcp] cli build failed" >&2; exit 1; }
 fi
+
+# ── 可视化后端自动拉起（BRIDGE_VIZ_URL 默认 http://127.0.0.1:8650）──
+start_viz_if_needed() {
+  local port="8650"
+  if netstat -ano 2>/dev/null | grep ":$port" | grep -qi listening; then
+    echo "[im-mcp] viz backend already listening on :$port"
+    return 0
+  fi
+  if [ ! -f "$ROOT/viz/run.mjs" ]; then
+    echo "[im-mcp] viz/run.mjs 不存在，跳过可视化后端"
+    return 0
+  fi
+  echo "[im-mcp] 启动可视化后端 http://127.0.0.1:$port/pipeline.html (viz/run.mjs)"
+  if command -v powershell.exe >/dev/null 2>&1; then
+    local winroot
+    winroot="$(cygpath -w "$ROOT" 2>/dev/null || echo "$ROOT")"
+    (cd "$ROOT" && powershell.exe -NoProfile -Command "Start-Process -WindowStyle Hidden -FilePath 'node' -ArgumentList 'viz/run.mjs' -WorkingDirectory '$winroot'") >/dev/null 2>&1 || true
+  else
+    (cd "$ROOT" && nohup node viz/run.mjs >/dev/null 2>&1 &) || true
+  fi
+}
+start_viz_if_needed
+
 echo "[im-mcp] ready"

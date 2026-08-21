@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BRIDGE · 源码至 MCP 生成管线（过程重演）</title>
+<title>BRIDGE · 源码至 MCP 生成管线（可视化跟随）</title>
 <style>
   /* ===== ZZT 蓝色系设计语言（参考 Z-INDUS 报告风） ===== */
   :root {
@@ -52,24 +52,8 @@
   .mechrow { margin-top:.85rem; font-size:.85rem; color:var(--t2); }
   .mechrow b { color:var(--primary-700); }
 
-  /* ===== 过程重演控制台 ===== */
+  /* ===== 跟随控制台 ===== */
   .console { display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin-bottom:1rem; }
-  .btn { font-family:var(--sans); font-size:.88rem; border-radius:7px; cursor:pointer; padding:.42rem 1.05rem;
-         border:1px solid var(--primary-500); background:var(--primary-500); color:#fff; font-weight:500;
-         transition:background .15s; display:inline-flex; align-items:center; gap:.4rem; }
-  .btn:hover { background:var(--primary-600); }
-  .btn.ghost { background:#fff; color:var(--primary-600); }
-  .btn.ghost:hover { background:var(--primary-50); }
-  .btn[disabled] { opacity:.45; cursor:default; }
-  .mode-toggle { display:inline-flex; border:1px solid var(--primary-200); border-radius:8px; overflow:hidden; }
-  .mode-btn { font-family:var(--sans); font-size:.88rem; padding:.42rem 1.05rem; cursor:pointer;
-              border:none; background:#fff; color:var(--primary-600); font-weight:500; }
-  .mode-btn.on { background:var(--primary-500); color:#fff; }
-  select#op-select { font-family:var(--mono); font-size:12.5px; border:1px solid var(--n200); border-radius:7px;
-                     padding:.34rem .5rem; color:var(--t1); background:#fff; outline:none; max-width:280px; }
-  select#op-select:focus { border-color:var(--primary-500); }
-  .chk { display:inline-flex; align-items:center; gap:.35rem; font-size:.82rem; color:var(--t2); cursor:pointer; user-select:none; }
-  .chk input { accent-color:var(--primary-500); }
   .serve-chip { font-size:.78rem; font-family:var(--mono); padding:.2rem .6rem; border-radius:6px;
                 color:var(--success); border:1px solid #c4e7cd; background:var(--success-50); }
   .serve-chip.off { color:var(--t3); border-color:var(--n200); background:var(--n50); }
@@ -258,20 +242,13 @@
 
     <div class="section">
       <div class="section-header">
-        <span class="section-number">PART 02</span><span class="section-title" id="gen-title">生成过程 · 重演</span>
-        <span class="section-sub" id="gen-sub">只读快照的过程重演 -- 节点计数皆为真实产物数值</span>
+        <span class="section-number">PART 02</span><span class="section-title">生成过程 · 实时跟随</span>
+        <span class="section-sub">跟随 agent 会话：skill 执行到哪一步即显示到哪一步 · 刷新不丢进度</span>
       </div>
       <div class="console">
-        <span class="mode-toggle">
-          <button class="mode-btn on" id="mode-replay">重演</button>
-          <button class="mode-btn" id="mode-live">实时</button>
-        </span>
-        <button class="btn" id="btn-play">▶ 播放</button>
-        <button class="btn ghost" id="btn-replay">⟳ 重播</button>
-        <button class="btn ghost speed" id="btn-speed">速度 1×</button>
         <span class="stage-now" id="stage-now">待命</span>
-        <span class="serve-chip off" id="serve-chip" style="display:none">serve · 未启动</span>
-        <span class="replay-note" id="mode-note">重演为对已录管线各阶段的顺序展示，非实时执行</span>
+        <span class="serve-chip off" id="serve-chip">serve · 未启动</span>
+        <span class="replay-note" id="mode-note">可视化地址：http://127.0.0.1:8650/pipeline.html（BRIDGE_VIZ_URL，插件已自动拉起后端）</span>
       </div>
       <div class="pbar-wrap"><div class="progress-fill" id="pbar"></div></div>
       <div class="pbar-meta"><span>管线进度</span><span><b id="pbar-pct">0%</b>　·　<b id="pbar-stage">0 / 6</b> 阶段</span></div>
@@ -578,137 +555,9 @@ function renderTools() {
   });
 }
 
-/* ---------- 过程重演引擎 ---------- */
-let speed = 1, paused = false, runToken = 0, t0 = 0;
-
-function buildStages(S) {
-  const regMech = (D.registry.present && D.registry.byMechanism) || {};
-  return [
-    { id: "n1", name: "① 输入素材", conns: [], steps: [
-      "app 源码 / PRD / APK / adb 观察 就绪（输入契约：任意形态）"] },
-    { id: "n2", name: "② bridge-analyze 分析", conns: ["n2"], steps: [
-      "摸清输入形态 -> 定位对外能力面",
-      "枚举能力：29（verified 27 · broken 2）",
-      "撰写 description（触发场景模板）",
-      "产出 e2e/bridge-analysis.json"] },
-    { id: "n3", name: "③ 唯一真相源", conns: ["n3"], steps: [
-      "载入 analysis.json -- serve 字段 ＋ 机制字段，一份产物双用"] },
-    { group: true, items: [
-      { id: "n4a", name: "④甲 serve 投影", conns: ["n4", "n4a"], steps: [
-        "MCP Server 启动（broken 2 略过）",
-        `工具面就绪：31 ＝ 27 ＋ media 内置 4`] },
-      { id: "n4b", name: "④乙 registry 生成", conns: ["n4", "n4b"], steps: [
-        "analysis-to-registry.mjs 机制字段投影",
-        `registry.json 27 tools（execmd ${regMech.execmd ?? "-"} · carcontrol ${regMech.carcontrol ?? "-"} · mapnav ${regMech.mapnav ?? "-"}）`,
-        "部署到车 files/registry.json"] },
-    ] },
-    { id: "n5", name: "⑤ 车端执行器", conns: ["n5"], steps: [
-      "bridge_executor 就绪（ExecutorActivity · imrpc 信箱）",
-      `按机制分派：execmd ${regMech.execmd ?? "-"} · carcontrol ${regMech.carcontrol ?? "-"} · mapnav ${regMech.mapnav ?? "-"} · media 内置`] },
-    { id: "n6", name: "⑥ 真实车机结果", conns: ["n6"], steps: [
-      "result.json {reqId, ok, data} -- 闭环成立 ✓"] },
-  ];
-}
-function totalStageUnits(stages) { return stages.reduce((a, s) => a + (s.group ? s.items.length : 1), 0); }
-
-const wait = (ms) => new Promise((r) => setTimeout(r, Math.max(30, ms / speed)));
-async function pauseGate(tk) {
-  while (paused && tk === runToken) await new Promise((r) => setTimeout(r, 90));
-}
-
-function log(html) {
-  const el = $("plog");
-  const t = ((performance.now() - t0) / 1000).toFixed(1);
-  const div = document.createElement("div");
-  div.innerHTML = `<span class="ts">t+${t}s</span>${html}`;
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
-}
-
-function setConn(stage, cls) {
-  (stage.conns || []).forEach((c) =>
-    document.querySelectorAll(`[data-for="${c}"]`).forEach((el) => {
-      el.classList.remove("flowing", "traversed");
-      if (cls) el.classList.add(cls);
-    }));
-}
+/* ---------- 实时跟随（会话订阅式：进度在服务端，刷新页面不丢） ---------- */
 function nodeEl(id) { return document.querySelector(`.fnode[data-stage="${id}"]`); }
-
-function updateProgress(doneUnits, total, activeName) {
-  const pct = Math.min(100, Math.round((doneUnits / total) * 100));
-  $("pbar").style.width = pct + "%";
-  $("pbar-pct").textContent = pct + "%";
-  $("pbar-stage").textContent = `${doneUnits} / ${total}`;
-  $("stage-now").innerHTML = activeName ? `当前阶段：<b>${esc(activeName)}</b>` : "管线就绪";
-}
-
-async function runStage(st, tk) {
-  const el = nodeEl(st.id);
-  if (!el) return;
-  el.classList.remove("pending"); el.classList.add("active");
-  setConn(st, "flowing");
-  log(`<span class="st">${esc(st.name)}</span>　开始`);
-  for (const s of st.steps) {
-    if (tk !== runToken) return;
-    await pauseGate(tk);
-    await wait(620);
-    if (tk !== runToken) return;
-    log(`　· ${esc(s)}`);
-  }
-  if (tk !== runToken) return;
-  el.classList.remove("active"); el.classList.add("done");
-  el.querySelector(".state-badge").textContent = "✓ 完成";
-  el.querySelectorAll(".cnt[data-count]").forEach((c) => countUp(c, +c.dataset.count, 520));
-  setConn(st, "traversed");
-  log(`<span class="ok">✓ ${esc(st.name)}　完成</span>`);
-}
-
-async function replay(auto) {
-  const tk = ++runToken;
-  const S = D.stats;
-  const stages = buildStages(S);
-  const total = totalStageUnits(stages);
-  paused = false;
-  $("btn-play").textContent = "⏸ 暂停";
-  /* 复位 */
-  document.querySelectorAll(".fnode").forEach((el) => {
-    el.classList.remove("active", "done"); el.classList.add("pending");
-    const b = el.querySelector(".state-badge"); if (b) b.textContent = "进行中";
-  });
-  document.querySelectorAll(".conn,.forkbar").forEach((el) => el.classList.remove("flowing", "traversed"));
-  document.querySelectorAll(".cnt[data-count]").forEach((c) => (c.textContent = "0"));
-  $("plog").innerHTML = "";
-  t0 = performance.now();
-  updateProgress(0, total, "");
-  log(`▶ 开始重演生成管线（BRIDGE-${D.version}，只读快照）`);
-
-  let done = 0;
-  for (const st of stages) {
-    if (tk !== runToken) return;
-    await pauseGate(tk);
-    if (st.group) {
-      updateProgress(done, total, `${st.items[0].name} ／ ${st.items[1].name}`);
-      await Promise.all(st.items.map((it) => runStage(it, tk)));
-      if (tk !== runToken) return;
-      done += st.items.length;
-    } else {
-      updateProgress(done, total, st.name);
-      await runStage(st, tk);
-      if (tk !== runToken) return;
-      done += 1;
-    }
-    updateProgress(done, total, "");
-  }
-  if (tk !== runToken) return;
-  updateProgress(total, total, "");
-  log(`<span class="fin">■ 管线就绪 -- serve 工具面 ${S.serveTools} · 车端 registry ${S.registryTools} · 闭环成立</span>`);
-  $("btn-play").textContent = "▶ 播放";
-  $("btn-play").disabled = true;
-  setTimeout(() => { $("btn-play").disabled = false; }, 400);
-}
-
-/* ---------- 实时模式（会话订阅式：进度在服务端，刷新页面不丢） ---------- */
-let mode = "replay", serverOk = false, pollTimer = null;
+let serverOk = false, pollTimer = null;
 const SESSION_IDS = ["n1", "n2", "n3", "n4a", "n4b", "n5", "n6"];
 const STAGE_NAMES = { n1: "① 输入素材", n2: "② bridge-analyze 分析", n3: "③ schema 校验", n4a: "④甲 serve 投影", n4b: "④乙 registry 生成", n5: "⑤ 车端部署·自检", n6: "⑥ 真实车机 invoke" };
 const CONN_MAP = { n1: [], n2: ["n2"], n3: ["n3"], n4: ["n4"], n4a: ["n4", "n4a"], n4b: ["n4", "n4b"], n5: ["n5"], n6: ["n6"] };
@@ -762,13 +611,12 @@ function applySession(s) {
   if ($("stage-now").innerHTML !== html) $("stage-now").innerHTML = html;
 }
 async function refreshSession() {
-  if (mode !== "live") return;
   try {
     const r = await fetch("/api/session", { cache: "no-store" });
     serverOk = true;
     applySession(await r.json());
   } catch (e) {
-    if (!serverOk) renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 未连接实时后端 — 请运行 node viz/run.mjs，并以 http://127.0.0.1:8650/pipeline.html 打开" }]);
+    if (!serverOk) renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 未连接可视化后端 — 插件已自动拉起，若仍不可用请运行 node viz/run.mjs" }]);
     serverOk = false;
   }
 }
@@ -792,34 +640,11 @@ async function applyTargetFromUrl() {
   } catch (e) { /* 忽略 */ }
 }
 async function refreshServeChip() {
-  if (mode !== "live") return;
   let running = false;
   try { const h = await fetch("/api/health", { cache: "no-store" }); running = (await h.json()).serveRunning === true; } catch (e) {}
   const chip = $("serve-chip");
   chip.textContent = running ? "serve · 运行中" : "serve · 未启动";
   chip.classList.toggle("off", !running);
-}
-function setMode(m) {
-  if (mode === m) return;
-  mode = m;
-  $("mode-replay").classList.toggle("on", m === "replay");
-  $("mode-live").classList.toggle("on", m === "live");
-  const r = m === "replay";
-  ["btn-play", "btn-replay", "btn-speed"].forEach((id) => ($(id).style.display = r ? "" : "none"));
-  ["serve-chip"].forEach((id) => ($(id).style.display = r ? "none" : ""));
-  $("mode-note").textContent = r
-    ? "重演为对已录管线各阶段的顺序展示，非实时执行"
-    : "跟随 agent 会话：skill 执行到哪一步即显示到哪一步 · 刷新不丢进度";
-  $("gen-title").textContent = r ? "生成过程 · 重演" : "生成过程 · 实时";
-  $("gen-sub").textContent = r
-    ? "只读快照的过程重演 -- 节点计数皆为真实产物数值"
-    : "服务端会话实时推送 -- 由 skill 执行驱动，页面纯跟随展示";
-  if (m === "live") {
-    if (location.protocol === "file:") renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 实时模式需经 node viz/run.mjs 提供 http 服务（当前为 file:// 直开）" }]);
-    applyTargetFromUrl();
-    startPolling();
-    refreshServeChip();
-  } else stopPolling();
 }
 
 /* ---------- 渲染入口（置于所有 let/const 声明之后，避免暂时性死区） ---------- */
@@ -846,33 +671,16 @@ function render() {
   renderPanels();
   renderTools();
 
-  /* 重演控制 */
-  $("btn-play").onclick = () => {
-    if ($("btn-play").disabled) return;
-    if ($("btn-play").textContent.includes("暂停")) { paused = true; $("btn-play").textContent = "▶ 继续"; }
-    else if ($("btn-play").textContent.includes("继续")) { paused = false; $("btn-play").textContent = "⏸ 暂停"; }
-    else { replay(); }
-  };
-  $("btn-replay").onclick = () => replay();
-  $("btn-speed").onclick = () => {
-    speed = speed === 1 ? 2 : speed === 2 ? 4 : 1;
-    $("btn-speed").textContent = `速度 ${speed}×`;
-  };
-
-  /* 实时模式（纯跟随 agent 会话） */
-  $("mode-replay").onclick = () => setMode("replay");
-  $("mode-live").onclick = () => setMode("live");
+  /* 可视化跟随：载入即订阅会话（skill 执行驱动；刷新不丢进度） */
   window.addEventListener("beforeunload", () => {
-    if (mode === "live") fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "serve:stop" }), keepalive: true }).catch(() => {});
+    fetch("/api/stage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "serve:stop" }), keepalive: true }).catch(() => {});
   });
-
-  /* 载入即自动重演一次（?mode=live 则直接进实时跟随模式） */
-  const q = new URLSearchParams(location.search);
-  if (q.get("mode") === "live") {
-    setMode("live");
-  } else {
-    setTimeout(() => replay(), 350);
+  if (location.protocol === "file:") {
+    renderLog([{ t: "0.0", cls: "warn", msg: "⚠ 请经 http://127.0.0.1:8650/pipeline.html 访问（插件已自动拉起后端；file:// 无法轮询）" }]);
   }
+  applyTargetFromUrl();
+  startPolling();
+  refreshServeChip();
 }
 
 if (!D) {
