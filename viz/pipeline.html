@@ -199,9 +199,51 @@
 
   #no-data { display:none; margin:2.5rem 0; padding:1.4rem; border:1px dashed var(--danger);
              color:var(--danger); text-align:center; background:#fff; border-radius:10px; }
+
+  /* ===== Atelier 嫁接：状态脸 + 布局切换器（保留蓝色主题） ===== */
+  .container { padding-bottom: 3rem; }
+  .shell { align-items:start; display:grid; grid-template-columns:minmax(260px,.8fr) minmax(0,1.35fr); gap:1.25rem; }
+  .preview-rail { min-width:0; position:sticky; top:1rem; z-index:5; }
+  .content-rail { min-width:0; }
+  .preview { background:#fff; border:1px solid var(--n200); border-radius:14px; padding:1rem; display:grid; gap:.8rem; }
+  .preview-head { display:flex; justify-content:space-between; align-items:center; }
+  .preview-head strong { font-size:.92rem; color:var(--primary-900); }
+  #face-state { font-family:var(--mono); font-size:.76rem; color:var(--primary-700); background:var(--primary-50); border:1px solid var(--primary-100); padding:.15rem .55rem; border-radius:6px; }
+  .preview svg { width:100%; height:auto; display:block; }
+  .preview .body { fill:var(--primary-500); }
+  .preview .eye { fill:var(--bg); }
+  .preview .status-line { display:flex; justify-content:space-between; font-size:.78rem; color:var(--t3); }
+  .preview .status-line strong { color:var(--primary-700); font-family:var(--mono); }
+
+  .layout-switcher { position:fixed; bottom:12px; right:14px; z-index:30;
+    display:flex; gap:2px; padding:3px; background:var(--t1); border-radius:999px;
+    box-shadow:0 6px 18px rgba(0,0,0,.18); opacity:.9; transition:opacity .15s; }
+  .layout-switcher:hover { opacity:1; }
+  .layout-switcher button { background:transparent; border:0; border-radius:999px; color:#fff;
+    font-family:var(--mono); font-size:.66rem; padding:.22rem .5rem; cursor:pointer; white-space:nowrap; transition:background .15s; }
+  .layout-switcher button:hover { background:rgba(255,255,255,.12); }
+  .layout-switcher button[aria-pressed="true"] { background:var(--primary-700); color:#fff; }
+  .layout-switcher button[aria-pressed="true"]:hover { background:var(--primary-900); }
+
+  body[data-variant="dock"] .shell { display:block; }
+  body[data-variant="dock"] .preview-rail { position:static; }
+  body[data-variant="dock"] .preview { grid-template-columns:160px 1fr; align-items:center; }
+  body[data-variant="dock"] .preview svg { max-height:150px; }
+  body[data-variant="dock"] .content-rail { margin-top:1.1rem; }
+  body[data-variant="focus"] .shell { grid-template-columns:minmax(360px,1.1fr) minmax(0,.95fr); }
+  body[data-variant="focus"] .preview svg { max-height:560px; }
+
+  @media (max-width:860px) {
+    .shell { display:block; }
+    .preview-rail { position:static; }
+    .preview { grid-template-columns:140px 1fr; align-items:center; }
+    .preview svg { max-height:130px; }
+    .layout-switcher { bottom:8px; right:8px; }
+    .layout-switcher button { padding:.2rem .42rem; font-size:.62rem; }
+  }
 </style>
 </head>
-<body>
+<body data-variant="split">
 
 <header>
   <div class="deco">
@@ -230,6 +272,22 @@
   </div>
 
   <div id="app">
+    <div class="shell">
+      <aside class="preview-rail">
+        <div class="preview">
+          <div class="preview-head"><strong>BRIDGE 状态</strong><span id="face-state">待命</span></div>
+          <svg viewBox="-15 -15 259 259" role="img" aria-label="管线状态脸">
+            <defs><clipPath id="head-clip"><path d="M228.541 114.228C228.541 130.133 225.184 145.994 218.738 160.534C212.674 174.217 203.904 186.669 193.065 196.988C155.933 232.34 99.497 238.596 55.5255 212.24C45.097 205.99 35.6851 198.072 27.7451 188.866C19.1926 178.953 12.3686 167.569 7.65781 155.351C2.60712 142.264 0 128.257 0 114.228C0 98.3219 3.35751 82.4611 9.80315 67.9215C15.8672 54.2382 24.6377 41.7862 35.4767 31.4668C72.6081 -3.88483 129.044 -10.1413 173.016 16.2153C183.444 22.4653 192.856 30.3829 200.796 39.5896C209.349 49.5018 216.173 60.8859 220.883 73.1037C225.934 86.1906 228.541 100.198 228.541 114.228Z"/></clipPath></defs>
+            <path class="body" d="M228.541 114.228C228.541 130.133 225.184 145.994 218.738 160.534C212.674 174.217 203.904 186.669 193.065 196.988C155.933 232.34 99.497 238.596 55.5255 212.24C45.097 205.99 35.6851 198.072 27.7451 188.866C19.1926 178.953 12.3686 167.569 7.65781 155.351C2.60712 142.264 0 128.257 0 114.228C0 98.3219 3.35751 82.4611 9.80315 67.9215C15.8672 54.2382 24.6377 41.7862 35.4767 31.4668C72.6081 -3.88483 129.044 -10.1413 173.016 16.2153C183.444 22.4653 192.856 30.3829 200.796 39.5896C209.349 49.5018 216.173 60.8859 220.883 73.1037C225.934 86.1906 228.541 100.198 228.541 114.228Z"/>
+            <g clip-path="url(#head-clip)" id="eyes-group">
+              <path class="eye" id="eye-0"/>
+              <path class="eye" id="eye-1"/>
+            </g>
+          </svg>
+          <div class="status-line"><span>表情 <strong id="face-expr">00</strong></span><span>状态 <strong id="face-status">idle</strong></span></div>
+        </div>
+      </aside>
+      <main class="content-rail">
     <div class="section">
       <div class="section-header">
         <span class="section-number">PART 01</span><span class="section-title">数量总览</span>
@@ -278,7 +336,15 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
+      </main>
+    </div>
   </div>
+</div>
+
+<div class="layout-switcher" aria-label="布局切换">
+  <button type="button" data-layout="split" aria-pressed="true">Split</button>
+  <button type="button" data-layout="dock">Dock</button>
+  <button type="button" data-layout="focus">Focus</button>
 </div>
 
 <script src="data.js"></script>
@@ -581,6 +647,20 @@ function renderLog(entries) {
   el.scrollTop = el.scrollHeight;
 }
 let lastStages = {}, lastLogLen = -1;
+function faceStateFromSession(s) {
+  const st = (s && s.stages) || {};
+  const ids = ["n1","n2","n3","n4a","n4b","n5","n6"];
+  const running = ids.filter(id => st[id] === "running");
+  if (running.length) {
+    if (st.n2 === "running") return "thinking";
+    if (st.n6 === "running") return "searching";
+    return "working";
+  }
+  const finished = ids.every(id => st[id] === "done" || st[id] === "skipped");
+  if (finished && ((s.progress || {}).done || 0) > 0) return "excited";
+  if (ids.some(id => st[id] === "skipped")) return "searching";
+  return "idle";
+}
 function applySession(s) {
   if (!s) return;
   for (const id of SESSION_IDS) {
@@ -605,6 +685,8 @@ function applySession(s) {
     ? `执行中：<b>${STAGE_NAMES[runningId] || runningId}</b>`
     : (s.name ? `会话：<b>${esc(s.name)}</b> · ${p.done ?? 0}/${p.total ?? 7}` : "待命");
   if ($("stage-now").innerHTML !== html) $("stage-now").innerHTML = html;
+  const __fs = faceStateFromSession(s);
+  if (window.setFaceState) window.setFaceState(__fs);
 }
 async function refreshSession() {
   try {
@@ -685,6 +767,153 @@ if (!D) {
 } else {
   render();
 }
+</script>
+<script>
+"use strict";
+/* Atelier GrokBot 状态脸 -- 裁剪移植自 smontlouis gist；随管线阶段反应（保留蓝色主题） */
+(function () {
+  const EXPRESSIONS = {
+    0: [
+      [[130.36,45.98],[132.71,46.19],[134.98,46.81],[137.11,47.83],[138.97,49.28],[140.47,51.09],[141.68,53.12],[142.73,55.23],[143.76,57.36],[144.78,59.49],[145.79,61.62],[146.79,63.76],[147.76,65.91],[148.71,68.07],[149.63,70.25],[150.52,72.43],[151.37,74.63],[151.99,76.91],[152.1,79.26],[151.64,81.57],[150.59,83.68],[149.04,85.45],[147.1,86.78],[144.9,87.62],[142.56,87.93],[140.22,87.71],[137.98,86.99],[135.93,85.82],[134.17,84.24],[132.78,82.34],[131.69,80.25],[130.77,78.08],[129.87,75.89],[128.94,73.72],[128,71.56],[127.03,69.4],[126.05,67.26],[125.05,65.12],[124.03,62.99],[122.93,60.9],[121.87,58.79],[121.03,56.59],[120.72,54.26],[121.1,51.93],[122.15,49.83],[123.75,48.1],[125.76,46.89],[128.01,46.19]],
+      [[176.61,37.08],[178.72,37.59],[180.7,38.48],[182.52,39.65],[184.2,41.03],[185.71,42.59],[187.03,44.31],[188.2,46.14],[189.26,48.03],[190.27,49.96],[191.26,51.89],[192.23,53.84],[193.16,55.8],[194.05,57.78],[194.92,59.77],[195.74,61.78],[196.53,63.8],[197.27,65.84],[197.97,67.9],[198.47,70.01],[198.63,72.18],[198.4,74.33],[197.58,76.33],[195.95,77.72],[193.83,78.08],[191.71,77.65],[189.76,76.69],[188.03,75.38],[186.53,73.82],[185.28,72.05],[184.25,70.13],[183.4,68.14],[182.63,66.11],[181.87,64.07],[181.07,62.05],[180.25,60.04],[179.39,58.05],[178.49,56.07],[177.57,54.1],[176.61,52.15],[175.62,50.22],[174.59,48.31],[173.53,46.41],[172.54,44.48],[171.86,42.42],[171.76,40.26],[172.62,38.3],[174.45,37.19]]
+    ],
+    2: [
+      [[104.84,104.08],[109.39,104.89],[113.63,106.73],[117.32,109.5],[120.25,113.08],[122.22,117.25],[123.15,121.77],[122.92,126.39],[121.86,130.89],[120.61,135.35],[119.37,139.81],[118.15,144.27],[116.94,148.74],[115.74,153.21],[114.56,157.69],[113.39,162.17],[112.24,166.65],[111.13,171.15],[110.04,175.65],[108.89,180.13],[106.98,184.33],[103.8,187.67],[99.75,189.87],[95.25,190.93],[90.63,190.93],[86.11,189.97],[81.86,188.16],[78.05,185.54],[74.89,182.18],[72.62,178.16],[71.54,173.67],[71.94,169.08],[73.01,164.57],[74.13,160.08],[75.26,155.59],[76.42,151.11],[77.59,146.63],[78.77,142.15],[79.97,137.68],[81.18,133.22],[82.41,128.75],[83.65,124.29],[84.87,119.83],[86.33,115.43],[88.67,111.46],[91.9,108.15],[95.83,105.72],[100.23,104.35]],
+      [[174.26,115.55],[178.59,116.54],[182.37,118.86],[185.31,122.2],[187.23,126.21],[188.12,130.57],[188.06,135.02],[187.52,139.44],[186.86,143.85],[186.11,148.25],[185.25,152.62],[184.3,156.98],[183.24,161.31],[182.07,165.61],[180.79,169.88],[179.39,174.12],[177.89,178.31],[176.27,182.47],[174.47,186.55],[172.17,190.35],[169.21,193.68],[165.73,196.46],[161.84,198.64],[157.66,200.16],[153.27,200.91],[148.83,200.69],[144.65,199.19],[141.47,196.14],[140.18,191.91],[140.82,187.53],[142.46,183.38],[144.16,179.26],[145.73,175.09],[147.18,170.87],[148.51,166.62],[149.73,162.33],[150.84,158.01],[151.84,153.67],[152.74,149.3],[153.54,144.91],[154.24,140.51],[154.85,136.1],[155.58,131.7],[156.93,127.46],[159.15,123.6],[162.12,120.29],[165.73,117.68],[169.84,116]]
+    ],
+    3: [
+      [[44.72,103.35],[47.95,103.93],[51.04,105.05],[53.93,106.62],[56.58,108.57],[58.97,110.83],[61.09,113.35],[62.93,116.07],[64.5,118.97],[65.79,121.99],[66.8,125.13],[67.52,128.34],[67.94,131.6],[68.08,134.89],[67.9,138.17],[67.4,141.42],[66.56,144.6],[65.33,147.66],[63.71,150.52],[61.69,153.11],[59.3,155.36],[56.54,157.16],[53.51,158.42],[50.29,159.07],[47,159.09],[43.76,158.5],[40.67,157.39],[37.78,155.82],[35.13,153.87],[32.75,151.6],[30.63,149.09],[28.78,146.36],[27.21,143.47],[25.92,140.44],[24.92,137.31],[24.2,134.1],[23.77,130.84],[23.64,127.55],[23.81,124.27],[24.31,121.01],[25.16,117.84],[26.38,114.78],[28,111.92],[30.02,109.33],[32.42,107.08],[35.17,105.28],[38.21,104.02],[41.43,103.37]],
+      [[114.62,83.64],[118.31,83.88],[121.94,84.6],[125.44,85.77],[128.77,87.38],[131.86,89.4],[134.67,91.81],[137.13,94.56],[139.2,97.62],[140.85,100.93],[142.05,104.42],[142.79,108.05],[143.05,111.73],[142.83,115.42],[142.13,119.05],[140.95,122.55],[139.34,125.88],[137.3,128.96],[134.88,131.75],[132.11,134.2],[129.05,136.27],[125.75,137.93],[122.25,139.13],[118.63,139.86],[114.94,140.1],[111.25,139.86],[107.63,139.14],[104.12,137.97],[100.8,136.36],[97.7,134.34],[94.9,131.93],[92.44,129.18],[90.36,126.12],[88.72,122.81],[87.51,119.31],[86.78,115.69],[86.52,112.01],[86.74,108.32],[87.44,104.69],[88.61,101.18],[90.23,97.86],[92.27,94.78],[94.69,91.99],[97.45,89.54],[100.51,87.47],[103.82,85.81],[107.31,84.61],[110.94,83.88]]
+    ],
+    7: [
+      [[105.72,72.58],[108.82,72.78],[111.75,73.82],[114.27,75.64],[116.39,77.92],[118.42,80.29],[120.45,82.66],[122.47,85.03],[124.48,87.41],[126.49,89.8],[128.48,92.2],[130.47,94.6],[132.45,97.01],[134.43,99.42],[136.4,101.83],[138.37,104.25],[140.3,106.7],[141.85,109.39],[142.65,112.4],[142.63,115.51],[141.8,118.5],[140.21,121.17],[137.95,123.31],[135.17,124.7],[132.11,125.26],[129.02,124.98],[126.12,123.86],[123.67,121.94],[121.61,119.6],[119.66,117.17],[117.69,114.75],[115.73,112.33],[113.75,109.92],[111.77,107.52],[109.77,105.12],[107.77,102.73],[105.76,100.34],[103.75,97.96],[101.72,95.59],[99.68,93.23],[97.63,90.89],[95.91,88.3],[94.95,85.34],[94.92,82.24],[95.84,79.27],[97.56,76.68],[99.9,74.63],[102.67,73.22]],
+      [[176.73,63.75],[179.52,64.43],[182.02,65.85],[184.15,67.78],[185.85,70.1],[187.08,72.7],[187.76,75.5],[187.76,78.37],[187.23,81.2],[186.58,84.01],[185.89,86.8],[185.16,89.59],[184.39,92.36],[183.59,95.13],[182.76,97.89],[181.88,100.64],[180.98,103.37],[180.02,106.09],[179.03,108.79],[177.99,111.48],[176.9,114.15],[175.5,116.66],[173.51,118.72],[171,120.11],[168.18,120.66],[165.34,120.29],[162.75,119.04],[160.62,117.12],[159.02,114.73],[158,112.04],[157.63,109.19],[157.98,106.34],[158.83,103.59],[159.86,100.9],[160.87,98.2],[161.85,95.49],[162.79,92.76],[163.7,90.03],[164.57,87.29],[165.41,84.53],[166.21,81.76],[166.98,78.99],[167.7,76.2],[168.38,73.4],[169,70.58],[169.79,67.82],[171.41,65.46],[173.88,64.03]]
+    ],
+    8: [
+      [[64.12,83.43],[66.69,84.08],[68.9,85.53],[70.57,87.6],[71.56,90.05],[71.86,92.69],[71.53,95.32],[70.55,97.78],[69.06,99.99],[67.36,102.03],[65.64,104.06],[63.95,106.11],[62.28,108.18],[60.63,110.27],[59,112.38],[57.41,114.5],[55.84,116.65],[54.29,118.82],[52.78,121],[51.31,123.22],[49.86,125.45],[48.42,127.69],[46.67,129.68],[44.36,130.96],[41.73,131.22],[39.22,130.38],[37.16,128.72],[35.64,126.55],[34.65,124.08],[34.2,121.46],[34.29,118.81],[34.94,116.24],[36.12,113.86],[37.54,111.61],[39.04,109.41],[40.54,107.21],[42.06,105.03],[43.61,102.87],[45.18,100.73],[46.79,98.6],[48.41,96.5],[50.07,94.42],[51.74,92.35],[53.45,90.31],[55.17,88.28],[56.94,86.3],[59.04,84.67],[61.48,83.65]],
+      [[104.23,93.09],[106.97,93.77],[109.4,95.24],[111.32,97.31],[112.59,99.85],[113.4,102.57],[114.13,105.32],[114.87,108.06],[115.62,110.8],[116.37,113.54],[117.14,116.28],[117.9,119.02],[118.67,121.75],[119.45,124.49],[120.23,127.22],[121.03,129.95],[121.83,132.68],[122.6,135.41],[122.98,138.22],[122.57,141.02],[121.34,143.57],[119.44,145.67],[117.05,147.19],[114.34,148.04],[111.51,148.14],[108.77,147.45],[106.33,146.01],[104.38,143.96],[103.07,141.44],[102.21,138.73],[101.43,136],[100.65,133.27],[99.87,130.53],[99.09,127.8],[98.32,125.06],[97.55,122.33],[96.79,119.59],[96.04,116.85],[95.28,114.11],[94.53,111.37],[93.79,108.62],[93.05,105.88],[92.73,103.07],[93.18,100.27],[94.42,97.72],[96.32,95.62],[98.7,94.08],[101.4,93.21]]
+    ]
+  };
+  const POOLS = { idle:[0,8], working:[7,8], thinking:[8,3], excited:[2,8], searching:[3,8] };
+  const EXPR_CADENCE = { idle:[9000,16000], working:[1800,3200], thinking:[2000,3600], excited:[1100,2000], searching:[1000,1800] };
+  const BLINK = { idle:[6000,14000], working:[2800,5500], thinking:[3500,7000], excited:[2000,4000], searching:[1600,4000] };
+  const STATE_ZH = { idle:"待命", working:"执行中", thinking:"分析中", excited:"完成", searching:"排查中" };
+
+  let expression = 0;
+  let currentRings = EXPRESSIONS[0].map(r => r.map(p => [p[0], p[1]]));
+  let targetRings = EXPRESSIONS[0];
+  let morph = 1, velocity = 0, lastFrame = performance.now();
+  let blinkStart = null, state = "idle";
+  let autoBlinkTimer = null, autoExpressionTimer = null;
+
+  const eyeEls = [document.getElementById("eye-0"), document.getElementById("eye-1")];
+  const faceStateEl = document.getElementById("face-state");
+  const faceExprEl = document.getElementById("face-expr");
+  const faceStatusEl = document.getElementById("face-status");
+  if (!eyeEls[0] || !eyeEls[1]) return; // 脸 DOM 不在则跳过
+
+  const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
+  const centroid = ring => { let x = 0, y = 0; ring.forEach(p => { x += p[0]; y += p[1]; }); return [x / ring.length, y / ring.length]; };
+  const path = ring => "M" + ring.map(p => p[0].toFixed(2) + " " + p[1].toFixed(2)).join("L") + "Z";
+
+  function displayedRings() {
+    return currentRings.map((ring, eye) =>
+      ring.map((p, i) => [
+        p[0] + (targetRings[eye][i][0] - p[0]) * clamp(morph, 0, 1),
+        p[1] + (targetRings[eye][i][1] - p[1]) * clamp(morph, 0, 1)
+      ]));
+  }
+  function selectExpression(index) {
+    currentRings = displayedRings();
+    targetRings = EXPRESSIONS[index];
+    expression = index;
+    morph = 0; velocity = 0;
+    if (faceExprEl) faceExprEl.textContent = String(index).padStart(2, "0");
+  }
+  function blinkScale(now) {
+    if (blinkStart === null) return 1;
+    const t = (now - blinkStart) / 320;
+    if (t >= 1) { blinkStart = null; return 1; }
+    return Math.max(t < 0.42 ? 1 - t / 0.42 : (t - 0.42) / 0.58, 0.04);
+  }
+  function render(now) {
+    const rings = displayedRings();
+    const blink = blinkScale(now);
+    rings.forEach((ring, index) => {
+      const c = centroid(ring);
+      const el = eyeEls[index];
+      el.setAttribute("d", path(ring));
+      el.setAttribute("transform",
+        "translate(" + c[0].toFixed(2) + " " + c[1].toFixed(2) +
+        ") scale(1 " + clamp(blink, 0.04, 2.4).toFixed(4) +
+        ") translate(" + (-c[0]).toFixed(2) + " " + (-c[1]).toFixed(2) + ")");
+      el.style.opacity = "1";
+    });
+  }
+  function animate(now) {
+    const dt = Math.min((now - lastFrame) / 1000, 0.1);
+    lastFrame = now;
+    const freq = 7;
+    velocity += (-2 * freq * velocity - freq * freq * (morph - 1)) * dt;
+    morph += velocity * dt;
+    if (!Number.isFinite(morph)) { morph = 1; velocity = 0; }
+    render(now);
+    requestAnimationFrame(animate);
+  }
+  function scheduleBlink() {
+    clearTimeout(autoBlinkTimer);
+    const cadence = BLINK[state];
+    if (!cadence) return;
+    const delay = cadence[0] + Math.random() * (cadence[1] - cadence[0]);
+    autoBlinkTimer = setTimeout(() => { blinkStart = performance.now(); scheduleBlink(); }, delay);
+  }
+  function scheduleExpression() {
+    clearTimeout(autoExpressionTimer);
+    const cadence = EXPR_CADENCE[state];
+    const delay = cadence[0] + Math.random() * (cadence[1] - cadence[0]);
+    autoExpressionTimer = setTimeout(() => {
+      const pool = POOLS[state];
+      const alts = pool.filter(x => x !== expression);
+      selectExpression(alts.length ? alts[Math.floor(Math.random() * alts.length)] : pool[0]);
+      scheduleExpression();
+    }, delay);
+  }
+  function setState(next) {
+    state = next;
+    if (faceStateEl) faceStateEl.textContent = STATE_ZH[next] || next;
+    if (faceStatusEl) faceStatusEl.textContent = next;
+    selectExpression(POOLS[state][0]);
+    scheduleBlink();
+    scheduleExpression();
+  }
+  window.setFaceState = function (next) { if (next !== state) setState(next); };
+
+  selectExpression(0);
+  render(performance.now());
+  requestAnimationFrame(animate);
+  setState("idle");
+
+  /* ===== 布局切换器（split / dock / focus 三态变形） ===== */
+  const allowed = ["split", "dock", "focus"];
+  const params = new URLSearchParams(location.search);
+  const initial = allowed.includes(params.get("variant")) ? params.get("variant") : "split";
+  const buttons = document.querySelectorAll(".layout-switcher [data-layout]");
+  const apply = variant => {
+    document.body.dataset.variant = variant;
+    buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === variant)));
+    try { const u = new URL(location.href); u.searchParams.set("variant", variant); history.replaceState(null, "", u); } catch (e) {}
+  };
+  buttons.forEach(b => b.addEventListener("click", () => apply(b.dataset.layout)));
+  addEventListener("keydown", e => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+    const cur = allowed.indexOf(document.body.dataset.variant);
+    if (cur < 0) return;
+    apply(allowed[(cur + (e.key === "ArrowRight" ? 1 : -1) + allowed.length) % allowed.length]);
+  });
+  apply(initial);
+})();
 </script>
 </body>
 </html>
