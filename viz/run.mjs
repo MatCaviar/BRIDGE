@@ -514,7 +514,7 @@ createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: r.ok, stage, output: r.output || "", error: r.error || "", durationMs: r.durationMs || 0 }));
     }
-    const path = url.pathname === "/" ? "pipeline.html" : decodeURIComponent(url.pathname.slice(1));
+    const path = (url.pathname === "/" || url.pathname === "/cockpit") ? "pipeline.html" : decodeURIComponent(url.pathname.slice(1));
     return serveFile(res, path);
   } catch (e) {
     res.writeHead(500, { "content-type": "application/json" });
