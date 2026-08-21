@@ -806,6 +806,313 @@
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
    "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "open_air_front_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开空调/空调前排\"（空调前排页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开空调/空调前排\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "air",
+    "subTabName": "frontSeat"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_air_rear_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开空调后排\"（空调后排页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开空调后排\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "air",
+    "subTabName": "rearSeat"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_heat_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开座椅加热/通风\"（座椅通风加热页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅加热/通风\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "heatVent"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_massage_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开座椅按摩\"（座椅按摩页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅按摩\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "massage"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_mode_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开座椅模式\"（座椅模式页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅模式\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "mode"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_position_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"调节座椅位置\"（座椅位置调节页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"调节座椅位置\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "position"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_light_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开灯光\"（灯光页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开灯光\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "light"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
   }
  ]
 }

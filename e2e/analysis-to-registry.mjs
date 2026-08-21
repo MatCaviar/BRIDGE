@@ -61,7 +61,7 @@ for (const cap of analysis.capabilities ?? []) {
       break;
     case "intent":
       t.mechanism = "intent";
-      Object.assign(t, { component: cap.component, intentScreens: cap.intentScreens, extras: cap.extras });
+      Object.assign(t, { component: cap.component, intentScreens: cap.intentScreens, extras: cap.extras, dataUri: cap.dataUri, args: cap.defaultArgs });
       break;
     default:
       t.mechanism = m;

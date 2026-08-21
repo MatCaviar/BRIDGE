@@ -17,6 +17,18 @@
     --sans:'Noto Sans SC','PingFang SC','Microsoft YaHei',-apple-system,'Segoe UI',sans-serif;
     --mono:Consolas,'Courier New',monospace;
   }
+/* 深色模式: 跟随系统(演示/夜间友好) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#0e1116; --t1:#e8ecf2; --t2:#aab4c2; --t3:#78828f;
+    --n50:#161b22; --n100:#1c232c; --n200:#242d38; --n300:#313c4a; --n400:#46536a; --n500:#5d6b84; --n600:#7787a1;
+    --primary:#4a94f0; --primary-900:#0b1e35; --primary-800:#12263f; --primary-700:#1d3a5f;
+    --primary-100:#152a44; --primary-50:#121f31; --primary-200:#2b4a70;
+    --success-bright:#5ad07e;
+  }
+}
+body { font-variant-numeric: tabular-nums; }
+
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:var(--sans); background:var(--bg); color:var(--t1); line-height:1.6; font-size:15px; }
   .container { max-width:1240px; margin:0 auto; padding:0 2rem 3rem; }
