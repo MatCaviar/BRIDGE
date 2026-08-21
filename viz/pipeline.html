@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BRIDGE · 源码至 MCP 生成管线（可视化跟随）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   /* ===== ZZT 蓝色系设计语言（参考 Z-INDUS 报告风） ===== */
   :root {
@@ -231,6 +234,7 @@
 
 /* Z-INDUS 复刻: 流动装饰曲线 */
 .decorative-lines{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.decorative-lines svg{position:absolute;width:100%;height:100%}
 .decorative-line{fill:none;stroke-linecap:round;stroke-linejoin:round}
 /* ── 顶部复刻 Z-INDUS v2 报告头 ── */
 header .decorative-line{stroke:rgba(63,134,232,.10) !important}
