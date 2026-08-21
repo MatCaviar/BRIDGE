@@ -6,8 +6,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const BIN_DIR = dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = resolve(BIN_DIR, "..");
-const ROOT_DIR = resolve(CLI_DIR, "..");
-const FRAMEWORK_DIR = resolve(ROOT_DIR, "framework");
 
 function commandFile(command) {
   return process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : command;
@@ -35,7 +33,6 @@ function ensurePackageReady(dir, distEntry) {
 }
 
 function ensureBuilt() {
-  ensurePackageReady(FRAMEWORK_DIR, "dist/index.js"); // framework/dist/index.js
   ensurePackageReady(CLI_DIR, "dist/cli.js"); // cli/dist/cli.js
 }
 

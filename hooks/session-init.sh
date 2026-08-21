@@ -1,5 +1,5 @@
 #!/bin/bash
-# SP-D: prepare framework + cli and build emitted dist; failures must be non-zero.
+# SP-D: prepare cli and build emitted dist; failures must be non-zero.
 set -euo pipefail
 
 ROOT="${CLAUDE_PLUGIN_ROOT:-}"
