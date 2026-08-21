@@ -201,20 +201,29 @@
   #no-data { display:none; margin:2.5rem 0; padding:1.4rem; border:1px dashed var(--danger);
              color:var(--danger); text-align:center; background:#fff; border-radius:10px; }
 
-  /* ===== Atelier 嫁接：状态脸（居中 · dock 单列布局 · 保留蓝色主题） ===== */
+  /* ===== Atelier 嫁接：状态脸（正方形小栏 · 与 PART 01 并列 · 保留蓝色主题） ===== */
   .container { padding-bottom: 3rem; }
   .shell { display:block; }
-  .preview-rail { min-width:0; margin:0 0 1.1rem; }
+  .top-grid { display:grid; grid-template-columns:224px minmax(0,1fr); gap:1.1rem; align-items:stretch; }
+  .preview-rail { min-width:0; }
   .content-rail { min-width:0; }
-  .preview { background:#fff; border:1px solid var(--n200); border-radius:14px; padding:1rem; display:grid; gap:.6rem; justify-items:center; text-align:center; }
-  .preview-head { display:flex; justify-content:center; align-items:center; gap:.5rem; }
+  .preview { background:#fff; border:1px solid var(--n200); border-radius:14px; padding:1rem;
+    display:grid; gap:.55rem; justify-items:center; align-content:center; text-align:center;
+    height:100%; box-sizing:border-box; text-decoration:none; color:inherit; cursor:pointer;
+    transition:border-color .15s, box-shadow .15s, transform .15s; }
+  .preview:hover { border-color:var(--primary-300); box-shadow:0 3px 14px rgba(63,134,232,.16); transform:translateY(-1px); }
+  .preview:active { transform:translateY(0); }
+  .preview-head { display:flex; justify-content:center; align-items:center; gap:.5rem; flex-wrap:wrap; }
   .preview-head strong { font-size:.92rem; color:var(--primary-900); }
   #face-state { font-family:var(--mono); font-size:.76rem; color:var(--primary-700); background:var(--primary-50); border:1px solid var(--primary-100); padding:.15rem .55rem; border-radius:6px; }
-  .preview svg { width:84px; height:84px; display:block; margin:0 auto; }
+  .preview svg { width:96px; height:96px; display:block; margin:0 auto; }
   .preview .body { fill:var(--primary-500); }
   .preview .eye { fill:var(--bg); }
   .preview .status-line { display:flex; justify-content:center; gap:1rem; font-size:.78rem; color:var(--t3); }
   .preview .status-line strong { color:var(--primary-700); font-family:var(--mono); }
+  .e2e-hint { font-size:.78rem; font-weight:600; color:var(--primary-600); background:var(--primary-50);
+    border:1px solid var(--primary-100); border-radius:6px; padding:.22rem .6rem; }
+  @media (max-width:760px) { .top-grid { grid-template-columns:1fr; } }
 
   @media (max-width:860px) {
     .preview svg { width:72px; height:72px; }
@@ -276,16 +285,11 @@ header h1{font-weight:700;margin-bottom:.3rem;line-height:1.3;color:#3f86e8;lett
           <div class="meta-item">快照 <span id="gen-at"></span></div>
           <div class="meta-item">校核 validate-analysis · PASS</div>
         </div>
-        <h1 style="font-size:2.2rem;">源码 → MCP Server<span style="color:#233b5d">（imaudio）</span></h1>
-        <div class="subtitle" style="font-size:1.5rem;color:#2f5f99 !important;margin-top:0.8rem;">『BRIDGE 智能体 | 应用能力 schema 生成管线』</div>
+        <h1 style="font-size:2.2rem;">imaudio 应用源码<span style="color:#233b5d"> → BRIDGE 套件</span></h1>
+        <div class="subtitle" style="font-size:1.5rem;color:#2f5f99 !important;margin-top:0.8rem;">『BRIDGE 智能体 | 输入源码包 · 产出能力套件（serve 投影 + 车端 registry）』</div>
       </div>
     </div>
   </header>
-
-<section style="max-width:1300px;margin:1.2rem auto 0;padding:0 2rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-  <a href="http://localhost:3000/cockpit" target="_blank" style="display:inline-flex;align-items:center;gap:0.5rem;background:linear-gradient(135deg,#2f5f99,#3f86e8);color:#fff;text-decoration:none;padding:0.65rem 1.5rem;border-radius:8px;font-size:0.95rem;font-weight:600;box-shadow:0 2px 8px rgba(63,134,232,.25);">▶ 打开端到端测试界面</a>
-  <span style="color:#5d6b84;font-size:0.9rem;">语音 → LLM → 工具 → 车机 全链路（cockpit）</span>
-</section>
 
 
 <div class="container">
@@ -296,8 +300,10 @@ header h1{font-weight:700;margin-bottom:.3rem;line-height:1.3;color:#3f86e8;lett
 
   <div id="app">
     <div class="shell">
+      <main class="content-rail">
+    <div class="top-grid">
       <aside class="preview-rail">
-        <div class="preview">
+        <a class="preview" href="http://localhost:3000/cockpit" target="_blank" rel="noopener" title="打开端到端测试界面（cockpit）">
           <div class="preview-head"><strong>BRIDGE 状态</strong><span id="face-state">待命</span></div>
           <svg viewBox="-15 -15 259 259" role="img" aria-label="管线状态脸">
             <defs><clipPath id="head-clip"><path d="M228.541 114.228C228.541 130.133 225.184 145.994 218.738 160.534C212.674 174.217 203.904 186.669 193.065 196.988C155.933 232.34 99.497 238.596 55.5255 212.24C45.097 205.99 35.6851 198.072 27.7451 188.866C19.1926 178.953 12.3686 167.569 7.65781 155.351C2.60712 142.264 0 128.257 0 114.228C0 98.3219 3.35751 82.4611 9.80315 67.9215C15.8672 54.2382 24.6377 41.7862 35.4767 31.4668C72.6081 -3.88483 129.044 -10.1413 173.016 16.2153C183.444 22.4653 192.856 30.3829 200.796 39.5896C209.349 49.5018 216.173 60.8859 220.883 73.1037C225.934 86.1906 228.541 100.198 228.541 114.228Z"/></clipPath></defs>
@@ -308,15 +314,16 @@ header h1{font-weight:700;margin-bottom:.3rem;line-height:1.3;color:#3f86e8;lett
             </g>
           </svg>
           <div class="status-line"><span>表情 <strong id="face-expr">00</strong></span><span>状态 <strong id="face-status">idle</strong></span></div>
-        </div>
+          <div class="e2e-hint">▶ 端到端测试 · cockpit</div>
+        </a>
       </aside>
-      <main class="content-rail">
     <div class="section">
       <div class="section-header">
         <span class="section-number">PART 01</span><span class="section-title">数量总览</span>
       </div>
       <div class="metrics" id="stats"></div>
       <div class="mechrow" id="mechrow"></div>
+    </div>
     </div>
 
     <div class="section">
