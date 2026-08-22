@@ -98,29 +98,42 @@
   .fico { width:44px; height:44px; color:var(--primary-500); flex:none; margin-top:2px; }
   .fnode.pending .fico { color:var(--n400); }
   .fico svg { width:100%; height:100%; }
-  /* ── 节点小圆脸: 与 BRIDGE 状态小球同族(呼吸 + 眨眼 + 状态表情) ── */
-  .fico svg.face { animation: face-breathe 3.6s ease-in-out infinite; transform-origin:center; }
-  .fico .eye, .fico .eye-happy { transform-box: fill-box; transform-origin: center; }
-  .fico .eye { animation: face-blink 4.6s infinite; }
-  .fico .eye-happy { display: none; }
-  [data-stage="n2"] .fico .eye, [data-stage="n2"] .fico svg.face { animation-delay: .6s; }
-  [data-stage="n3"] .fico .eye, [data-stage="n3"] .fico svg.face { animation-delay: 1.2s; }
-  [data-stage="n4a"] .fico .eye, [data-stage="n4a"] .fico svg.face { animation-delay: 1.8s; }
-  [data-stage="n4b"] .fico .eye, [data-stage="n4b"] .fico svg.face { animation-delay: 2.4s; }
-  [data-stage="n5"] .fico .eye, [data-stage="n5"] .fico svg.face { animation-delay: 3s; }
-  [data-stage="n6"] .fico .eye, [data-stage="n6"] .fico svg.face { animation-delay: 3.6s; }
-  .fnode.pending .fico .eye { animation: none; transform: scaleY(.28); }
-  .fnode.pending .fico svg.face { animation: none; }
-  .fnode.active .fico svg.face { animation: face-bounce 1.15s ease-in-out infinite; }
-  .fnode.active .fico .eye { animation: face-look 1.7s ease-in-out infinite; }
-  .fnode.done .fico .eye { display: none; }
-  .fnode.done .fico .eye-happy { display: block; }
-  .fnode.done .fico svg.face { animation: face-breathe 3.6s ease-in-out infinite; }
-  .fnode.skipped .fico .eye { animation: none; transform: scaleY(.15); }
-  @keyframes face-breathe { 50% { transform: scale(1.055); } }
-  @keyframes face-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.1); } }
-  @keyframes face-bounce { 0%, 100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-2.5px) scale(1.04); } 60% { transform: translateY(0) scale(.99); } }
-  @keyframes face-look { 0%, 100% { transform: translateX(0) scaleY(1); } 25% { transform: translateX(2.2px) scaleY(1.05); } 65% { transform: translateX(-2.2px) scaleY(.95); } }
+  /* ── 节点图标: 蓝底白部件(状态小球同族) + 部件微动画 ── */
+  .fico svg.tile { animation: tile-breathe 3.8s ease-in-out infinite; transform-origin:center; }
+  .fico .tile, .fico [class] { transform-box: fill-box; }
+  [data-stage="n2"] .fico svg.tile { animation-delay: .5s; }
+  [data-stage="n3"] .fico svg.tile { animation-delay: 1s; }
+  [data-stage="n4a"] .fico svg.tile { animation-delay: 1.5s; }
+  [data-stage="n4b"] .fico svg.tile { animation-delay: 2s; }
+  [data-stage="n5"] .fico svg.tile { animation-delay: 2.5s; }
+  [data-stage="n6"] .fico svg.tile { animation-delay: 3s; }
+  /* 部件微动画: 语义化(扫描/翻动/闪光/跳动/旋转/摆针), 各自节奏 */
+  .fico .scan { animation: ico-scan 2.1s ease-in-out infinite; }
+  .fico .ln { animation: ico-wave 2.9s ease-in-out infinite; }
+  .fico .spark { animation: ico-pulse 1.7s ease-in-out infinite; }
+  .fico .beam { animation: ico-beam 2.2s ease-in-out infinite; }
+  .fico .card { animation: ico-pop 3.1s ease-in-out infinite; }
+  .fico .card:nth-of-type(2) { animation-delay: 1s; }
+  .fico .card:nth-of-type(3) { animation-delay: 2s; }
+  .fico .gear { animation: ico-spin 9s linear infinite; transform-origin: 24px 24px; }
+  .fico .needle { animation: ico-swing 2.5s ease-in-out infinite; transform-origin: 24.2px 30.5px; }
+  @keyframes tile-breathe { 50% { transform: scale(1.05); } }
+  @keyframes ico-scan { 0%,100% { transform: translate(0,0); } 25% { transform: translate(2.6px,-2px); } 60% { transform: translate(-2.4px,1.6px); } }
+  @keyframes ico-wave { 0%,100% { opacity: .95; } 50% { opacity: .35; } }
+  @keyframes ico-pulse { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+  @keyframes ico-beam { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+  @keyframes ico-pop { 0%,100% { transform: translateY(0); } 12% { transform: translateY(-2.4px); } 24% { transform: translateY(0); } }
+  @keyframes ico-spin { to { transform: rotate(360deg); } }
+  @keyframes ico-swing { 0%,100% { transform: rotate(-11deg); } 50% { transform: rotate(14deg); } }
+  /* 状态联动: 待命/跳过 = 静止昏暗; 进行中 = 提速; 完成 = 舒缓 */
+  .fnode.pending .fico svg.tile, .fnode.skipped .fico svg.tile,
+  .fnode.pending .fico [class], .fnode.skipped .fico [class] { animation: none; }
+  .fnode.active .fico svg.tile { animation: tile-bounce 1.15s ease-in-out infinite; }
+  .fnode.active .fico .scan { animation-duration: .8s; }
+  .fnode.active .fico .gear { animation-duration: 1.8s; }
+  .fnode.active .fico .needle { animation-duration: .9s; }
+  .fnode.active .fico .ln, .fnode.active .fico .beam, .fnode.active .fico .spark { animation-duration: .9s; }
+  @keyframes tile-bounce { 0%,100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-2.5px) scale(1.04); } 60% { transform: translateY(0) scale(.99); } } }
   .fbody { flex:1; min-width:0; }
   .fbody h3 { font-size:.98rem; margin:0 0 3px; color:var(--t1); font-weight:600; }
   .fnum { color:var(--gold); margin-right:2px; font-family:var(--mono); }
@@ -409,19 +422,38 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
 <script>
 "use strict";
 /* ---- 线刻小图标（ZZT 蓝调） ---- */
-const faceIcon = (seed) => {
-  // 与 BRIDGE 状态小球同族的节点小圆脸: 实心蓝体 + 白眼睛, 表情/动画由 CSS 按节点状态驱动
-  const wob = 24 + ((seed * 7) % 5) - 2; // 每只小脸眼睛高度略有个性
-  return `<svg class="face" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-    <rect class="body" x="4" y="4" width="40" height="40" rx="14" fill="currentColor"/>
-    <g class="eyes">
-      <ellipse class="eye" cx="17.5" cy="${wob}" rx="3.4" ry="4.6" fill="#fff"/>
-      <ellipse class="eye" cx="30.5" cy="${wob}" rx="3.4" ry="4.6" fill="#fff"/>
-      <path class="eye-happy" d="M14.5 ${wob + 1} q3 -4.5 6 0" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-      <path class="eye-happy" d="M27.5 ${wob + 1} q3 -4.5 6 0" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-    </g></svg>`;
+const W = 'stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round"';
+// 节点图标: 蓝底圆角块(状态小球同族) + 白色部件(保留各节点原意象), 微动画由 CSS 驱动
+const tileIcon = (name) => {
+  const tile = '<rect class="tile" x="4" y="4" width="40" height="40" rx="13" fill="currentColor"/>';
+  const G = {
+    docs: `<rect x="11" y="9.5" width="13" height="19" rx="2.5" ${W} stroke-width="2" opacity=".55"/>
+      <rect x="17" y="14" width="17" height="23" rx="2.5" ${W} stroke-width="2"/>
+      <path class="ln" d="M21 20 h9 M21 24.5 h9 M21 29 h6" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+    analyze: `<circle cx="21" cy="20.5" r="8.6" ${W} stroke-width="2.3"/>
+      <path d="M27.3 26.8 L36 35.5" stroke="#fff" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+      <circle class="scan" cx="21" cy="20.5" r="2.6" fill="#fff"/>`,
+    ledger: `<rect x="12" y="8.5" width="24" height="31" rx="2.5" ${W} stroke-width="2.3"/>
+      <path d="M18.5 8.5 v31" stroke="#fff" stroke-width="2" fill="none"/>
+      <path class="ln" d="M22.5 15 h8.5 M22.5 20 h8.5 M22.5 25 h8.5 M22.5 30 h5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>`,
+    projector: `<rect x="9" y="19" width="14" height="10.5" rx="2.2" ${W} stroke-width="2.3"/>
+      <circle cx="15.8" cy="24.2" r="1.9" fill="#fff"/>
+      <path class="beam" d="M24 21.5 L36 17.5 M24 27 L36 30.5" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
+      <circle class="spark" cx="33.5" cy="20.2" r="1.5" fill="#fff"/>`,
+    cardfile: `<rect class="card" x="19.5" y="12.5" width="9.5" height="3.2" rx="1.6" fill="#fff" opacity=".6"/>
+      <rect class="card" x="12" y="17" width="9.5" height="3.2" rx="1.6" fill="#fff" opacity=".8"/>
+      <rect class="card" x="21.5" y="21.5" width="9.5" height="3.2" rx="1.6" fill="#fff"/>
+      <rect x="10" y="27" width="28" height="12" rx="2.5" ${W} stroke-width="2.3"/>`,
+    engine: `<g class="gear"><circle cx="24" cy="24" r="8.8" ${W} stroke-width="2.3"/>
+      <path d="M24 11.5 v4.5 M24 32 v4.5 M11.5 24 h4.5 M32 24 h4.5 M15.2 15.2 l3.1 3.1 M29.7 29.7 l3.1 3.1 M32.8 15.2 l-3.1 3.1 M18.3 29.7 l-3.1 3.1" stroke="#fff" stroke-width="2.3" stroke-linecap="round" fill="none"/></g>
+      <circle cx="24" cy="24" r="2.8" fill="#fff"/>`,
+    gauge: `<path d="M11.5 30.5 a12.8 12.8 0 0 1 25.5 0" ${W} stroke-width="2.3"/>
+      <path d="M9.5 30.5 h29" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none" opacity=".45"/>
+      <line class="needle" x1="24.2" y1="30.5" x2="30.5" y2="21.8" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="24.2" cy="30.5" r="2.3" fill="#fff"/>`,
+  };
+  return `<svg class="tile" data-ico="${name}" viewBox="0 0 48 48" aria-hidden="true">${tile}${G[name] || G.docs}</svg>`;
 };
-const ICONS = { docs:0, analyze:1, ledger:2, projector:3, cardfile:4, engine:5, gauge:6 };
 
 const D = window.__PIPELINE_DATA__;
 const $ = (id) => document.getElementById(id);
@@ -468,7 +500,7 @@ function renderFlow(S) {
   const n = (id, num, ico, title, meta, cmds) => `
     <div class="fnode pending" data-stage="${id}">
       <span class="state-badge">${id.startsWith("n4") ? "进行中" : "进行中"}</span>
-      <div class="fico">${faceIcon(ICONS[ico] ?? 0)}</div>
+      <div class="fico">${tileIcon(ico)}</div>
       <div class="fbody">
         <h3><span class="fnum">${num}</span> ${title}</h3>
         <div class="meta">${meta}</div>${(cmds || []).map(cmdHtml).join("")}
