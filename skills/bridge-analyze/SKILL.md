@@ -124,7 +124,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。**上报前先探测**后端是否在（GET 该地址）——不在则尝试 `node <套件根>/viz/run.mjs` 自行拉起（后台）；拉不起则静默跳过上报（不阻断）。
 
-**开始执行 skill 时（必做）**：先告知用户可视化地址——"可视化已同步：`$BRIDGE_VIZ_URL/pipeline.html`"（默认 `http://127.0.0.1:8650/pipeline.html`），让用户能打开页面实时观看。然后按下列协议上报：
+**开始执行 skill 时（必做）**：确保后端在（见上）后，**直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。然后按下列协议上报：
 
 - 会话开始：`POST $BRIDGE_VIZ_URL/api/session/start` `{"name":"bridge-analyze · <app>"}`
 - 每步开始/结束：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
