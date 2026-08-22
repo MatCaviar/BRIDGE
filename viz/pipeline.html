@@ -95,9 +95,32 @@
   .fnode.pending { opacity:.48; filter:grayscale(.75); }
   .fnode.active { border-color:var(--primary-500); box-shadow:0 0 0 3px var(--primary-100); opacity:1; filter:none; }
   .fnode.done { border-color:var(--n200); opacity:1; filter:none; }
-  .fico { width:44px; height:44px; color:var(--primary-600); flex:none; margin-top:2px; }
+  .fico { width:44px; height:44px; color:var(--primary-500); flex:none; margin-top:2px; }
   .fnode.pending .fico { color:var(--n400); }
   .fico svg { width:100%; height:100%; }
+  /* ── 节点小圆脸: 与 BRIDGE 状态小球同族(呼吸 + 眨眼 + 状态表情) ── */
+  .fico svg.face { animation: face-breathe 3.6s ease-in-out infinite; transform-origin:center; }
+  .fico .eye, .fico .eye-happy { transform-box: fill-box; transform-origin: center; }
+  .fico .eye { animation: face-blink 4.6s infinite; }
+  .fico .eye-happy { display: none; }
+  [data-stage="n2"] .fico .eye, [data-stage="n2"] .fico svg.face { animation-delay: .6s; }
+  [data-stage="n3"] .fico .eye, [data-stage="n3"] .fico svg.face { animation-delay: 1.2s; }
+  [data-stage="n4a"] .fico .eye, [data-stage="n4a"] .fico svg.face { animation-delay: 1.8s; }
+  [data-stage="n4b"] .fico .eye, [data-stage="n4b"] .fico svg.face { animation-delay: 2.4s; }
+  [data-stage="n5"] .fico .eye, [data-stage="n5"] .fico svg.face { animation-delay: 3s; }
+  [data-stage="n6"] .fico .eye, [data-stage="n6"] .fico svg.face { animation-delay: 3.6s; }
+  .fnode.pending .fico .eye { animation: none; transform: scaleY(.28); }
+  .fnode.pending .fico svg.face { animation: none; }
+  .fnode.active .fico svg.face { animation: face-bounce 1.15s ease-in-out infinite; }
+  .fnode.active .fico .eye { animation: face-look 1.7s ease-in-out infinite; }
+  .fnode.done .fico .eye { display: none; }
+  .fnode.done .fico .eye-happy { display: block; }
+  .fnode.done .fico svg.face { animation: face-breathe 3.6s ease-in-out infinite; }
+  .fnode.skipped .fico .eye { animation: none; transform: scaleY(.15); }
+  @keyframes face-breathe { 50% { transform: scale(1.055); } }
+  @keyframes face-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(.1); } }
+  @keyframes face-bounce { 0%, 100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-2.5px) scale(1.04); } 60% { transform: translateY(0) scale(.99); } }
+  @keyframes face-look { 0%, 100% { transform: translateX(0) scaleY(1); } 25% { transform: translateX(2.2px) scaleY(1.05); } 65% { transform: translateX(-2.2px) scaleY(.95); } }
   .fbody { flex:1; min-width:0; }
   .fbody h3 { font-size:.98rem; margin:0 0 3px; color:var(--t1); font-weight:600; }
   .fnum { color:var(--gold); margin-right:2px; font-family:var(--mono); }
@@ -386,37 +409,19 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
 <script>
 "use strict";
 /* ---- 线刻小图标（ZZT 蓝调） ---- */
-const ICONS = {
-  docs: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="8" y="6" width="22" height="30"/><path d="M12 10 h3 M12 14 h3 M12 18 h3"/>
-    <rect x="15" y="11" width="24" height="31"/><path d="M20 19 h13 M20 24 h13 M20 29 h13 M20 34 h8"/></svg>`,
-  analyze: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-    <circle cx="18" cy="19" r="9"/><circle cx="18" cy="19" r="3.5"/>
-    <path d="M18 6 v4 M18 28 v4 M5 19 h4 M27 19 h4 M9 10 l3 3 M24 28 l3 3 M27 10 l-3 3 M9 28 l3 3"/>
-    <circle cx="34" cy="34" r="7"/><path d="M39 39 l6 6"/><path d="M31 34 h6 M34 31 v6" opacity=".5"/></svg>`,
-  ledger: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-    <rect x="10" y="7" width="28" height="35" rx="1.5"/><path d="M17 7 v35"/>
-    <path d="M13 11 h1.5 M13 15 h1.5 M13 19 h1.5 M13 23 h1.5 M13 27 h1.5 M13 31 h1.5 M13 35 h1.5"/>
-    <path d="M22 14 h11 M22 19 h11 M22 24 h11 M22 29 h11 M22 34 h7"/><circle cx="34" cy="10" r="1.6"/></svg>`,
-  projector: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="5" y="25" width="15" height="11" rx="1"/><circle cx="20" cy="30.5" r="4.2"/>
-    <path d="M24.5 27 L45 19 M24.5 34 L45 42"/><path d="M45 15 v32"/>
-    <path d="M8.5 36 l-2.5 6 M16.5 36 l2.5 6"/><path d="M32 26.5 l3 -1 M33 31.5 l3 1 M38 24.5 l3 -1" opacity=".55"/>
-    <path d="M8 28.5 h4 M8 32 h4"/></svg>`,
-  cardfile: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="12" y="6" width="11" height="14"/><rect x="25" y="9" width="11" height="11"/>
-    <path d="M14.5 10 h6 M14.5 13.5 h6 M27.5 13 h6"/><rect x="7" y="18" width="34" height="23" rx="1"/>
-    <rect x="19.5" y="25" width="9" height="3.2"/><path d="M10 38 h28" opacity=".35"/></svg>`,
-  engine: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-    <rect x="8" y="15" width="23" height="19" rx="1.5"/>
-    <circle cx="14" cy="21" r="2"/><circle cx="25" cy="21" r="2"/><circle cx="14" cy="29" r="2"/><circle cx="25" cy="29" r="2"/>
-    <path d="M11 15 v-4.5 h6 v4.5"/><circle cx="38.5" cy="24.5" r="7.5"/><circle cx="38.5" cy="24.5" r="3"/>
-    <path d="M38.5 13.5 v3.5 M38.5 32 v3.5 M31 24.5 h-3.5 M45.5 24.5 h-3.5"/></svg>`,
-  gauge: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-    <path d="M8 37 a16 16 0 0 1 32 0"/><path d="M8 37 h32"/>
-    <path d="M11.5 24.5 l2.3 2 M24 19.5 v3 M36.5 24.5 l-2.3 2 M9.5 31 l2.6 1.4 M38.5 31 l-2.6 1.4"/>
-    <path d="M24 37 L34 23.5" stroke-width="2"/><circle cx="24" cy="37" r="2.6"/><path d="M15 43 h18" opacity=".4"/></svg>`
+const faceIcon = (seed) => {
+  // 与 BRIDGE 状态小球同族的节点小圆脸: 实心蓝体 + 白眼睛, 表情/动画由 CSS 按节点状态驱动
+  const wob = 24 + ((seed * 7) % 5) - 2; // 每只小脸眼睛高度略有个性
+  return `<svg class="face" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+    <rect class="body" x="4" y="4" width="40" height="40" rx="14" fill="currentColor"/>
+    <g class="eyes">
+      <ellipse class="eye" cx="17.5" cy="${wob}" rx="3.4" ry="4.6" fill="#fff"/>
+      <ellipse class="eye" cx="30.5" cy="${wob}" rx="3.4" ry="4.6" fill="#fff"/>
+      <path class="eye-happy" d="M14.5 ${wob + 1} q3 -4.5 6 0" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+      <path class="eye-happy" d="M27.5 ${wob + 1} q3 -4.5 6 0" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    </g></svg>`;
 };
+const ICONS = { docs:0, analyze:1, ledger:2, projector:3, cardfile:4, engine:5, gauge:6 };
 
 const D = window.__PIPELINE_DATA__;
 const $ = (id) => document.getElementById(id);
@@ -463,7 +468,7 @@ function renderFlow(S) {
   const n = (id, num, ico, title, meta, cmds) => `
     <div class="fnode pending" data-stage="${id}">
       <span class="state-badge">${id.startsWith("n4") ? "进行中" : "进行中"}</span>
-      <div class="fico">${ICONS[ico] || ""}</div>
+      <div class="fico">${faceIcon(ICONS[ico] ?? 0)}</div>
       <div class="fbody">
         <h3><span class="fnum">${num}</span> ${title}</h3>
         <div class="meta">${meta}</div>${(cmds || []).map(cmdHtml).join("")}
