@@ -97,7 +97,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>` — 零错误
 2. **serve 加载**: `node ../../cli/bin/mcp-pipeline.js serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
-3. **契约核对**(有源码时): `validate_aidl <registry.json> <aidlDir> <adapter> <types>` — 机制字段与 AIDL 一致
+3. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
 4. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
 5. **报告**: 向用户说明 — 工具数、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
 
