@@ -122,9 +122,16 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 ## 可视化同步（适配层，默认开启；不影响执行流程）
 
-执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。**上报前先探测**后端是否在（GET 该地址）——不在则尝试 `node <套件根>/viz/run.mjs` 自行拉起（后台）；拉不起则静默跳过上报（不阻断）。
+执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。上报失败**静默忽略**（不阻断）。
 
-**开始执行 skill 时（必做）**：确保后端在（见上）后，**直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。然后按下列协议上报：
+**开始执行 skill 时（必做）— 可视化跟本次输入走（通用泛化，不绑定特定 app）**：
+
+1. 把 `<套件根>/viz/`（pipeline.html、run.mjs、gen.mjs）**整体复制到输入源同目录** `<输入目录>/viz/`（输入目录不可写时，退化为复制到产物目录）；
+2. 用**本次产出的 analysis** 重新生成该项目的可视化数据：`node <输入目录>/viz/gen.mjs <产出的 analysis.json> [<registry.json>]`（页面标题/数据源等身份信息全部由它驱动，跟着项目走）；
+3. 后台启动 `node <输入目录>/viz/run.mjs`（默认端口 8650，被占用则 `PORT=87xx` 自选空闲口，`BRIDGE_VIZ_URL` 同步指向实际地址）；
+4. **直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。
+
+然后按下列协议上报：
 
 - 会话开始：`POST $BRIDGE_VIZ_URL/api/session/start` `{"name":"bridge-analyze · <app>"}`
 - 每步开始/结束：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`

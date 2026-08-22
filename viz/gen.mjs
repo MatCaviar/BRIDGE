@@ -7,13 +7,20 @@
  *   bridge-executor/registries/registry.json 车端 registry (analysis-to-registry.mjs 产物)
  *   tmp/car-backup/probe-full-results.json   车控候选 probe 结果 (可选, 存在才读)
  *
- * 用法: node viz/gen.mjs   (任意 cwd 均可; 输出 viz/data.js, 之后双击 viz/pipeline.html 查看)
+ * 用法:
+ *   node viz/gen.mjs                              套件模式(读 e2e/bridge-analysis.json 等)
+ *   node viz/gen.mjs <analysis.json> [registry]   任意项目模式(viz/ 目录可整体复制到项目旁, 输出同目录 data.js)
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname, join, sep } from "path";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+// 任意项目模式: 前两个参数为 analysis / registry 的路径
+const argAnalysis = process.argv[2];
+const argRegistry = process.argv[3];
 
 // serve 内置 media 工具 (不进 analysis/registry, 执行器直认) - 与 cli/src/commands/serve.ts 一致
 const MEDIA_BUILTINS = [
@@ -24,10 +31,10 @@ const MEDIA_BUILTINS = [
 ];
 
 function readJson(rel) {
-  const p = join(ROOT, rel);
-  if (!existsSync(p)) return null;
+  const rp = join(ROOT, rel ?? "");
+  if (!existsSync(rp)) return null;
   try {
-    return JSON.parse(readFileSync(p, "utf-8"));
+    return JSON.parse(readFileSync(rp, "utf-8"));
   } catch (e) {
     console.error(`parse error in ${rel}: ${e.message}`);
     process.exit(1);
@@ -35,9 +42,12 @@ function readJson(rel) {
 }
 
 // --- 1. 唯一真相源 ---
-const analysis = readJson("e2e/bridge-analysis.json");
+const analysisRel = argAnalysis ?? "e2e/bridge-analysis.json";
+const analysis = argAnalysis
+  ? JSON.parse(readFileSync(argAnalysis, "utf-8"))
+  : readJson(analysisRel);
 if (!analysis) {
-  console.error("missing e2e/bridge-analysis.json (唯一真相源)");
+  console.error(`missing analysis: ${analysisRel}`);
   process.exit(1);
 }
 const caps = analysis.capabilities ?? [];
@@ -53,7 +63,10 @@ const active = caps.filter((c) => c.status !== "broken");
 const serveTools = active.length + MEDIA_BUILTINS.length;
 
 // --- 2. 车端 registry + 与 analysis 的一致性 ---
-const registryJson = readJson("bridge-executor/registries/registry.json");
+const registryRel = argRegistry ?? "bridge-executor/registries/registry.json";
+const registryJson = argRegistry
+  ? (existsSync(argRegistry) ? JSON.parse(readFileSync(argRegistry, "utf-8")) : null)
+  : readJson(registryRel);
 let registry = { present: false, tools: 0 };
 if (registryJson) {
   const regTools = registryJson.tools ?? [];
@@ -89,9 +102,13 @@ const payload = {
   generatedAt: new Date().toISOString(),
   version: "0.1.23",
   sources: {
-    analysis: "e2e/bridge-analysis.json",
-    registry: "bridge-executor/registries/registry.json",
+    analysis: argAnalysis ? analysisRel.split(sep).join("/") : "e2e/bridge-analysis.json",
+    registry: argRegistry ? registryRel.split(sep).join("/") : (registryJson ? "bridge-executor/registries/registry.json" : ""),
     probe: "tmp/car-backup/probe-full-results.json",
+  },
+  title: {
+    input: `${(analysis.app ?? {}).name ?? "应用"} ${(analysis.app ?? {}).framework === "apk-reverse" ? "APK" : "应用源码"}`,
+    output: "MCP 工具套件",
   },
   app: analysis.app ?? {},
   stats: {
@@ -110,7 +127,7 @@ const payload = {
   probe,
 };
 
-const out = join(ROOT, "viz", "data.js");
+const out = join(HERE, "data.js");
 writeFileSync(
   out,
   "// 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs\n" +

@@ -289,12 +289,12 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
       <div class="header-content">
         <div class="report-meta">
           <div class="meta-item">应用能力管线报告</div>
-          <div class="meta-item">数据源 e2e/bridge-analysis.json</div>
+          <div class="meta-item">数据源 <span id="meta-src">e2e/bridge-analysis.json</span></div>
           <div class="meta-item">版本 <span id="ver-badge"></span></div>
           <div class="meta-item">快照 <span id="gen-at"></span></div>
           <div class="meta-item">校核 validate-analysis · PASS</div>
         </div>
-        <h1 style="font-size:35.2px;">imaudio 应用源码<span style="color:#233b5d"> → MCP 工具套件</span></h1>
+        <h1 id="page-h1" style="font-size:35.2px;">应用源码<span style="color:#233b5d"> → MCP 工具套件</span></h1>
         <div class="subtitle" style="font-size:24px;color:#2f5f99 !important;margin-top:12.8px;">『BRIDGE 代码智能体套件』</div>
       </div>
     </div>
@@ -477,7 +477,7 @@ function renderFlow(S) {
       "摸清输入形态 -> 枚举能力（id / params / status / mechanism）-> 写 description -> 产出 analysis.json -> 验证修正",
       ["skills/bridge-analyze/SKILL.md　（host agent 判断 ＋ 确定性校验器）"]),
     drop("n3", false),
-    n("n3", "③", "ledger", `<code>e2e/bridge-analysis.json</code> · 唯一真相源`,
+    n("n3", "③", "ledger", `<code>${(window.__PIPELINE_DATA__ && window.__PIPELINE_DATA__.sources && window.__PIPELINE_DATA__.sources.analysis) || "e2e/bridge-analysis.json"}</code> · 唯一真相源`,
       `<b class="cnt" data-count="${S.totalCaps}">0</b> capabilities（verified <b class="cnt" data-count="${S.verified}">0</b> · broken <b class="cnt" data-count="${S.broken}">0</b>）-- serve 字段 ＋ 车端机制字段，<b>一份产物双用</b>`),
     drop("n4", false),
     `<div class="forkbar" data-for="n4"></div>`,
@@ -489,7 +489,7 @@ function renderFlow(S) {
        <div class="fbranch">${n("n4a", "④", "projector", "甲 · serve 投影（本机 MCP Server）",
          `MCP 工具面 <b class="cnt" data-count="${S.serveTools}">0</b> tools ＝ 非broken <b class="cnt" data-count="${S.active}">0</b> ＋ media 内置四件（broken 略过）<br>` +
          `tools/call -> invoke -> adb push cmd.json -> 车端 imrpc 信箱 -> ExecutorActivity -> 轮询 result.json`,
-         ["node cli/bin/mcp-pipeline.js serve --analysis e2e/bridge-analysis.json --device <车IP>:5555"])}</div>
+         ["node cli/bin/mcp-pipeline.js serve --analysis " + ((window.__PIPELINE_DATA__ && window.__PIPELINE_DATA__.sources && window.__PIPELINE_DATA__.sources.analysis) || "e2e/bridge-analysis.json") + " --device <车IP>:5555"])}</div>
        <div class="fbranch">${n("n4b", "④", "cardfile", "乙 · registry 生成（车端分派表）",
          `registry.json <b class="cnt" data-count="${reg ? reg.tools : 0}">0</b> tools（跳过 media_*/broken；机制字段投影）`,
          ["node e2e/analysis-to-registry.mjs e2e/bridge-analysis.json bridge-executor/registries/registry.json",
@@ -520,7 +520,7 @@ function renderSteps(S) {
   $("steps").innerHTML = [
     st(1, "schema 校验", "validate-analysis.mjs：必填字段 / id 唯一 / params 类型 / 机制字段一致性",
       `PASS（${S.totalCaps} caps / ${S.active} active / serve ${S.serveTools}）`,
-      "node skills/bridge-analyze/validate-analysis.mjs e2e/bridge-analysis.json"),
+      "node skills/bridge-analyze/validate-analysis.mjs " + ((window.__PIPELINE_DATA__ && window.__PIPELINE_DATA__.sources && window.__PIPELINE_DATA__.sources.analysis) || "e2e/bridge-analysis.json")),
     st(2, "serve 加载", "serve 启动后工具数必须 ＝ 非broken ＋ media 四件", `当前：${S.serveTools} ＝ ${S.active} ＋ 4 ✓`),
     st(3, "契约核对", "validate_aidl：registry 与 AIDL 契约（事务码 / typed-parcelable）核对",
       null, "mcp-pipeline validate_aidl <registry.json> <aidlDir> <adapter> <types>"),
@@ -763,6 +763,17 @@ function render() {
   const S = D.stats;
   $("ver-badge").textContent = "BRIDGE-" + (D.version || "");
   $("gen-at").textContent = (D.generatedAt || "").replace("T", " ").slice(0, 10);
+  // 身份信息数据驱动: 跟着本次输入的 analysis 走, 不硬编码应用名
+  if (D.title) {
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const h1 = $("page-h1");
+    if (h1) h1.innerHTML = esc(D.title.input || "应用源码") + '<span style="color:#233b5d"> → ' + esc(D.title.output || "MCP 工具套件") + "</span>";
+    document.title = (D.app && D.app.name ? D.app.name + " · " : "") + "源码至 MCP 生成管线（可视化跟随）";
+  }
+  if (D.sources && D.sources.analysis) {
+    const m = $("meta-src");
+    if (m) m.textContent = D.sources.analysis;
+  }
 
   const m = (num, lbl, cls) =>
     `<div class="metric${cls ? " " + cls : ""}"><div class="num" data-count="${num}">0</div><div class="lbl">${lbl}</div></div>`;
