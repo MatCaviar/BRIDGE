@@ -77,6 +77,8 @@
   .pbar-meta { display:flex; justify-content:space-between; font-size:.78rem; color:var(--t3); margin-top:.3rem; }
   .pbar-meta b { color:var(--primary-700); font-family:var(--mono); }
 
+  .plog .hint { color:var(--t3); font-size:.82rem; padding:.4rem .2rem; }
+  .plog .hint code { font-size:.78rem; }
   .plog { margin-top:.9rem; background:var(--n50); border:1px solid var(--n200); border-radius:8px;
           font-family:var(--mono); font-size:13.5px; line-height:1.85; padding:.7rem .95rem;
           height:168px; overflow-y:auto; }
@@ -344,7 +346,7 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
       </div>
       <div class="pbar-wrap"><div class="progress-fill" id="pbar"></div></div>
       <div class="pbar-meta"><span>管线进度</span><span><b id="pbar-pct">0%</b>　·　<b id="pbar-stage">0 / 6</b> 阶段</span></div>
-      <div class="plog" id="plog"></div>
+      <div class="plog" id="plog"><div class="hint" id="plog-hint">等待会话上报——bridge-analyze 执行时经 <code>POST /api/session/*</code> 驱动此区实时跟随（阶段推进 / 进度条 / 日志滚动 / 状态脸联动）；下方流程图与工具面已由本次产物静态渲染。</div></div>
 
       <div class="flow" id="flow" style="margin-top:1.4rem"></div>
     </div>
