@@ -176,9 +176,14 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 // 视图分页: 座舱(语音/车控) ⇄ 管线(bridge-analyze 可视化, 同源 viz 后端)
 document.querySelectorAll('.vtab').forEach(btn => {
   btn.addEventListener('click', () => {
+    const isPipe = btn.dataset.v === 'pipeline';
+    // 被管线页(127.0.0.1:8650/cockpit)嵌入时: 通知宿主同页切回管线, 不嵌套 iframe
+    if (isPipe && window.parent !== window) {
+      window.parent.postMessage('bridge:e2e-back', '*');
+      return;
+    }
     document.querySelectorAll('.vtab').forEach(b => b.classList.toggle('active', b === btn));
     const pv = document.getElementById('pipeline-view');
-    const isPipe = btn.dataset.v === 'pipeline';
     pv.style.display = isPipe ? 'block' : 'none';
     document.querySelector('.overlay').style.display = isPipe ? 'none' : '';
     document.getElementById('bg').style.display = isPipe ? 'none' : 'block';

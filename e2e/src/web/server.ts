@@ -274,11 +274,14 @@ async function main(): Promise<void> {
   console.log(`[dashboard] Connecting to MCP servers: ${config.mcpServers.map((s) => s.name).join(", ")}`);
 
   const connector = new McpConnector(config.mcpServers);
-  await connector.connectAll();
   configState.connector = connector;
-
-  const toolCount = connector.getToolDefinitions().length;
-  console.log(`[dashboard] Ready — ${toolCount} tools available`);
+  // 车机离线时 connectAll 可能长时间重试 — 不阻塞 HTTP 服务, 后台连接
+  connector.connectAll().then(() => {
+    const toolCount = connector.getToolDefinitions().length;
+    console.log(`[dashboard] MCP ready — ${toolCount} tools available`);
+  }).catch((err: unknown) => {
+    console.error(`[dashboard] MCP connect error: ${err instanceof Error ? err.message : String(err)}`);
+  });
 
   app.listen(port, () => {
     console.log(`[dashboard] MCP Gateway Dashboard running at http://localhost:${port}`);
