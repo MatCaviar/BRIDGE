@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * bridge-serve-wrapper — BRIDGE serve 的透明代理 + 断线自愈。
+ * bridge-serve-wrapper — 在每次 MCP 连接前发现设备并启动 BRIDGE serve。
  *
  * 车热点 adb IP 每次重连都会漂移。MCP stdio server 的
- * --device 是启动时固定的, 掉线后 invoke 全部失败。这个 wrapper:
+ * --device 是启动时固定的。E2E connector 使用短连接，因此这个 wrapper:
  *   1. 优先使用 BRIDGE_DEVICE/已连接设备，再探测当前热点路由 → spawn 真正的 serve;
- *   2. 每 15s 检查 adb devices, 设备不在 → 杀掉 serve 子进程 → 重新探测 IP → 重启 serve;
- *   3. 代理 stdio: gateway 通过本进程的 stdin/stdout 与 serve 通信。子进程重启后调用方应重新连接。
+ *   2. 在该连接内只代理一个子 server，保持 MCP initialize 与后续调用属于同一会话;
+ *   3. 下次短连接会重新探测设备，适应串号或热点 IP 变化。
  *
  * 用法(替代 config 里的 serve args):
  *   cd e2e
@@ -14,40 +14,30 @@
  *     -- ../cli/bin/mcp-pipeline.js serve --analysis bridge-analysis.json --timeout 20000
  */
 import { spawn } from "child_process";
-import { discoverAdbDevice, isAdbDeviceOnline, resolveAdbBinary } from "./device-discovery.mjs";
+import { discoverAdbDevice, resolveAdbBinary } from "./device-discovery.mjs";
 
 const ADB = resolveAdbBinary();
 
-let serveProc = null;
-let currentSerial = null;
-let restarting = false;
-
-function stopServe() {
-  if (serveProc) {
-    try { serveProc.kill(); } catch { /* best effort */ }
-    serveProc = null;
-  }
-}
-
 function startServe(baseArgs) {
-  stopServe();
   const device = discoverAdbDevice(ADB);
   if (!device) {
-    console.error("[bridge-serve-wrapper] no unique adb device; connect one or set BRIDGE_DEVICE — retrying");
-    return;
+    console.error("[bridge-serve-wrapper] no unique adb device; connect one or set BRIDGE_DEVICE");
+    process.exit(1);
   }
   const serial = device.serial;
-  currentSerial = serial;
   console.error(`[bridge-serve-wrapper] serve -> ${serial}`);
-  serveProc = spawn("node", [...baseArgs, "--device", serial], { stdio: ["pipe", "pipe", "inherit"] });
+  const serveProc = spawn(process.execPath, [...baseArgs, "--device", serial], { stdio: ["pipe", "pipe", "inherit"] });
   serveProc.stdin.on("error", () => {});
   serveProc.stdout.on("error", () => {});
   process.stdin.pipe(serveProc.stdin);
   serveProc.stdout.pipe(process.stdout);
   serveProc.on("exit", (code) => {
     console.error(`[bridge-serve-wrapper] serve exited (${code})`);
-    if (serveProc) serveProc = null; // killed by us → restart via watchdog
+    process.stdin.unpipe(serveProc.stdin);
+    process.exit(code ?? 1);
   });
+  process.on("SIGINT", () => { try { serveProc.kill("SIGINT"); } catch { /* best effort */ } });
+  process.on("SIGTERM", () => { try { serveProc.kill("SIGTERM"); } catch { /* best effort */ } });
 }
 
 const sep = process.argv.indexOf("--");
@@ -58,19 +48,3 @@ if (baseArgs.length === 0) {
 }
 
 startServe(baseArgs);
-
-setInterval(() => {
-  const alive = serveProc && serveProc.exitCode === null && currentSerial && isAdbDeviceOnline(currentSerial, ADB);
-  if (!alive) {
-    if (!restarting) {
-      restarting = true;
-      console.error(`[bridge-serve-wrapper] device ${currentSerial ?? "?"} lost — restarting serve`);
-      startServe(baseArgs);
-    }
-  } else {
-    restarting = false;
-  }
-}, 15000);
-
-process.on("SIGINT", () => { stopServe(); process.exit(0); });
-process.on("SIGTERM", () => { stopServe(); process.exit(0); });

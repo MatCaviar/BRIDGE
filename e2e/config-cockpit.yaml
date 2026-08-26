@@ -11,7 +11,7 @@ mcp_servers:
   - name: bridge
     transport: stdio
     command: node
-    # bridge-serve-wrapper: 动态探测热点 IP + 断线自愈(车热点 IP 每次重连会漂移); -- 后为 serve 实际参数
+    # bridge-serve-wrapper: 每次 MCP 短连接动态探测设备(热点 IP 漂移也会重新发现); -- 后为 serve 实际参数
     # 相对路径自动按本配置文件所在目录解析，可从任意工作目录启动。
     args: ["bridge-serve-wrapper.mjs", "--", "../cli/bin/mcp-pipeline.js", "serve", "--analysis", "bridge-analysis.json", "--timeout", "20000"]
   - name: bridge-ui
