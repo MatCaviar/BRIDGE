@@ -20,7 +20,7 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 **输出**：`analysis.json`（必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
 - serve 投影：`capabilities[].id/description/params/status` → MCP 工具 + inputSchema（LLM 直接可见）
 - 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
-- 套件根 = 本 skill 的 `../../`（仓库根: cli/e2e/...）。CLI: `node ../../cli/bin/mcp-pipeline.js <subcmd>`（`serve`/`invoke`）；analysis 校验只使用本目录的 `validate-analysis.mjs`。
+- 先把本 `SKILL.md` 所在目录解析为绝对路径 `<skill目录>`，再把其 `../..` 解析为 `<套件根>`（仓库根：`cli/e2e/...`）。所有套件命令都使用这两个绝对路径，不依赖用户当前工作目录。CLI：`node "<套件根>/cli/bin/mcp-pipeline.js" <subcmd>`（`serve`/`invoke`）；analysis 校验只使用 `<skill目录>/validate-analysis.mjs`。
 
 ## 输出规格
 
@@ -96,7 +96,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 产出后按序验证, 每条都要过:
 
 1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>` — 零错误
-2. **serve 加载**: `node ../../cli/bin/mcp-pipeline.js serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
+2. **serve 加载**: `node "<套件根>/cli/bin/mcp-pipeline.js" serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
 3. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
 4. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
 5. **报告**: 向用户说明 — 工具数、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
@@ -128,7 +128,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 1. 把 `<套件根>/viz/`（pipeline.html、run.mjs、gen.mjs）**整体复制到输入源同目录** `<输入目录>/viz/`（输入目录不可写时，退化为复制到产物目录）；
 2. 用**本次产出的 analysis** 重新生成该项目的可视化数据：`node <输入目录>/viz/gen.mjs <产出的 analysis.json> [<registry.json>]`（页面标题/数据源等身份信息全部由它驱动，跟着项目走）；
-3. 后台启动 `node <输入目录>/viz/run.mjs`（默认端口 8650，被占用则 `PORT=87xx` 自选空闲口，`BRIDGE_VIZ_URL` 同步指向实际地址）；
+3. 后台启动 `node "<输入目录>/viz/run.mjs" --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<产出的 analysis.json>" --src "<输入目录>"`（默认端口 8650，被占用则加 `--port 87xx` 自选空闲口，`BRIDGE_VIZ_URL` 同步指向实际地址）；这样复制出的查看器仍从已安装套件调用 CLI/校验器，不会要求用户项目自带 `cli/skills/e2e/tools`；
 4. **直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。
 
 然后按下列协议上报：
