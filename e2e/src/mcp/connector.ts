@@ -25,7 +25,7 @@ interface McpToolResultContent {
  * Typical lifecycle:
  *   1. Construct with server configs.
  *   2. `connectAll()` to discover available tools.
- *   3. `executeTool()` / `fetchPrompt()` to invoke operations.
+ *   3. `executeTool()` to invoke operations.
  *   4. `disconnect()` to clean up.
  */
 export class McpConnector {
@@ -127,67 +127,6 @@ export class McpConnector {
   }
 
   // ---------------------------------------------------------------------------
-  // Prompt fetching
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Fetch a named prompt from any connected MCP server.
-   *
-   * Iterates through configured servers and returns the first match. Returns
-   * `null` if no server exposes the requested prompt.
-   */
-  async fetchPrompt(promptName: string): Promise<string | null> {
-    for (const config of this.serverConfigs) {
-      try {
-        const client = await this.createEphemeralClient(config);
-        try {
-          const promptsResult = await client.listPrompts();
-          const promptList = promptsResult?.prompts ?? [];
-
-          const match = promptList.find(
-            (p: { name: string }) => p.name === promptName,
-          );
-          if (!match) {
-            continue;
-          }
-
-          const promptResult = await client.getPrompt({ name: promptName, arguments: {} });
-          const messages = promptResult?.messages ?? [];
-
-          const textParts = messages
-            .filter(
-              (m: { content?: { type?: string } }) =>
-                m.content?.type === "text",
-            )
-            .map(
-              (m: { content: { type: string; text?: string } }) =>
-                (m.content as { type: string; text: string }).text,
-            );
-
-          if (textParts.length > 0) {
-            process.stderr.write(
-              `[mcp-connector] Fetched prompt "${promptName}" from server "${config.name}"\n`,
-            );
-            return textParts.join("\n");
-          }
-        } finally {
-          await this.closeClient(client, config.name);
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        process.stderr.write(
-          `[mcp-connector] Error fetching prompt "${promptName}" from "${config.name}": ${message}\n`,
-        );
-      }
-    }
-
-    process.stderr.write(
-      `[mcp-connector] Prompt "${promptName}" not found on any server\n`,
-    );
-    return null;
-  }
-
-  // ---------------------------------------------------------------------------
   // Cleanup
   // ---------------------------------------------------------------------------
 
@@ -248,9 +187,14 @@ export class McpConnector {
       );
     }
 
+    const bridgeEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([key, value]) => key.startsWith("BRIDGE_") && value !== undefined),
+    ) as Record<string, string>;
     const transport = new StdioClientTransport({
       command: config.command,
       args: config.args ?? [],
+      cwd: config.cwd,
+      env: { ...bridgeEnv, ...config.env },
     });
 
     const client = new Client(

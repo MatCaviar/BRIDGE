@@ -19,6 +19,12 @@ export interface McpServerConfig {
   /** Arguments passed to the spawned process (stdio transport). */
   readonly args?: string[];
 
+  /** Working directory for the spawned server; relative values resolve from the config file. */
+  readonly cwd?: string;
+
+  /** Additional environment variables for the spawned server. */
+  readonly env?: Readonly<Record<string, string>>;
+
   /** Server URL (sse transport). */
   readonly url?: string;
 }

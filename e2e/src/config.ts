@@ -65,6 +65,7 @@ function expandDeep<T>(obj: T): T {
  */
 export function loadConfig(configPath: string): GatewayConfig {
   const resolved = path.resolve(configPath);
+  const configDir = path.dirname(resolved);
 
   if (!fs.existsSync(resolved)) {
     throw new Error(`Config file not found: ${resolved}`);
@@ -92,6 +93,11 @@ export function loadConfig(configPath: string): GatewayConfig {
   }
   const task = parsed.task as Record<string, unknown>;
 
+  const mcpServers = (parsed.mcp_servers as McpServerConfig[]).map((server) => ({
+    ...server,
+    cwd: server.cwd ? path.resolve(configDir, server.cwd) : configDir,
+  }));
+
   return {
     llm: {
       provider: String(llm.provider),
@@ -101,7 +107,7 @@ export function loadConfig(configPath: string): GatewayConfig {
       temperature: llm.temperature ? Number(llm.temperature) : undefined,
       maxTokens: llm.max_tokens ? Number(llm.max_tokens) : undefined,
     },
-    mcpServers: (parsed.mcp_servers as McpServerConfig[]),
+    mcpServers,
     uiSync: (parsed.ui_sync as Array<Record<string, unknown>> | undefined)?.map((r) => ({
       tool: String(r.tool),
       argKey: String(r.arg_key ?? r.argKey ?? ""),
