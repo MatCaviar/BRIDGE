@@ -75,6 +75,7 @@ for (const [i, c] of caps.entries()) {
   if (!m) { warns.push(`${at}: 缺 mechanism(车端执行字段; serve 忽略但建议补全)`); }
   else if (!VALID_MECH.has(m)) { errors.push(`${at}: mechanism 非法 '${m}'`); }
   else if (m === "execmd") {
+    if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: execmd 缺 servicePackage/serviceClass`);
     if (!c.methodName) errors.push(`${at}: execmd 缺 methodName`);
     if (c.pattern && !["none", "scalar", "dataclass", "envelope"].includes(c.pattern)) errors.push(`${at}: pattern 非法 '${c.pattern}'`);
     if (c.pattern === "dataclass" && !c.dataClass) warns.push(`${at}: dataclass 建议声明 dataClass`);
@@ -85,9 +86,19 @@ for (const [i, c] of caps.entries()) {
         errors.push(`${at}: devicePaths '${dp}' 未引用 app.deviceSources 中的设备源(${[...deviceSources].join("/") || "无"})`);
     }
   } else if (m === "carcontrol") {
+    if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: carcontrol 缺 servicePackage/serviceClass`);
     if (!c.ccFunction) errors.push(`${at}: carcontrol 缺 ccFunction`);
   } else if (m === "mapnav") {
+    if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: mapnav 缺 servicePackage/serviceClass`);
     if (!c.bindAction) warns.push(`${at}: mapnav 建议声明 bindAction(部分服务要求 action 匹配)`);
+  } else if (m === "aidl") {
+    if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: aidl 缺 servicePackage/serviceClass`);
+    if (!c.interfaceClass) errors.push(`${at}: aidl 缺 interfaceClass`);
+  } else if (m === "intent") {
+    if (!c.component && !c.intentScreens) errors.push(`${at}: intent 至少需要 component 或 intentScreens`);
+    if (c.intentScreens && (!c.intentScreens.pkg || !c.intentScreens.byDisplay || Object.keys(c.intentScreens.byDisplay).length === 0)) {
+      errors.push(`${at}: intentScreens 需要 pkg 和非空 byDisplay`);
+    }
   }
 }
 

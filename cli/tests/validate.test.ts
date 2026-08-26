@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { dispatch } from "../src/cli.js";
@@ -20,6 +22,21 @@ describe("bridge-analyze validator", () => {
     const result = runValidator(join(import.meta.dirname, "../../e2e/bridge-analysis-carcontrol-candidates.json"));
     expect(result.status).toBe(1);
     expect(result.stdout + result.stderr).toContain("结果: FAIL");
+  });
+
+  it("rejects a binder capability without an explicit service target", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bridge-validator-"));
+    const out = join(dir, "analysis.json");
+    try {
+      const analysis = JSON.parse(readFileSync(join(import.meta.dirname, "../../e2e/bridge-analysis.json"), "utf8"));
+      delete analysis.capabilities.find((cap: any) => cap.mechanism === "execmd").serviceClass;
+      writeFileSync(out, JSON.stringify(analysis));
+      const result = runValidator(out);
+      expect(result.status).toBe(1);
+      expect(result.stdout + result.stderr).toContain("缺 servicePackage/serviceClass");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("is the only analysis validator; the legacy CLI command is absent", async () => {
