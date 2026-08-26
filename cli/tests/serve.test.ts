@@ -7,7 +7,7 @@ import type { AnalysisData, CapabilityDef } from "../src/types.js";
 import type { InvokeOptions, InvokeResult } from "../src/commands/invoke.js";
 
 const cap = (over: Partial<CapabilityDef>): CapabilityDef => ({
-  id: "x", domain: "d", object: "o", action: "a", safetyLevel: "readonly", sdkCalls: [], sourceRef: "ref", ...over,
+  id: "x", domain: "d", object: "o", action: "a", description: "Test capability", safetyLevel: "readonly", status: "verified", sourceRef: "ref", ...over,
 });
 
 describe("inputSchemaFor (zod shape)", () => {

@@ -1,6 +1,5 @@
 import { readFileSync } from "fs";
 import { z } from "zod";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { formatResponse } from "../utils/response.js";
@@ -11,11 +10,11 @@ import { invokeTool, type InvokeOptions } from "./invoke.js";
 /**
  * serve — run the BRIDGE MCP server on the host (stdio JSON-RPC). Exposes the target app's capabilities
  * (read from analysis.json) as MCP tools; each tool call routes through the `invoke` D-step → on-car
- * generic executor → target app's callTool service. This is the piece that lets an external LLM
- * (Claude Desktop, etc.) drive car tools directly.
+ * generic executor → the mechanism selected by the car-side registry. This lets an external LLM
+ * drive the currently modeled car tools without embedding app-specific dispatch code in the server.
  *
- * Tool surface (name / description / inputSchema / safetyLevel) is projected from analysis.json — the
- * rich interface surface from mcp-analyze. The car-side executor resolves the op id to a method via its
+ * Tool surface (name / description / inputSchema) is projected from analysis.json — the
+ * contract produced by bridge-analyze. The car-side executor resolves the op id to a method via its
  * own registry, so this server stays app-agnostic.
  */
 
@@ -141,6 +140,3 @@ export async function serveCommand(argv: string[]): Promise<void> {
   await server.connect(transport);
   // Runs until the LLM client closes stdio.
 }
-
-// Re-exported for tests that need the SDK client to drive an in-process server.
-export { Client };
