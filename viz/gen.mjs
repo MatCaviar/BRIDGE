@@ -100,7 +100,7 @@ const probe = probeJson
 
 const payload = {
   generatedAt: new Date().toISOString(),
-  version: "0.1.23",
+  version: "0.1.24",
   sources: {
     analysis: argAnalysis ? analysisRel.split(sep).join("/") : "e2e/bridge-analysis.json",
     registry: argRegistry ? registryRel.split(sep).join("/") : (registryJson ? "bridge-executor/registries/registry.json" : ""),

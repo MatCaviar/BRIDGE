@@ -1,7 +1,7 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-08-22T06:51:11.705Z",
- "version": "0.1.23",
+ "generatedAt": "2026-08-26T10:26:11.368Z",
+ "version": "0.1.24",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",
   "registry": "bridge-executor/registries/registry.json",
@@ -31,7 +31,7 @@ window.__PIPELINE_DATA__ = {
    "carcontrol": 5,
    "intent": 7
   },
-  "registryTools": 27
+  "registryTools": 34
  },
  "capabilities": [
   {
@@ -1166,21 +1166,14 @@ window.__PIPELINE_DATA__ = {
  ],
  "registry": {
   "present": true,
-  "tools": 27,
+  "tools": 34,
   "byMechanism": {
    "execmd": 21,
    "mapnav": 1,
-   "carcontrol": 5
+   "carcontrol": 5,
+   "intent": 7
   },
-  "missingFromRegistry": [
-   "open_air_front_page",
-   "open_air_rear_page",
-   "open_seat_heat_page",
-   "open_seat_massage_page",
-   "open_seat_mode_page",
-   "open_seat_position_page",
-   "open_light_page"
-  ],
+  "missingFromRegistry": [],
   "extraInRegistry": []
  },
  "probe": {
