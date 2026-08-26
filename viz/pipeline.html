@@ -997,7 +997,9 @@ if (!D) {
 <script>
 /* ── 端到端视图: 同页切换 + URL 同步(/cockpit) ── */
 (function(){
-  const COCKPIT_URL = "http://localhost:3000/cockpit";
+  const cockpitParam = new URLSearchParams(location.search).get("cockpit");
+  const COCKPIT_URL = cockpitParam || "http://localhost:3000/cockpit";
+  const COCKPIT_ORIGIN = new URL(COCKPIT_URL).origin;
   const ov = document.getElementById("e2e-overlay");
   const frame = document.getElementById("e2e-frame");
   const entry = document.getElementById("e2e-entry");
@@ -1006,7 +1008,11 @@ if (!D) {
   function show(push){
     ov.hidden = false;
     if (!frame.src) frame.src = COCKPIT_URL;
-    if (push && !isE2E()){ history.pushState({ e2e: true }, "", "/cockpit"); pushed = true; }
+    if (push && !isE2E()){
+      const query = cockpitParam ? `?cockpit=${encodeURIComponent(COCKPIT_URL)}` : "";
+      history.pushState({ e2e: true }, "", `/cockpit${query}`);
+      pushed = true;
+    }
   }
   function hide(){ ov.hidden = true; }
   entry.addEventListener("click", e => { e.preventDefault(); show(true); });
@@ -1015,7 +1021,7 @@ if (!D) {
     else location.replace("/pipeline.html");
   }
   window.addEventListener("message", (e) => {
-    if (e.data === "bridge:e2e-back" && e.origin === "http://localhost:3000") leave();
+    if (e.data === "bridge:e2e-back" && e.origin === COCKPIT_ORIGIN) leave();
   });
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && isE2E()) leave();
