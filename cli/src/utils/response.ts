@@ -1,4 +1,4 @@
-/** MCP text-content response helpers (原 @im/mcp-server-framework 内联, 2026-08 精简)。 */
+/** MCP text-content response helpers used by the host-side serve command. */
 export interface TextContent {
   readonly type: "text";
   readonly text: string;

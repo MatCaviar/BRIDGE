@@ -88,6 +88,17 @@ if (market && claude) {
   }
 }
 
+// Runtime package versions are part of one installable suite and must ship together.
+const cliPackage = readJson("cli/package.json");
+const e2ePackage = readJson("e2e/package.json");
+if (claude) {
+  for (const [label, pkg] of [["cli/package.json", cliPackage], ["e2e/package.json", e2ePackage]]) {
+    if (pkg && pkg.version !== claude.version) {
+      errors.push(`${label} version "${pkg.version}" != plugin version "${claude.version}"`);
+    }
+  }
+}
+
 if (errors.length > 0) {
   for (const e of errors) console.error(`[check-manifests] ${e}`);
   console.error(`[check-manifests] ${errors.length} drift error(s).`);
