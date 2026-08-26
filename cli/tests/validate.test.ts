@@ -39,6 +39,27 @@ describe("bridge-analyze validator", () => {
     }
   });
 
+  it.each([
+    { deviceSources: ["vin"], devicePath: "body.vin.extra", message: "未引用 app.deviceSources" },
+    { deviceSources: ["vin", "uid"], devicePath: "body.uid", message: "执行器不支持的设备源 'uid'" },
+  ])("rejects an unresolvable device injection path: $devicePath", ({ deviceSources, devicePath, message }) => {
+    const dir = mkdtempSync(join(tmpdir(), "bridge-device-source-"));
+    const out = join(dir, "analysis.json");
+    try {
+      const analysis = JSON.parse(readFileSync(join(import.meta.dirname, "../../e2e/bridge-analysis.json"), "utf8"));
+      analysis.app.deviceSources = deviceSources;
+      const cap = analysis.capabilities.find((item: any) => item.mechanism === "execmd");
+      cap.pattern = "envelope";
+      cap.devicePaths = [devicePath];
+      writeFileSync(out, JSON.stringify(analysis));
+      const result = runValidator(out);
+      expect(result.status).toBe(1);
+      expect(result.stdout + result.stderr).toContain(message);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("is the only analysis validator; the legacy CLI command is absent", async () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     try {

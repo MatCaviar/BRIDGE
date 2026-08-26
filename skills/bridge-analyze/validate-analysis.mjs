@@ -29,6 +29,7 @@ const VALID_TYPES = new Set(["string", "int", "long", "number", "boolean", "arra
 const VALID_STATUS = new Set(["verified", "probe", "broken"]);
 const VALID_SAFETY = new Set(["readonly", "normal", "broken", "p_gear_required", "p_gear_and_confirm", "p_gear_and_network"]);
 const VALID_MECH = new Set(["aidl", "execmd", "media", "mapnav", "carcontrol", "intent"]);
+const EXECUTOR_DEVICE_SOURCES = new Set(["vin"]);
 const BUILTIN_MEDIA = new Set(["media_next", "media_prev", "media_play", "media_pause"]);
 
 // app
@@ -80,10 +81,13 @@ for (const [i, c] of caps.entries()) {
     if (c.pattern && !["none", "scalar", "dataclass", "envelope"].includes(c.pattern)) errors.push(`${at}: pattern 非法 '${c.pattern}'`);
     if (c.pattern === "dataclass" && !c.dataClass) warns.push(`${at}: dataclass 建议声明 dataClass`);
     for (const dp of c.devicePaths ?? []) {
-      // devicePaths 是注入路径(如 body.vin); 路径中出现的设备源名(vin)必须在 app.deviceSources
+      // 执行器按路径末段解析设备源；声明和内置 resolver 必须同时覆盖该名称。
       const segs = dp.split(".");
-      if (!segs.some((s) => deviceSources.has(s)))
+      const source = segs.at(-1);
+      if (!source || !deviceSources.has(source))
         errors.push(`${at}: devicePaths '${dp}' 未引用 app.deviceSources 中的设备源(${[...deviceSources].join("/") || "无"})`);
+      else if (!EXECUTOR_DEVICE_SOURCES.has(source))
+        errors.push(`${at}: devicePaths '${dp}' 使用了执行器不支持的设备源 '${source}'`);
     }
   } else if (m === "carcontrol") {
     if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: carcontrol 缺 servicePackage/serviceClass`);

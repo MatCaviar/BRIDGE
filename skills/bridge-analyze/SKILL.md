@@ -82,7 +82,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 **描述模糊 = LLM 幻觉选错工具**（弱描述下把 A 地名导成 B 地名的实测教训）。
 
 ### params 规范
-- 类型/范围/optional 来自源码类型标注；设备注入值(vin/token/uid)不进 params, 进 `app.deviceSources`
+- 类型/范围/optional 来自源码类型标注；设备注入值不进 params, 进 `app.deviceSources`。内置执行器当前解析 `vin`；新增设备源时须同步加入执行器 resolver
 - enum 必须 wire 真实值（从源码/枚举定义逐字抽取, 不是展示名/中文名）——agent 按 schema 原样传值
 - 对象/数组参数: 用 `properties`/`items` 展开内层形状(递归), 否则 agent 只能猜
 
