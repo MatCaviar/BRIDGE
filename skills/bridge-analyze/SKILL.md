@@ -1,6 +1,6 @@
 ---
 name: bridge-analyze
-description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力调用 schema(analysis.json)。用于 host codeagent: 自主分析一个应用, 产出可被 MCP serve 直接投影给 LLM agent 的工具 schema, 并完成验证。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。
+description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力调用 schema(analysis.json)。用于 host codeagent: 自主分析一个应用, 产出可被 MCP serve 直接投影给 LLM agent 的工具 schema, 并完成验证。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。'
 ---
 
 > 🌐 默认用中文与用户交互和输出；代码/命令/标识符/文件名保持英文。
