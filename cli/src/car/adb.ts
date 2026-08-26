@@ -1,4 +1,7 @@
 import { spawn } from "child_process";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * adb I/O boundary for the BRIDGE host → car executor channel.
@@ -20,16 +23,21 @@ export interface Adb {
 
 /** Real [Adb] over the `adb` CLI binary. */
 export class CliAdb implements Adb {
-  constructor(private readonly serial: string) {}
+  constructor(
+    private readonly serial: string,
+    private readonly shellPrefix: string = process.env.BRIDGE_ADB_SHELL_PREFIX ?? "su 0 sh -c",
+  ) {}
 
   async push(localPath: string, devicePath: string): Promise<void> {
     await runAdb(this.serial, ["push", localPath, devicePath]);
   }
 
   async shell(cmd: string): Promise<string> {
-    // Wrap the command in single quotes for adbd's shell; escape any internal single quotes.
+    // Default to root for privileged executors. Set BRIDGE_ADB_SHELL_PREFIX="" for plain adb shell,
+    // or provide another prefix such as "run-as <package> sh -c" for a different deployment profile.
     const quoted = "'" + cmd.replace(/'/g, "'\\''") + "'";
-    return runAdb(this.serial, ["shell", `su 0 sh -c ${quoted}`]);
+    const remote = this.shellPrefix.trim() ? `${this.shellPrefix.trim()} ${quoted}` : cmd;
+    return runAdb(this.serial, ["shell", remote]);
   }
 }
 
@@ -38,7 +46,18 @@ export function mailboxPath(pkg: string, user = 10): string {
   return `/data/user/${user}/${pkg}/files/imrpc`;
 }
 
-const ADB_BIN = process.platform === "win32" ? "adb.exe" : "adb";
+export function resolveAdbBinary(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (env.BRIDGE_ADB?.trim()) return env.BRIDGE_ADB.trim();
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const bundledWindowsAdb = resolve(moduleDir, "../../..", "tools", "adb", "adb.exe");
+  if (platform === "win32" && existsSync(bundledWindowsAdb)) return bundledWindowsAdb;
+  return platform === "win32" ? "adb.exe" : "adb";
+}
+
+const ADB_BIN = resolveAdbBinary();
 
 function runAdb(serial: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {

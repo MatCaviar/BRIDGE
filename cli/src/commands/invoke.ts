@@ -45,9 +45,9 @@ export interface InvokeResult {
   readonly elapsedMs: number;
 }
 
-const DEFAULT_PKG = "com.immotors.bridge.executor";
-const DEFAULT_ACTIVITY = ".ExecutorActivity";
-const DEFAULT_USER = 10;
+const DEFAULT_PKG = process.env.BRIDGE_EXECUTOR_PACKAGE || "com.immotors.bridge.executor";
+const DEFAULT_ACTIVITY = process.env.BRIDGE_EXECUTOR_ACTIVITY || ".ExecutorActivity";
+const DEFAULT_USER = Number(process.env.BRIDGE_USER || 10);
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_POLL_MS = 500;
 

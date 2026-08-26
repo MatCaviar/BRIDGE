@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { invokeTool, parseInvokeArgs, type InvokeOptions } from "../src/commands/invoke.js";
-import type { Adb } from "../src/car/adb.js";
+import { resolveAdbBinary, type Adb } from "../src/car/adb.js";
 
 /** Records calls + serves scripted shell responses (FIFO). push() captures the local file content. */
 class MockAdb implements Adb {
@@ -103,5 +103,12 @@ describe("parseInvokeArgs", () => {
     expect(o.user).toBe(0);
     expect(o.timeoutMs).toBe(5000);
     expect(o.json).toBe(true);
+  });
+});
+
+describe("resolveAdbBinary", () => {
+  it("honors an explicit binary and otherwise uses the host-appropriate fallback", () => {
+    expect(resolveAdbBinary({ BRIDGE_ADB: "/opt/android/adb" } as NodeJS.ProcessEnv, "linux")).toBe("/opt/android/adb");
+    expect(resolveAdbBinary({} as NodeJS.ProcessEnv, "linux")).toBe("adb");
   });
 });
