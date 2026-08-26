@@ -1,23 +1,24 @@
 {
   "name": "im-mcp-codeagent",
   "version": "0.1.23",
-  "description": "Auto-generate controllable MCP Servers from YunOS HDT apps (Claude Code + Codex).",
+  "description": "Model Android and in-vehicle capabilities, expose them as MCP tools, and invoke a thin real-device executor.",
   "author": { "name": "Tongji University & IM" },
-  "homepage": "https://github.com/MatCaviar/im-mcp-codeagent",
-  "repository": "https://github.com/MatCaviar/im-mcp-codeagent",
+  "homepage": "https://github.com/MatCaviar/BRIDGE",
+  "repository": "https://github.com/MatCaviar/BRIDGE",
   "license": "MIT",
-  "keywords": ["yunos", "automotive", "mcp", "codex", "rpc-bridge"],
+  "keywords": ["android", "automotive", "mcp", "real-device", "codex", "adb"],
   "skills": "./skills/",
   "interface": {
-    "displayName": "CodeAgent @ MCP",
-    "shortDescription": "Auto-generate controllable MCP Servers from YunOS HDT apps.",
-    "longDescription": "Scaffolds an MCP Server from a YunOS HDT app manifest, generates an adb-driven rpc-bridge, and wires a car-side RpcEngine so Claude Code and Codex can drive the device.",
+    "displayName": "BRIDGE",
+    "shortDescription": "Expose Android and in-vehicle capabilities as MCP tools.",
+    "longDescription": "BRIDGE turns source, APK, PRD, or device observations into an auditable analysis contract, projects active capabilities through a host-side MCP server, and invokes a thin privileged Android executor on real devices.",
     "developerName": "Tongji University & IM",
     "category": "Developer",
     "capabilities": ["Write"],
     "defaultPrompt": [
-      "Scaffold an MCP server from a YunOS HDT app manifest.",
-      "Generate the rpc-bridge and car-side RpcEngine wiring."
+      "Analyze this Android app and produce a verified BRIDGE capability model.",
+      "Serve this BRIDGE analysis as MCP tools for a connected device.",
+      "Report unverified or broken paths in this BRIDGE capability model."
     ]
   }
 }

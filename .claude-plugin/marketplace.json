@@ -1,11 +1,11 @@
 {
   "name": "im-mcp-marketplace",
-  "description": "IM Cockpit MCP CodeAgent 插件市场（本地/团队）",
+  "description": "BRIDGE 车载真机能力建模与 MCP 执行插件市场（本地/团队）",
   "owner": { "name": "Tongji University & IM" },
   "plugins": [
     {
       "name": "im-mcp-codeagent",
-      "description": "Auto-generate controllable MCP Servers from YunOS HDT apps.",
+      "description": "Model Android and in-vehicle capabilities, expose them as MCP tools, and invoke a thin real-device executor.",
       "version": "0.1.23",
       "source": "./"
     }
