@@ -26,7 +26,9 @@ function newestMtime(path) {
 function runNpm(cliDir, args) {
   const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "npm";
   const commandArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm", ...args] : args;
-  const result = spawnSync(command, commandArgs, { cwd: cliDir, stdio: "inherit", windowsHide: true });
+  // MCP stdio reserves stdout for JSON-RPC. Route npm's stdout and stderr to the
+  // parent stderr so a first-run install/build cannot corrupt the protocol stream.
+  const result = spawnSync(command, commandArgs, { cwd: cliDir, stdio: ["ignore", 2, 2], windowsHide: true });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`npm ${args.join(" ")} failed with exit code ${result.status}`);
 }
@@ -58,8 +60,9 @@ export function ensureCliReady(cliDir) {
     const stamp = join(cliDir, "node_modules", ".bridge-package-lock.sha256");
     const installedHash = existsSync(stamp) ? readFileSync(stamp, "utf8").trim() : "";
     if (installedHash !== lockHash) {
-      console.log("[bridge] installing CLI dependencies");
-      runNpm(cliDir, ["install", "--include=dev", "--no-fund", "--no-audit"]);
+      console.error("[bridge] installing CLI dependencies");
+      runNpm(cliDir, ["install", "--omit=dev", "--no-fund", "--no-audit"]);
+      mkdirSync(join(cliDir, "node_modules"), { recursive: true });
       writeFileSync(stamp, `${lockHash}\n`);
     }
 
@@ -70,7 +73,7 @@ export function ensureCliReady(cliDir) {
       newestMtime(join(cliDir, "tsconfig.json")),
     );
     if (!existsSync(output) || inputsMtime > newestMtime(output)) {
-      console.log("[bridge] building CLI");
+      console.error("[bridge] building CLI");
       runNpm(cliDir, ["run", "build"]);
     }
   } finally {
