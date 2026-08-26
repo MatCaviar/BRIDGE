@@ -1,0 +1,511 @@
+{
+  "schemaVersion": "bridge.function-schema/v1",
+  "app": {
+    "name": "bridge",
+    "framework": "android-kotlin",
+    "deviceSources": [
+      "vin"
+    ]
+  },
+  "functions": [
+    {
+      "name": "get_sound_stage",
+      "arguments": {},
+      "description": "查询当前音场模式(主驾优先/沉浸环绕等)、fade 前后声场偏移、balance 左右平衡。用户问'现在是什么音场'时用。"
+    },
+    {
+      "name": "set_sound_stage",
+      "arguments": {
+        "mode": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            7,
+            8,
+            9,
+            10,
+            235,
+            236,
+            237,
+            238
+          ],
+          "description": "音场模式编号(见描述)"
+        },
+        "fade": {
+          "type": "int",
+          "required": false,
+          "description": "前后声场偏移, 省略保持当前"
+        },
+        "balance": {
+          "type": "int",
+          "required": false,
+          "description": "左右平衡, 省略保持当前"
+        }
+      },
+      "description": "切换音场模式: 0=至臻原声(自定义) 1=专业听音室 2=小型演奏会 3=音乐剧场 4=沉浸影院 7=主驾优先 8=后排优先 9=全车均衡 10=全景影院 235=AI莱茵之声 236=AI极光暖调 237=AI英伦格调 238=AI美式金属。用户说'把音场调到XX/切换音场'时用。"
+    },
+    {
+      "name": "set_beosonic_point",
+      "arguments": {
+        "x": {
+          "type": "int",
+          "required": true,
+          "description": "x 轴 0-20(亮音→暖音)"
+        },
+        "y": {
+          "type": "int",
+          "required": true,
+          "description": "y 轴 0-20(柔和→活力)"
+        },
+        "z": {
+          "type": "int",
+          "required": true,
+          "description": "z 轴 0-10(空间感)"
+        }
+      },
+      "description": "设置 Beosonic 三维均衡点(x 0-20 亮音-暖音, y 0-20 柔和-活力, z 0-10 空间感)。用户调均衡器/音质时用。"
+    },
+    {
+      "name": "get_mic_vocal",
+      "arguments": {},
+      "description": "查询当前麦克风音量。用户问\"麦克风音量多少\"时用。"
+    },
+    {
+      "name": "set_mic_vocal",
+      "arguments": {
+        "vol": {
+          "type": "int",
+          "required": true,
+          "description": "麦克风音量 0-31"
+        }
+      },
+      "description": "设置麦克风音量(vol 0-31)。用户说\"把麦克风音量调到X\"时用。"
+    },
+    {
+      "name": "get_fast_audio_mode",
+      "arguments": {},
+      "description": "查询当前 K歌混响模式(普通/录音棚/K歌房)。用户问\"现在是什么K歌模式\"时用。"
+    },
+    {
+      "name": "set_fast_audio_mode",
+      "arguments": {
+        "mode": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1,
+            2
+          ],
+          "description": "0=普通 1=录音棚 2=K歌房"
+        }
+      },
+      "description": "设置 K歌混响模式: 0=普通 1=录音棚 2=K歌房。用户说'开录音棚模式/K歌房模式'时用。"
+    },
+    {
+      "name": "set_car_and_headrest_volume",
+      "arguments": {
+        "volume": {
+          "type": "int",
+          "required": true,
+          "description": "音量值(建议 0-31)"
+        },
+        "streamType": {
+          "type": "int",
+          "required": false,
+          "description": "音频流类型, 默认 0(媒体)"
+        },
+        "zoneId": {
+          "type": "int",
+          "required": false,
+          "description": "区域, 省略默认"
+        }
+      },
+      "description": "设置整车+头枕音量(volume 音量值, streamType 0=媒体流)。用户说'音量调到XX'时用, 这是调音量的核心工具。"
+    },
+    {
+      "name": "get_last_volume_data",
+      "arguments": {
+        "streamType": {
+          "type": "int",
+          "required": false,
+          "description": "音频流类型, 默认 0"
+        }
+      },
+      "description": "查询上次设置的音量数据(streamType 默认0=媒体)。用户问\"现在音量多少\"时用。"
+    },
+    {
+      "name": "query_current_active_sound",
+      "arguments": {},
+      "description": "查询当前激活的解闭锁声音(默认/自定义)。"
+    },
+    {
+      "name": "query_sound_library",
+      "arguments": {
+        "pageNum": {
+          "type": "int",
+          "required": false,
+          "description": "页码, 默认1"
+        },
+        "pageSize": {
+          "type": "int",
+          "required": false,
+          "description": "每页数量, 默认5"
+        }
+      },
+      "description": "查询解闭锁音效库列表(分页 pageNum/pageSize)。用户说\"看看有哪些音效/音效库\"时用。"
+    },
+    {
+      "name": "install_sound_library",
+      "arguments": {
+        "resourceCode": {
+          "type": "str",
+          "required": true,
+          "description": "音效资源 code"
+        }
+      },
+      "description": "下载安装音效资源(resourceCode, 如 default)。用户说\"下载/安装这个音效\"时用。"
+    },
+    {
+      "name": "preview_sound",
+      "arguments": {
+        "resourceCode": {
+          "type": "str",
+          "required": true,
+          "description": "音效资源 code"
+        },
+        "voiceType": {
+          "type": "int",
+          "required": false,
+          "description": "0=解锁 1=闭锁"
+        }
+      },
+      "description": "预览音效(resourceCode; voiceType 0=解锁 1=闭锁)。用户说\"试听这个音效\"时用。"
+    },
+    {
+      "name": "query_effect_library",
+      "arguments": {
+        "sourceType": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1
+          ],
+          "description": "0=官方 1=自定义"
+        }
+      },
+      "description": "查询均衡器效果库(sourceType 0=官方 1=自定义)。用户说\"有哪些均衡器效果\"时用。"
+    },
+    {
+      "name": "add_effect",
+      "arguments": {
+        "name": {
+          "type": "str",
+          "required": true,
+          "description": "效果名称"
+        },
+        "effectValues": {
+          "type": "List[Any]",
+          "required": false,
+          "description": "均衡值数组"
+        }
+      },
+      "description": "添加自定义均衡器效果(name 名称 + effectValues 均衡值数组)。用户说\"新建一个均衡器效果\"时用。"
+    },
+    {
+      "name": "update_effect",
+      "arguments": {
+        "effectId": {
+          "type": "str",
+          "required": true,
+          "description": "效果 id"
+        },
+        "name": {
+          "type": "str",
+          "required": false,
+          "description": "效果名称"
+        }
+      },
+      "description": "更新自定义均衡器效果(effectId + name)。用户说\"修改均衡器效果\"时用。"
+    },
+    {
+      "name": "delete_effect",
+      "arguments": {
+        "effectId": {
+          "type": "str",
+          "required": true,
+          "description": "效果 id"
+        }
+      },
+      "description": "删除自定义均衡器效果(effectId)。用户说\"删除这个均衡器效果\"时用。"
+    },
+    {
+      "name": "get_effect_share_code",
+      "arguments": {
+        "effectId": {
+          "type": "str",
+          "required": true,
+          "description": "效果 id"
+        }
+      },
+      "description": "获取均衡器效果的分享码(effectId)。用户说\"分享这个均衡器\"时用。"
+    },
+    {
+      "name": "add_effect_by_share_code",
+      "arguments": {
+        "shareCode": {
+          "type": "str",
+          "required": true,
+          "description": "分享码"
+        }
+      },
+      "description": "通过分享码添加均衡器效果(shareCode)。用户说\"用分享码添加均衡器\"时用。"
+    },
+    {
+      "name": "save_current_effect_data",
+      "arguments": {},
+      "description": "保存当前均衡器效果数据。用户说\"保存当前音效设置\"时用。"
+    },
+    {
+      "name": "nav_start",
+      "arguments": {
+        "name": {
+          "type": "str",
+          "required": true,
+          "description": "目的地名称, 如'同济大学'"
+        },
+        "lat": {
+          "type": "float",
+          "required": false,
+          "description": "目的地纬度(可选)"
+        },
+        "lon": {
+          "type": "float",
+          "required": false,
+          "description": "目的地经度(可选)"
+        }
+      },
+      "description": "车机地图导航到指定地点。用户说'导航去XX/导航到XX'时用。name 目的地名称必填。若你能确定经纬度则给出 lat/lon; 不确定时先调用 geo_search(name) 获取坐标再传入。"
+    },
+    {
+      "name": "cc_seat_heat_driver",
+      "arguments": {
+        "on": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1
+          ],
+          "description": "1=开 0=关"
+        }
+      },
+      "description": "打开/关闭主驾座椅加热(on 1=开 0=关)。用户说\"打开/关闭座椅加热\"时用。"
+    },
+    {
+      "name": "cc_seat_heat_level_driver",
+      "arguments": {
+        "level": {
+          "type": "int",
+          "required": true,
+          "description": "加热档位 1-3"
+        }
+      },
+      "description": "设置主驾座椅加热档位(level 1-3)。用户说\"座椅加热调到X档\"时用。"
+    },
+    {
+      "name": "cc_seat_ventilation_driver",
+      "arguments": {
+        "on": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1
+          ],
+          "description": "1=开 0=关"
+        }
+      },
+      "description": "打开/关闭主驾座椅通风(on 1=开 0=关)。用户说\"打开座椅通风\"时用。"
+    },
+    {
+      "name": "cc_seat_massage_driver",
+      "arguments": {
+        "on": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1
+          ],
+          "description": "1=开 0=关"
+        }
+      },
+      "description": "打开/关闭主驾座椅按摩(on 1=开 0=关)。用户说\"打开座椅按摩\"时用。"
+    },
+    {
+      "name": "cc_seat_heat_stone_massage_driver",
+      "arguments": {
+        "on": {
+          "type": "int",
+          "required": true,
+          "options": [
+            0,
+            1
+          ],
+          "description": "1=开 0=关"
+        }
+      },
+      "description": "打开/关闭主驾座椅热石按摩(on 1=开 0=关)。用户说\"打开热石按摩\"时用。"
+    },
+    {
+      "name": "delete_sound_library",
+      "arguments": {
+        "resourceCode": {
+          "type": "str",
+          "required": true,
+          "description": "音效资源 code"
+        }
+      },
+      "description": "删除音效资源(resourceCode)。用户说\"删除这个音效\"时用。"
+    },
+    {
+      "name": "open_air_front_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"打开空调/空调前排\"（空调前排页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开空调/空调前排\"时用。"
+    },
+    {
+      "name": "open_air_rear_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"打开空调后排\"（空调后排页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开空调后排\"时用。"
+    },
+    {
+      "name": "open_seat_heat_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"打开座椅加热/通风\"（座椅通风加热页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅加热/通风\"时用。"
+    },
+    {
+      "name": "open_seat_massage_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"打开座椅按摩\"（座椅按摩页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅按摩\"时用。"
+    },
+    {
+      "name": "open_seat_mode_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"打开座椅模式\"（座椅模式页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅模式\"时用。"
+    },
+    {
+      "name": "open_seat_position_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"调节座椅位置\"（座椅位置调节页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"调节座椅位置\"时用。"
+    },
+    {
+      "name": "open_light_page",
+      "arguments": {
+        "display": {
+          "type": "str",
+          "required": false,
+          "options": [
+            "DRIVER",
+            "PASSENGER",
+            "REAR"
+          ],
+          "description": "目标屏(默认主驾)"
+        }
+      },
+      "description": "打开用户说\"打开灯光\"（灯光页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开灯光\"时用。"
+    },
+    {
+      "name": "media_next",
+      "arguments": {},
+      "description": "Control media playback: next on the active session"
+    },
+    {
+      "name": "media_prev",
+      "arguments": {},
+      "description": "Control media playback: previous on the active session"
+    },
+    {
+      "name": "media_play",
+      "arguments": {},
+      "description": "Control media playback: play on the active session"
+    },
+    {
+      "name": "media_pause",
+      "arguments": {},
+      "description": "Control media playback: pause on the active session"
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
   "name": "im-mcp-codeagent",
   "displayName": "BRIDGE",
-  "version": "0.1.24",
-  "description": "Model Android and in-vehicle capabilities, validate one analysis contract, expose it as MCP tools, and invoke a thin real-device executor.",
+  "version": "0.1.25",
+  "description": "Model Android and in-vehicle capabilities, export upstream Agent function schemas, expose the same contract as MCP tools, and invoke a thin real-device executor.",
   "author": { "name": "Tongji University & IM" },
   "license": "MIT",
   "homepage": "https://github.com/MatCaviar/BRIDGE",

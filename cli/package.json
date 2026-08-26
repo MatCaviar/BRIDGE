@@ -1,6 +1,6 @@
 {
   "name": "@im/mcp-pipeline-cli",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "description": "Host-side MCP projection and real-device invocation CLI for BRIDGE",
   "type": "module",
   "engines": {

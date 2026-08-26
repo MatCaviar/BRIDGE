@@ -13,7 +13,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, join, sep } from "path";
+import { basename, dirname, join, sep } from "path";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -21,6 +21,16 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // 任意项目模式: 前两个参数为 analysis / registry 的路径
 const argAnalysis = process.argv[2];
 const argRegistry = process.argv[3];
+const argSchema = process.argv[4];
+
+function schemaForAnalysis(analysisPath) {
+  const dir = dirname(analysisPath);
+  const stem = basename(analysisPath, ".json");
+  if (stem === "analysis") return join(dir, "function-schema.json");
+  if (stem.startsWith("analysis-")) return join(dir, `function-schema-${stem.slice("analysis-".length)}.json`);
+  if (stem.endsWith("-analysis")) return join(dir, `${stem.slice(0, -"-analysis".length)}-function-schema.json`);
+  return join(dir, `function-schema-${stem}.json`);
+}
 
 // serve 内置 media 工具 (不进 analysis/registry, 执行器直认) - 与 cli/src/commands/serve.ts 一致
 const MEDIA_BUILTINS = [
@@ -62,7 +72,16 @@ const active = caps.filter((c) => c.status !== "broken");
 // 口径与 skills/bridge-analyze/validate-analysis.mjs 完全一致: serve 工具面 = 非broken + 4 media
 const serveTools = active.length + MEDIA_BUILTINS.length;
 
-// --- 2. 车端 registry + 与 analysis 的一致性 ---
+// --- 2. 上游 Agent function schema（CLI schema 产物） ---
+const functionSchemaPath = argSchema ?? schemaForAnalysis(analysisRel);
+let functionSchema = null;
+if (existsSync(functionSchemaPath)) {
+  try { functionSchema = JSON.parse(readFileSync(functionSchemaPath, "utf-8")); }
+  catch (e) { console.error(`parse error in ${functionSchemaPath}: ${e.message}`); process.exit(1); }
+}
+const functionSchemas = functionSchema?.functions?.length ?? serveTools;
+
+// --- 3. 车端 registry + 与 analysis 的一致性 ---
 const registryRel = argRegistry ?? "bridge-executor/registries/registry.json";
 const registryJson = argRegistry
   ? (existsSync(argRegistry) ? JSON.parse(readFileSync(argRegistry, "utf-8")) : null)
@@ -85,7 +104,7 @@ if (registryJson) {
   };
 }
 
-// --- 3. probe 结果 (可选) ---
+// --- 4. probe 结果 (可选) ---
 const probeJson = readJson("tmp/car-backup/probe-full-results.json");
 const probe = probeJson
   ? {
@@ -100,15 +119,16 @@ const probe = probeJson
 
 const payload = {
   generatedAt: new Date().toISOString(),
-  version: "0.1.24",
+  version: "0.1.25",
   sources: {
     analysis: argAnalysis ? analysisRel.split(sep).join("/") : "e2e/bridge-analysis.json",
+    functionSchema: functionSchemaPath.split(sep).join("/"),
     registry: argRegistry ? registryRel.split(sep).join("/") : (registryJson ? "bridge-executor/registries/registry.json" : ""),
     probe: "tmp/car-backup/probe-full-results.json",
   },
   title: {
     input: `${(analysis.app ?? {}).name ?? "应用"} ${(analysis.app ?? {}).framework === "apk-reverse" ? "APK" : "应用源码"}`,
-    output: "MCP 工具套件",
+    output: "Agent Functions + MCP 工具套件",
   },
   app: analysis.app ?? {},
   stats: {
@@ -118,6 +138,7 @@ const payload = {
     broken: byStatus.broken ?? 0,
     active: active.length,
     serveTools,
+    functionSchemas,
     byMechanism,
     registryTools: registry.present ? registry.tools : 0,
   },
@@ -137,6 +158,6 @@ writeFileSync(
 );
 console.log(
   `viz/data.js written: caps=${caps.length} (verified=${byStatus.verified ?? 0} probe=${byStatus.probe ?? 0} broken=${byStatus.broken ?? 0})` +
-    ` serveTools=${serveTools} (active ${active.length} + 4 media)` +
+    ` functionSchemas=${functionSchemas} serveTools=${serveTools} (active ${active.length} + 4 media)` +
     ` registry=${registry.present ? registry.tools : "-"} probe=${probe.present ? `${probe.totalCandidates} candidates (allVerified=${probe.allVerified})` : "-"}`
 );

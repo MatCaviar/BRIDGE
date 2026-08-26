@@ -155,7 +155,7 @@ export class McpConnector {
       const rawTools = result?.tools ?? [];
 
       return rawTools.map(
-        (tool: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => {
+        (tool: { name: string; description?: string; inputSchema?: Record<string, unknown>; annotations?: Record<string, unknown> }) => {
           const qualifiedName = `${config.name}.${tool.name}`;
           return Object.freeze({
             serverName: config.name,
@@ -163,6 +163,7 @@ export class McpConnector {
             qualifiedName,
             description: tool.description ?? "",
             inputSchema: tool.inputSchema ?? { type: "object", properties: {} },
+            annotations: tool.annotations,
           }) satisfies McpToolDef;
         },
       );

@@ -6,6 +6,7 @@ import { formatResponse } from "../utils/response.js";
 import type { AnalysisData, CapabilityDef, FieldShape, ParamDef } from "../types.js";
 import { CliAdb } from "../car/adb.js";
 import { invokeTool, type InvokeOptions } from "./invoke.js";
+import { annotationsForSafety, arrayItemShape, normalizedEnum, normalizedJsonType } from "./schema.js";
 
 /**
  * serve — run the BRIDGE MCP server on the host (stdio JSON-RPC). Exposes the target app's capabilities
@@ -37,31 +38,33 @@ function paramsToZodShape(ps: readonly ParamDef[]): Record<string, z.ZodTypeAny>
 
 function fieldZod(p: ParamDef | FieldShape): z.ZodTypeAny {
   let s: z.ZodTypeAny;
-  if (p.enum && p.enum.length > 0) {
-    s = z.enum(p.enum as [string, ...string[]]);
+  const t = normalizedJsonType(p.type);
+  if (t === "array") {
+    const item = arrayItemShape(p);
+    s = z.array(item ? fieldZod(item) : z.unknown());
+  } else if (p.enum && p.enum.length > 0) {
+    const values = normalizedEnum(p)!;
+    if (values.every((value): value is string => typeof value === "string")) {
+      s = z.enum(values as [string, ...string[]]);
+    } else {
+      const literals = values.map((value) => z.literal(value));
+      s = literals.length === 1
+        ? literals[0]!
+        : z.union(literals as [z.ZodLiteral<string | number | boolean>, z.ZodLiteral<string | number | boolean>, ...z.ZodLiteral<string | number | boolean>[]]);
+    }
   } else {
-    const t = jsonType(p.type);
-    if (t === "number") {
+    if (t === "number" || t === "integer") {
       let n = z.number();
+      if (t === "integer") n = n.int();
       if ("minimum" in p && p.minimum !== undefined) n = n.min(p.minimum);
       if ("maximum" in p && p.maximum !== undefined) n = n.max(p.maximum);
       s = n;
     } else if (t === "boolean") s = z.boolean();
-    else if (t === "array") s = z.array(p.items ? fieldZod(p.items) : z.unknown());
     else if (t === "object") s = z.object(paramsToZodShape(p.properties ?? []));
     else s = z.string();
   }
   if (p.description) s = s.describe(p.description);
   return s;
-}
-
-function jsonType(t: string): string {
-  const lt = t.toLowerCase();
-  if (/^(int|long|short|byte|float|double|number)/.test(lt)) return "number";
-  if (/^(bool)/.test(lt)) return "boolean";
-  if (/^(array|list|set)/.test(lt)) return "array";
-  if (/^(object|map)/.test(lt)) return "object";
-  return "string";
 }
 
 /**
@@ -80,8 +83,8 @@ export function buildMcpServer(
   const adb = new CliAdb(opts.device);
   const caps = analysis.capabilities ?? [];
 
-  const register = (id: string, description: string, inputSchema: Record<string, never>) => {
-    server.registerTool(id, { description, inputSchema }, async (input: Record<string, unknown>) => {
+  const register = (id: string, description: string, inputSchema: Record<string, never>, safetyLevel: string) => {
+    server.registerTool(id, { description, inputSchema, annotations: annotationsForSafety(safetyLevel) }, async (input: Record<string, unknown>) => {
       try {
         const res = await invoke(adb, {
           op: id, args: input, device: opts.device,
@@ -98,13 +101,13 @@ export function buildMcpServer(
     if (!opts.includeBroken && cap.status === "broken") continue;
     const description = cap.description?.trim() ||
       `${cap.domain}/${cap.object}/${cap.action} (${cap.safetyLevel})`;
-    register(cap.id, description, inputSchemaFor(cap) as Record<string, never>);
+    register(cap.id, description, inputSchemaFor(cap) as Record<string, never>, cap.safetyLevel);
   }
 
   // Bridge built-in media tools (切歌): bridge-level, work for ANY media app exposing a MediaSession.
   // The executor handles `media_*` ops without a registry entry (mechanism=media).
   for (const action of ["next", "prev", "play", "pause"] as const) {
-    register(`media_${action}`, `Control media playback: ${action} on the active session`, {});
+    register(`media_${action}`, `Control media playback: ${action} on the active session`, {}, "normal");
   }
   return server;
 }

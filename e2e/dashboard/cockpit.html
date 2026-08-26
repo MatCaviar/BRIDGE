@@ -81,9 +81,10 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 .tool-item.err{border-color:rgba(255,138,128,.4)}
 .tool-item.err .tres{color:var(--err)}
 /* registry list */
-#registry{max-height:150px;overflow-y:auto}
-.reg-item{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.04)}
-.reg-item .rid{color:var(--text)}
+#registry{max-height:230px;overflow-y:auto}
+.reg-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;font-size:11px;padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+.reg-item .rid{color:var(--text);font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reg-item .rparams{grid-column:1/-1;color:var(--teal-bright);font-family:ui-monospace,Consolas,monospace;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reg-item .rsafety{font-size:9.5px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--text-dim)}
 .reg-item .rsafety.ro{color:var(--teal-bright);border-color:rgba(158,207,211,.3)}
 .reg-item .rsafety.normal{color:var(--warn);border-color:rgba(224,182,74,.3)}
@@ -460,8 +461,11 @@ function renderRegistry(tools){
   const box=$('registry');$('reg-count').textContent=tools.length;box.innerHTML='';
   for(const t of tools){
     const d=document.createElement('div');d.className='reg-item';
-    const s=document.createElement('span');s.className='rsafety '+(t.safetyLevel==='readonly'?'ro':'normal');s.textContent=t.safetyLevel;
-    d.innerHTML='<span class="rid">'+t.name+'</span>';d.appendChild(s);box.appendChild(d);
+    const s=document.createElement('span');s.className='rsafety '+(t.safetyLevel==='readonly'?'ro':'normal');s.textContent=t.safetyLevel||'normal';
+    const props=(t.inputSchema&&t.inputSchema.properties)||{};const req=new Set((t.inputSchema&&t.inputSchema.required)||[]);
+    const sig=Object.entries(props).map(([name,p])=>{const typ=p.type==='array'?'List['+((p.items&&p.items.type)||'any')+']':(p.type||'any');const opts=p.enum||(p.items&&p.items.enum);return name+(req.has(name)?'*':'')+': '+typ+(opts&&opts.length?' {'+opts.join('/')+'}':'');}).join(', ')||'no arguments';
+    d.title=(t.description||'')+'\n'+JSON.stringify(t.inputSchema||{},null,2);
+    d.innerHTML='<span class="rid">'+t.name+'</span>';d.appendChild(s);const p=document.createElement('div');p.className='rparams';p.textContent=sig;d.appendChild(p);box.appendChild(d);
   }
 }
 /* voice */

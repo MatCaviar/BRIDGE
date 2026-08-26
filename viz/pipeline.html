@@ -517,7 +517,7 @@ function renderFlow(S) {
       ["skills/bridge-analyze/SKILL.md　（host agent 判断 ＋ 确定性校验器）"]),
     drop("n3", false),
     n("n3", "③", "ledger", `<code>${(D.sources && D.sources.analysis) || "analysis.json"}</code> · 唯一真相源`,
-      `<b class="cnt" data-count="${S.totalCaps}">0</b> capabilities（verified <b class="cnt" data-count="${S.verified}">0</b> · broken <b class="cnt" data-count="${S.broken}">0</b>）-- serve 字段 ＋ 车端机制字段，<b>一份产物双用</b>`),
+      `<b class="cnt" data-count="${S.totalCaps}">0</b> capabilities → <code>${(D.sources && D.sources.functionSchema) || "function-schema.json"}</code>（<b class="cnt" data-count="${S.functionSchemas || S.serveTools}">0</b> functions）＋ MCP tools/list ＋车端 registry，<b>一源三投影</b>`),
     drop("n4", false),
     `<div class="forkbar" data-for="n4"></div>`,
     `<div class="forkcols">
@@ -525,10 +525,11 @@ function renderFlow(S) {
        <div class="fcell"><span class="ftag">乙</span>${drop("n4b", true)}</div>
      </div>`,
     `<div class="fork">
-       <div class="fbranch">${n("n4a", "④", "projector", "甲 · serve 投影（本机 MCP Server）",
-         `MCP 工具面 <b class="cnt" data-count="${S.serveTools}">0</b> tools ＝ 非broken <b class="cnt" data-count="${S.active}">0</b> ＋ media 内置四件（broken 略过）<br>` +
-         `tools/call -> invoke -> adb push cmd.json -> 车端 imrpc 信箱 -> ExecutorActivity -> 轮询 result.json`,
-         ["node cli/bin/mcp-pipeline.js serve --analysis " + ((D.sources && D.sources.analysis) || "analysis.json") + " --device <serial>"])}</div>
+       <div class="fbranch">${n("n4a", "④", "projector", "甲 · 上游 Agent schema 注入 + MCP serve",
+         `function-schema.json 与 MCP tools/list 均为 <b class="cnt" data-count="${S.serveTools}">0</b> tools；E2E gateway 转为 OpenAI / Anthropic function envelope<br>` +
+         `Agent tool call -> invoke -> adb push cmd.json -> 车端 imrpc 信箱 -> ExecutorActivity -> result.json`,
+         ["mcp-pipeline schema --analysis " + ((D.sources && D.sources.analysis) || "analysis.json") + " --out function-schema.json",
+          "mcp-pipeline serve --analysis " + ((D.sources && D.sources.analysis) || "analysis.json") + " --device <serial>"])}</div>
        <div class="fbranch">${n("n4b", "④", "cardfile", "乙 · registry 生成（车端分派表）",
          `registry.json <b class="cnt" data-count="${reg ? reg.tools : 0}">0</b> tools（跳过 media_*/broken；机制字段投影）`,
           ["node e2e/analysis-to-registry.mjs <analysis.json> <registry.json>",
@@ -557,14 +558,17 @@ function renderSteps(S) {
       ${res ? `<div class="vr">${res}</div>` : ""}${cmd ? cmdHtml(cmd) : ""}
     </div>`;
   $("steps").innerHTML = [
-    st(1, "schema 校验", "validate-analysis.mjs：必填字段 / id 唯一 / params 类型 / 机制字段一致性",
+    st(1, "analysis 校验", "validate-analysis.mjs：必填字段 / id 唯一 / params 类型 / 机制字段一致性",
       `PASS（${S.totalCaps} caps / ${S.active} active / serve ${S.serveTools}）`,
       "node skills/bridge-analyze/validate-analysis.mjs " + ((D.sources && D.sources.analysis) || "analysis.json")),
-    st(2, "serve 加载", "serve 启动后工具数必须 ＝ 非broken ＋ media 四件", `当前：${S.serveTools} ＝ ${S.active} ＋ 4 ✓`),
-    st(3, "契约核对", "逐项比对 registry / AIDL / manifest / adapter 的 methodName、service component、bindAction 与事务码；输出可审查证据"),
-    st(4, "实测", "invoke 路由成功只记 route_ok；观察到预期物理效果或可信状态回读后，才可提升为 verified",
+    st(2, "function schema 导出", "name / arguments / type / options / description 均由 analysis 确定性投影", `当前：${S.functionSchemas || S.serveTools} functions ✓`,
+      "mcp-pipeline schema --analysis <analysis.json> --out <function-schema.json>"),
+    st(3, "上游注入 E2E", "真实 MCP tools/list 与 OpenAI / Anthropic envelope 逐字段对齐", `当前：${S.serveTools} tools ✓`,
+      "node e2e/schema-injection-smoke.mjs --analysis <analysis.json>"),
+    st(4, "契约核对", "逐项比对 registry / AIDL / manifest / adapter 的 methodName、service component、bindAction 与事务码；输出可审查证据"),
+    st(5, "实测", "invoke 路由成功只记 route_ok；观察到预期物理效果或可信状态回读后，才可提升为 verified",
       null, "mcp-pipeline invoke --op <id> --device <serial>"),
-    st(5, "报告", "工具数 / 机制分布 / verified·probe·broken / 证据 / 下一步"),
+    st(6, "报告", "function schema 注入 / 工具数 / 机制分布 / verified·probe·broken / 下一步"),
   ].join("");
 }
 
@@ -693,7 +697,7 @@ function renderTools() {
 function nodeEl(id) { return document.querySelector(`.fnode[data-stage="${id}"]`); }
 let serverOk = false, pollTimer = null;
 const SESSION_IDS = ["n1", "n2", "n3", "n4a", "n4b", "n5", "n6"];
-const STAGE_NAMES = { n1: "① 输入素材", n2: "② bridge-analyze 分析", n3: "③ schema 校验", n4a: "④甲 serve 投影", n4b: "④乙 registry 生成", n5: "⑤ 车端部署·自检", n6: "⑥ 真实车机 invoke" };
+const STAGE_NAMES = { n1: "① 输入素材", n2: "② bridge-analyze 分析", n3: "③ 校验 + function schema", n4a: "④甲 Agent schema + serve", n4b: "④乙 registry 生成", n5: "⑤ 车端部署·自检", n6: "⑥ 真实车机 invoke" };
 const CONN_MAP = { n1: [], n2: ["n2"], n3: ["n3"], n4: ["n4"], n4a: ["n4", "n4a"], n4b: ["n4", "n4b"], n5: ["n5"], n6: ["n6"] };
 function setConnFor(id, cls) {
   (CONN_MAP[id] || []).forEach((c) =>
@@ -825,6 +829,7 @@ function renderData() {
     m(S.verified, "verified", "ok"),
     m(S.broken, "broken（serve 略过）", "bad"),
     m(S.serveTools, `serve 工具面（${S.active}＋${S.serveTools - S.active}）`, "gold"),
+    m(S.functionSchemas || S.serveTools, "上游 function schemas", "ok"),
     m(S.registryTools, "车端 registry tools"),
   ].join("");
   $("stats").querySelectorAll(".num[data-count]").forEach((el) => countUp(el, +el.dataset.count, 900));

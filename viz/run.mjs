@@ -3,7 +3,7 @@
  * BRIDGE 管线可视化 · 实时模式后端（零依赖）
  *
  * 静态服务 viz/ 目录 + 管线阶段执行 API。页面「实时」模式通过本服务
- * 逐阶段执行真实命令（validate / registry 生成 / 部署 / serve / carcheck / invoke）。
+ * 逐阶段执行真实命令（validate / function schema / registry / serve / deploy / carcheck / invoke）。
  *
  * 用法: node viz/run.mjs [--port 8650]
  * 然后浏览器打开 http://127.0.0.1:8650/pipeline.html 切「实时」模式。
@@ -12,7 +12,7 @@
  *   GET  /api/health         存活 + 服务信息
  *   GET  /api/state          当前状态（车 IP / serve 运行 / 日志尾）
  *   POST /api/stage          执行阶段 {stage, args}
- *       stage: validate | registry | deploy | serve:start | serve:stop | carcheck | invoke
+ *       stage: validate | schema | registry | deploy | serve:start | serve:stop | carcheck | invoke
  *   其余 GET 请求 → 静态文件（viz/ 目录，默认 pipeline.html）
  *
  * 安全：仅绑定 127.0.0.1 本地回环；车端操作（deploy/invoke）会真动车，页面侧有护栏。
@@ -53,12 +53,24 @@ function registryForAnalysis(analysisPath) {
   return join(dir, `registry-${stem}.json`);
 }
 
+function functionSchemaForAnalysis(analysisPath) {
+  const dir = dirname(analysisPath);
+  const stem = basename(analysisPath, ".json");
+  if (stem === "analysis") return join(dir, "function-schema.json");
+  if (stem.startsWith("analysis-")) return join(dir, `function-schema-${stem.slice("analysis-".length)}.json`);
+  if (stem.endsWith("-analysis")) return join(dir, `${stem.slice(0, -"-analysis".length)}-function-schema.json`);
+  return join(dir, `function-schema-${stem}.json`);
+}
+
 const analysisArg = argValue("--analysis");
 const resolvedAnalysis = analysisArg ? resolve(PROJECT_ROOT, analysisArg) : join(ROOT, "e2e", "bridge-analysis.json");
 
 // 分析目标（可经启动参数或 POST /api/target 切换；套件模式默认使用仓库样例）
 let TARGET = {
   analysis: resolvedAnalysis,
+  functionSchema: argValue("--function-schema")
+    ? resolve(PROJECT_ROOT, argValue("--function-schema"))
+    : functionSchemaForAnalysis(resolvedAnalysis),
   registry: argValue("--registry")
     ? resolve(PROJECT_ROOT, argValue("--registry"))
     : (analysisArg ? registryForAnalysis(resolvedAnalysis) : join(ROOT, "bridge-executor", "registries", "registry.json")),
@@ -163,6 +175,8 @@ function targetViewData() {
   }
   let registryTools = [];
   try { registryTools = JSON.parse(readFileSync(TARGET.registry, "utf8")).tools ?? []; } catch { /* optional */ }
+  let functionSchemas = [];
+  try { functionSchemas = JSON.parse(readFileSync(TARGET.functionSchema, "utf8")).functions ?? []; } catch { /* optional */ }
   const registryByMechanism = {};
   for (const tool of registryTools) {
     const mechanism = tool.mechanism ?? "execmd";
@@ -177,11 +191,12 @@ function targetViewData() {
     version,
     sources: {
       analysis: TARGET.analysis.replace(/\\/g, "/"),
+      functionSchema: TARGET.functionSchema.replace(/\\/g, "/"),
       registry: registryTools.length ? TARGET.registry.replace(/\\/g, "/") : "",
     },
     title: {
       input: `${analysis.app?.name ?? "应用"} ${analysis.app?.framework === "apk-reverse" ? "APK" : "应用源码"}`,
-      output: "MCP 工具套件",
+      output: "Agent Functions + MCP 工具套件",
     },
     app: analysis.app ?? {},
     capabilities: caps,
@@ -192,6 +207,7 @@ function targetViewData() {
       broken: byStatus.broken ?? 0,
       active: active.length,
       serveTools: active.length + MEDIA_BUILTINS.length,
+      functionSchemas: functionSchemas.length || active.length + MEDIA_BUILTINS.length,
       byMechanism,
       registryTools: registryTools.length,
     },
@@ -327,6 +343,9 @@ async function stageAnalyze() {
 async function stageValidate() {
   return run(process.execPath, [VALIDATE, TARGET.analysis]);
 }
+async function stageSchema() {
+  return run(process.execPath, [CLI, "schema", "--analysis", TARGET.analysis, "--out", TARGET.functionSchema, "--format", "bridge"]);
+}
 async function stageRegistry() {
   return run(process.execPath, [GEN_REG, TARGET.analysis, TARGET.registry]);
 }
@@ -405,7 +424,7 @@ async function stageInvoke(args) {
 }
 
 const STAGES = {
-  inputs: stageInputs, analyze: stageAnalyze, validate: stageValidate, registry: stageRegistry, deploy: stageDeploy,
+  inputs: stageInputs, analyze: stageAnalyze, validate: stageValidate, schema: stageSchema, registry: stageRegistry, deploy: stageDeploy,
   "serve:start": stageServeStart, "serve:stop": stageServeStop,
   carcheck: stageCarcheck, invoke: stageInvoke,
 };
@@ -450,7 +469,12 @@ async function runPipeline(args) {
   };
   await step("n1", "① 输入素材", async () => { const r = await stageInputs(); logOut(r.output); return r; });
   await step("n2", "② bridge-analyze", async () => { const r = await stageAnalyze(); logOut(r.output); return r; });
-  await step("n3", "③ schema 校验", async () => { const r = await stageValidate(); logOut(r.output); return r; });
+  await step("n3", "③ 校验 + function schema 导出", async () => {
+    const validated = await stageValidate(); logOut(validated.output);
+    if (!validated.ok) return validated;
+    const projected = await stageSchema(); logOut(projected.output);
+    return projected;
+  });
   await step("n4b", "④乙 registry 生成", async () => { const r = await stageRegistry(); logOut(r.output); return r; });
   await step("n4a", "④甲 serve 投影", async () => {
     if (!serveOn) { sessLog("n4a", "warn", "　· 跳过：未勾选「启动并保持 serve」"); return { ok: false, error: "未勾选 serve" }; }
@@ -538,6 +562,7 @@ createServer(async (req, res) => {
         const t = JSON.parse(body || "{}");
         if (t.analysis) {
           TARGET.analysis = resolve(PROJECT_ROOT, String(t.analysis));
+          TARGET.functionSchema = functionSchemaForAnalysis(TARGET.analysis);
           TARGET.registry = registryForAnalysis(TARGET.analysis);
         }
         if (t.src) TARGET.srcDir = resolve(PROJECT_ROOT, String(t.src));
@@ -546,6 +571,7 @@ createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({
         analysis: TARGET.analysis.replace(/\\/g, "/"),
+        functionSchema: TARGET.functionSchema.replace(/\\/g, "/"),
         registry: TARGET.registry.replace(/\\/g, "/"),
         srcDir: TARGET.srcDir.replace(/\\/g, "/"),
         adapter: TARGET.adapter.replace(/\\/g, "/"),

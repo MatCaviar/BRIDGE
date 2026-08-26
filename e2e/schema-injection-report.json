@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "analysis": "D:/IM/bridge_test/package/e2e/bridge-analysis.json",
+  "bridgeFunctions": 38,
+  "mcpToolsList": 38,
+  "openaiFunctions": 38,
+  "anthropicTools": 38,
+  "sample": {
+    "name": "bridge__set_sound_stage",
+    "description": "切换音场模式: 0=至臻原声(自定义) 1=专业听音室 2=小型演奏会 3=音乐剧场 4=沉浸影院 7=主驾优先 8=后排优先 9=全车均衡 10=全景影院 235=AI莱茵之声 236=AI极光暖调 237=AI英伦格调 238=AI美式金属。用户说'把音场调到XX/切换音场'时用。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "number",
+          "enum": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            7,
+            8,
+            9,
+            10,
+            235,
+            236,
+            237,
+            238
+          ],
+          "description": "音场模式编号(见描述)"
+        },
+        "fade": {
+          "type": "integer",
+          "description": "前后声场偏移, 省略保持当前"
+        },
+        "balance": {
+          "type": "integer",
+          "description": "左右平衡, 省略保持当前"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  }
+}

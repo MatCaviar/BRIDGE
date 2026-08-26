@@ -45,4 +45,7 @@ export interface McpToolDef {
 
   /** JSON Schema describing the tool's input parameters. */
   readonly inputSchema: Record<string, unknown>;
+
+  /** MCP tool behavior hints projected from BRIDGE safetyLevel. */
+  readonly annotations?: Readonly<Record<string, unknown>>;
 }

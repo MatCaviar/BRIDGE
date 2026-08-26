@@ -7,7 +7,7 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 
 # bridge-analyze — 应用 → 上游 Agent 能力调用 Schema
 
-本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出 `analysis.json`（上游 LLM agent 可直接调用的能力 schema），并自主完成验证。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
+本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出 `analysis.json`（唯一真相源）和 `function-schema.json`（直接交给上游 Agent 的函数定义），并自主完成验证。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
 
 ## 输入 → 输出契约
 
@@ -17,10 +17,10 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 - APK / 安装包（可逆向：dex、manifest、resources）
 - 运行环境（adb 设备、日志、行为观察）
 
-**输出**：`analysis.json`（必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
-- serve 投影：`capabilities[].id/description/params/status` → MCP 工具 + inputSchema（LLM 直接可见）
+**输出**：`analysis.json` + `function-schema.json`（均必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
+- Agent schema 投影：`capabilities[].id/description/params/status` → `function-schema.json` 的 `name/arguments/options/description`；同一语义也由 MCP `tools/list` 以标准 JSON Schema 注入上游 Agent
 - 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
-- 先把本 `SKILL.md` 所在目录解析为绝对路径 `<skill目录>`，再把其 `../..` 解析为 `<套件根>`（仓库根：`cli/e2e/...`）。所有套件命令都使用这两个绝对路径，不依赖用户当前工作目录。CLI：`node "<套件根>/cli/bin/mcp-pipeline.js" <subcmd>`（`serve`/`invoke`）；analysis 校验只使用 `<skill目录>/validate-analysis.mjs`。
+- 先把本 `SKILL.md` 所在目录解析为绝对路径 `<skill目录>`，再把其 `../..` 解析为 `<套件根>`（仓库根：`cli/e2e/...`）。所有套件命令都使用这两个绝对路径，不依赖用户当前工作目录。CLI：`node "<套件根>/cli/bin/mcp-pipeline.js" <subcmd>`（`schema`/`serve`/`invoke`）；analysis 校验只使用 `<skill目录>/validate-analysis.mjs`。
 
 ## 输出规格
 
@@ -96,12 +96,14 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 产出后按序验证, 每条都要过:
 
 1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>` — 零错误
-2. **serve 加载**: `node "<套件根>/cli/bin/mcp-pipeline.js" serve --analysis <analysis.json> --device <任意串>` 启动无异常; 工具数 = 非 broken capabilities + 4(media_*)（用 MCP client 或日志确认）
-3. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
-4. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
-5. **报告**: 向用户说明 — 工具数、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
+2. **Agent schema 导出**: `node "<套件根>/cli/bin/mcp-pipeline.js" schema --analysis <analysis.json> --out <function-schema.json> --format bridge`；数组参数必须导出为 `List[T]`，枚举必须落为 `options`
+3. **运行时注入**: `node "<套件根>/cli/bin/mcp-pipeline.js" serve --analysis <analysis.json> --device <任意串>` 启动无异常；MCP `tools/list` 返回完整 `inputSchema`；工具数 = 非 broken capabilities + 4(media_*)
+4. **端到端 schema 测试**: `node "<套件根>/e2e/schema-injection-smoke.mjs" --analysis <analysis.json> --report <schema-injection-report.json>` — BRIDGE 文件产物、MCP `tools/list`、OpenAI 与 Anthropic envelope 四层数量和字段一致
+5. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
+6. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
+7. **报告**: 向用户说明 — 工具数、function schema 注入结果、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
 
-无设备时: 1+2 必做, 4 留待有环境, status 保持 probe 并明确告知。
+无设备时: 1-4 必做, 6 留待有环境, status 保持 probe 并明确告知。
 
 ## 通用陷阱（逆向/分析时必须验证, 不要假设）
 
@@ -117,7 +119,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 1. 摸清输入形态 → 定位对外能力面(manifest/AIDL/服务/页面/媒体/functionId 清单)
 2. 枚举能力 → 逐项定 id/params/status/mechanism
 3. 写 description(触发场景模板)
-4. 产出 analysis.json(及可选 registry)
+4. 产出 analysis.json，并由 CLI 确定性导出 function-schema.json（及可选 registry）
 5. 执行验证协议 → 修正 → 报告
 
 ## 可视化同步（适配层，默认开启；不影响执行流程）
@@ -127,7 +129,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 **开始执行 skill 时（必做）— 可视化跟本次输入走（通用泛化，不绑定特定 app）**：
 
 1. 把 `<套件根>/viz/`（pipeline.html、run.mjs、gen.mjs）**整体复制到输入源同目录** `<输入目录>/viz/`（输入目录不可写时，退化为复制到产物目录）；
-2. 用**本次产出的 analysis** 重新生成该项目的可视化数据：`node <输入目录>/viz/gen.mjs <产出的 analysis.json> [<registry.json>]`（页面标题/数据源等身份信息全部由它驱动，跟着项目走）；
+2. 用**本次产出的 analysis** 先导出 `<产物目录>/function-schema.json`，再生成该项目的可视化数据：`node <输入目录>/viz/gen.mjs <产出的 analysis.json> [<registry.json>]`（页面标题、schema 数和数据源等身份信息全部由它驱动，跟着项目走）；
 3. 后台启动 `node "<输入目录>/viz/run.mjs" --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<产出的 analysis.json>" --src "<输入目录>"`（默认端口 8650，被占用则加 `--port 87xx` 自选空闲口，`BRIDGE_VIZ_URL` 同步指向实际地址）；这样复制出的查看器仍从已安装套件调用 CLI/校验器，不会要求用户项目自带 `cli/skills/e2e/tools`；
 4. **直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。
 
@@ -141,4 +143,4 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 ## 产物去向
 
-产物直接 `serve`(E2E 兼容); 机制字段经 `analysis-to-registry` 生成车端 registry。
+`function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope；机制字段经 `analysis-to-registry` 生成车端 registry。

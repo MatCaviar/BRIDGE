@@ -5,8 +5,8 @@
   "plugins": [
     {
       "name": "im-mcp-codeagent",
-      "description": "Model Android and in-vehicle capabilities, expose them as MCP tools, and invoke a thin real-device executor.",
-      "version": "0.1.24",
+      "description": "Model Android and in-vehicle capabilities, export upstream Agent function schemas, expose the same contract as MCP tools, and invoke a thin real-device executor.",
+      "version": "0.1.25",
       "source": "./"
     }
   ]

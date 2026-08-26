@@ -21,6 +21,9 @@ export interface ToolsDiscoveredEvent {
     readonly name: string;
     readonly qualifiedName: string;
     readonly description: string;
+    readonly inputSchema: Record<string, unknown>;
+    readonly annotations?: Readonly<Record<string, unknown>>;
+    readonly safetyLevel: "readonly" | "normal";
   }>;
 }
 

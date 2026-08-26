@@ -1,5 +1,5 @@
 export interface LLMConfig {
-  readonly provider: string; // "anthropic" | "openai" | "qwen" | "glm" | "deepseek"
+  readonly provider: string; // "anthropic" | "openai" | "qwen" | "glm" | "deepseek" | "mock"(E2E smoke only)
   readonly model: string;
   readonly apiKey: string;
   readonly baseUrl?: string;

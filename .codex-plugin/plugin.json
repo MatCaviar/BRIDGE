@@ -1,7 +1,7 @@
 {
   "name": "im-mcp-codeagent",
-  "version": "0.1.24",
-  "description": "Model Android and in-vehicle capabilities, expose them as MCP tools, and invoke a thin real-device executor.",
+  "version": "0.1.25",
+  "description": "Model Android and in-vehicle capabilities, export upstream Agent function schemas, expose the same contract as MCP tools, and invoke a thin real-device executor.",
   "author": { "name": "Tongji University & IM" },
   "homepage": "https://github.com/MatCaviar/BRIDGE",
   "repository": "https://github.com/MatCaviar/BRIDGE",
@@ -10,13 +10,14 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "BRIDGE",
-    "shortDescription": "Expose Android and in-vehicle capabilities as MCP tools.",
-    "longDescription": "BRIDGE turns source, APK, PRD, or device observations into an auditable analysis contract, projects active capabilities through a host-side MCP server, and invokes a thin privileged Android executor on real devices.",
+    "shortDescription": "Project app capabilities into Agent schemas and MCP tools.",
+    "longDescription": "BRIDGE turns source, APK, PRD, or device observations into a portable analysis contract, projects active capabilities into upstream Agent function schemas and a host-side MCP server, and invokes a thin privileged Android executor on real devices.",
     "developerName": "Tongji University & IM",
     "category": "Developer",
     "capabilities": ["Write"],
     "defaultPrompt": [
       "Analyze this Android app and produce a verified BRIDGE capability model.",
+      "Export this BRIDGE capability model as function schemas for an upstream Agent.",
       "Serve this BRIDGE analysis as MCP tools for a connected device.",
       "Report unverified or broken paths in this BRIDGE capability model."
     ]

@@ -1,0 +1,16 @@
+# Deterministic, offline E2E proof that MCP tools/list schemas reach an upstream Agent.
+llm:
+  provider: mock
+  model: bridge-schema-smoke
+  api_key: local-smoke
+
+mcp_servers:
+  - name: bridge
+    transport: stdio
+    command: node
+    args: ["../cli/bin/mcp-pipeline.js", "serve", "--analysis", "bridge-analysis.json", "--device", "schema-smoke"]
+
+task:
+  system_prompt: "Inspect the injected function schemas and report what the upstream Agent received. Do not invoke a vehicle tool."
+  user_message: "验证 function schema 已注入上游 Agent。"
+  max_turns: 2

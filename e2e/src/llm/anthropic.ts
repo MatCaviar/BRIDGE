@@ -6,16 +6,10 @@ import type {
   ContentBlockParam,
 } from "@anthropic-ai/sdk/resources/messages.js";
 import type { LLMConfig, LLMClient, LLMResponse, ToolCall, Message } from "./types.js";
+import { parseProviderToolName } from "../mcp/schema-convert.js";
 
 function parseToolName(combined: string): { serverName: string; toolName: string } {
-  const dotIndex = combined.indexOf(".");
-  if (dotIndex === -1) {
-    return { serverName: combined, toolName: combined };
-  }
-  return {
-    serverName: combined.slice(0, dotIndex),
-    toolName: combined.slice(dotIndex + 1),
-  };
+  return parseProviderToolName(combined);
 }
 
 function convertMessages(messages: Message[]): MessageParam[] {

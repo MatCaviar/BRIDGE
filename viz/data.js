@@ -1,15 +1,16 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-08-26T10:26:11.368Z",
- "version": "0.1.24",
+ "generatedAt": "2026-08-26T15:27:50.991Z",
+ "version": "0.1.25",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",
+  "functionSchema": "e2e/bridge-function-schema.json",
   "registry": "bridge-executor/registries/registry.json",
   "probe": "tmp/car-backup/probe-full-results.json"
  },
  "title": {
   "input": "bridge 应用源码",
-  "output": "MCP 工具套件"
+  "output": "Agent Functions + MCP 工具套件"
  },
  "app": {
   "name": "bridge",
@@ -25,6 +26,7 @@ window.__PIPELINE_DATA__ = {
   "broken": 2,
   "active": 34,
   "serveTools": 38,
+  "functionSchemas": 38,
   "byMechanism": {
    "execmd": 23,
    "mapnav": 1,

@@ -67,6 +67,9 @@ export async function runObservable(
       name: t.name,
       qualifiedName: t.qualifiedName,
       description: t.description,
+      inputSchema: t.inputSchema,
+      annotations: t.annotations,
+      safetyLevel: t.annotations?.readOnlyHint === true ? "readonly" : "normal",
     })),
   } satisfies ToolsDiscoveredEvent);
 
