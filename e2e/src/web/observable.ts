@@ -76,20 +76,13 @@ export async function runObservable(
 
   const llmTools = convertSchemas(toolDefs, config.llm.provider);
 
-  const promptFetchStart = Date.now();
   let systemPrompt: string;
-  let promptSource: "config" | "mcp_server" | "fallback" = "fallback";
+  let promptSource: "config" | "fallback" = "fallback";
   if (config.task.systemPrompt !== null) {
     systemPrompt = config.task.systemPrompt;
     promptSource = "config";
   } else {
-    const fetched = await connector.fetchPrompt("aipet-guide");
-    if (fetched) {
-      systemPrompt = fetched;
-      promptSource = "mcp_server";
-    } else {
-      systemPrompt = "You are a helpful assistant with access to tools. Use them to help the user.";
-    }
+    systemPrompt = "You are a helpful assistant with access to tools. Use them to help the user.";
   }
 
   emit(emitter, {

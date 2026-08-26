@@ -42,14 +42,9 @@ export async function run(
   const llmTools = convertSchemas(toolDefs, config.llm.provider);
   logger.info("orchestrator", `Converted ${llmTools.length} tool schemas for ${config.llm.provider}`);
 
-  // System prompt: config override → MCP server prompt → fallback
-  let systemPrompt: string;
-  if (config.task.systemPrompt !== null) {
-    systemPrompt = config.task.systemPrompt;
-  } else {
-    const fetched = await connector.fetchPrompt("aipet-guide");
-    systemPrompt = fetched ?? "You are a helpful assistant with access to tools. Use them to help the user.";
-  }
+  // System prompt: config override → generic tool-using fallback.
+  const systemPrompt = config.task.systemPrompt
+    ?? "You are a helpful assistant with access to tools. Use them to help the user.";
   logger.info("orchestrator", `System prompt: ${truncate(systemPrompt, 100)}...`);
 
   // ── Phase 2: Execution loop ──

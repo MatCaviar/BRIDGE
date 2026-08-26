@@ -28,7 +28,7 @@ export interface SystemPromptEvent {
   readonly type: "system_prompt";
   readonly timestamp: string;
   readonly content: string;
-  readonly source: "config" | "mcp_server" | "fallback";
+  readonly source: "config" | "fallback";
 }
 
 export interface TurnStartedEvent {
