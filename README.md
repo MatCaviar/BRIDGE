@@ -6,7 +6,7 @@
 
 **B**uilding **R**eal-device **I**nterfaces via **D**eterministic **G**ated **E**xecution
 
-`bridge-analyze` › `validate` › `serve` › `invoke`
+`bridge-analyze` › `validate-analysis` › `serve` › `invoke`
 
 ![version](https://img.shields.io/badge/version-0.1.23-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
@@ -29,7 +29,7 @@ The pipeline below lays out the stages; the figure after it shows who does what 
 **Pipeline** — every step is a deterministic CLI subcommand or an agent skill:
 
 ```
-输入任意 app(源码/APK/PRD/行为观察) › bridge-analyze 产出 analysis.json › validate 校验 › serve 投影为 MCP 工具 › invoke 上车执行 🟢
+输入任意 app(源码/APK/PRD/行为观察) › bridge-analyze 产出 analysis.json › validate-analysis 校验 › serve 投影为 MCP 工具 › invoke 上车执行 🟢
   (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
 ```
 
@@ -106,7 +106,7 @@ Done means:
 
 1. `tools-schema.json` exposes every selected capability exactly once.
 2. Every tool has a concrete description, concrete input schema, correct enum values, and safety annotations.
-3. `validate`, `validate_config`, `wire_check`, `test`, `build`, and `verify` all pass.
+3. `validate-analysis.mjs`, `validate_config`, `wire_check`, `test`, `build`, and `verify` all pass.
 4. `verify` proves business-tool calls, not only `health_check`.
 5. `car-side/` can be handed to the device-side colleague without reverse-engineering the pipeline internals.
 
@@ -134,15 +134,15 @@ Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
 
 First session start auto-installs `cli/` deps and builds `cli/dist` (idempotent).
 
-Entry points — the `bridge-analyze` skill (analysis) and the CLI (`validate` · `serve` · `invoke`). For the voice E2E loop (gateway + cockpit), see the 2026-08 section below.
+Entry points — the `bridge-analyze` skill (analysis + validation) and the CLI (`serve` · `invoke`). For the voice E2E loop (gateway + cockpit), see the 2026-08 section below.
 
 **Codex** reads the mirrored `.codex-plugin/plugin.json` (dual-end).
 
 Typical run shape:
 
 ```bash
-# deterministic checks / generation
-mcp-pipeline validate <analysis.json>
+# analysis validation / deterministic generation
+node skills/bridge-analyze/validate-analysis.mjs <analysis.json>
 mcp-pipeline scaffold <analysis.json> --output <server>
 
 # host-agent judgment product + deterministic gates
@@ -163,7 +163,7 @@ Normal plugin users usually enter through `/mcp-pipeline`; the lower-level CLI c
 Most apps expose far more capabilities than you want to MCP-ify. Selection happens **in the analysis itself** (no separate curate step):
 
 - `capabilities[].status` — `verified` / `probe` / `broken`; serve skips `broken` by default (`--include-broken` to override)
-- Drop or keep a capability by editing `analysis.json` and re-running `validate` — the file is the single source of truth, consumed by both `serve` (tool surface) and the car-side registry
+- Drop or keep a capability by editing `analysis.json` and re-running `validate-analysis.mjs` — the file is the single source of truth, consumed by both `serve` (tool surface) and the car-side registry
 - Callback-registration style methods (non-scalar binder params) are recorded as excluded with reasons, not silently dropped
 
 ## 🔄 Update (already installed)
@@ -212,12 +212,11 @@ im-mcp-codeagent/
 ├── skills/               bridge-analyze (analyze → analysis.json, with validator)
 ├── hooks/                SessionStart → build cli (run-hook.cmd → session-init.sh)
 ├── cli/                  @im/mcp-pipeline-cli — deterministic Node
-│   ├── src/commands/     validate · serve · invoke
+│   ├── src/commands/     serve · invoke
 │   └── bin/mcp-pipeline.js
 │   └── bin/mcp-pipeline.js
 
-├── tools/adb/            bundled adb (self-contained; see LICENSE note)
-└── schema/               analysis.schema.json + fixtures
+└── tools/adb/            bundled adb (self-contained; see LICENSE note)
 ```
 
 The CLI runs via a **skill-base-relative path** (`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`) — self-contained, no PATH / global-link dependency.
@@ -249,7 +248,7 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 
 **E2E 快速开始**：`cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`（先起 `asr/asr-whisper-server.py`），浏览器 `http://localhost:3000/cockpit` 点 🎤 说话。
 
-**规格对齐**：`schema/analysis.schema.json` 已扩展支持 mechanism 等新字段（sdkCalls/app.domain/entryFile 降为可选）——新旧 analysis 均可通过旧 `validate`；新流程推荐用 bridge-analyze 自带校验器。
+**单一校验入口**：analysis 规格由 `skills/bridge-analyze/validate-analysis.mjs` 校验；CLI 只负责 `serve` / `invoke`，避免旧 schema 与 E2E 规格漂移。
 
 **工具规格流（唯一真相源）**：`e2e/bridge-analysis.json`(serve 字段+机制字段) → `node e2e/analysis-to-registry.mjs` 生成车端 registry → 校验 `node skills/bridge-analyze/validate-analysis.mjs e2e/bridge-analysis.json`。
 

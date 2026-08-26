@@ -7,7 +7,7 @@
 **B**uilding **R**eal-device **I**nterfaces via **D**eterministic **G**ated **E**xecution
 （基于确定性门控执行构建真机接口）
 
-`analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
+`bridge-analyze` › `validate-analysis` › `serve` › `invoke`
 
 ![version](https://img.shields.io/badge/version-0.1.23-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
@@ -30,8 +30,7 @@
 **Pipeline**——每一步均为确定性 CLI 子命令或智能体 skill：
 
 ```
-validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
-  (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
+输入任意 app › bridge-analyze 产出 analysis.json › validate-analysis 校验 › serve 投影 MCP 工具 › invoke 上车执行 🟢
 ```
 
 进度持久化于 `.mcp-pipeline/<app>/state.json`，支持断点续跑——`--from`、`--only`、`--step`、`--batch`。
@@ -107,7 +106,7 @@ mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-s
 
 1. `tools-schema.json` 精确地、各一次地暴露每个选中能力。
 2. 每个工具都有具体的描述、具体的输入 schema、正确的枚举值与安全 annotation。
-3. `validate`、`validate_config`、`wire_check`、`test`、`build`、`verify` 全部通过。
+3. `validate-analysis.mjs`、`validate_config`、`wire_check`、`test`、`build`、`verify` 全部通过。
 4. `verify` 证明的是业务工具调用，而非仅 `health_check`。
 5. `car-side/` 可直接交付给设备端同事，无需其逆向 pipeline 内部。
 
@@ -146,8 +145,8 @@ mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-s
 典型运行形态：
 
 ```bash
-# 确定性检查 / 生成
-mcp-pipeline validate <analysis.json>
+# analysis 校验 / 确定性生成
+node skills/bridge-analyze/validate-analysis.mjs <analysis.json>
 mcp-pipeline scaffold <analysis.json> --output <server>
 
 # 宿主智能体判断产物 + 确定性闸门
@@ -229,8 +228,7 @@ im-mcp-codeagent/
 │   ├── assets/           car-rpc-engine.ts.template（内嵌、去硬编码）
 │   └── bin/mcp-pipeline.js
 ├── framework/            @im/mcp-server-framework（共享 dispatch 核心：constructDbusCall / …）
-├── tools/adb/            内嵌 adb（自包含；见 LICENSE 注）
-└── schema/               analysis.schema.json + fixtures
+└── tools/adb/            内嵌 adb（自包含；见 LICENSE 注）
 ```
 
 CLI 经 **skill-base 相对路径**（`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`）运行——自包含，不依赖 PATH / 全局链接。

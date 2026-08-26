@@ -20,7 +20,7 @@ description: 任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 **输出**：`analysis.json`（必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
 - serve 投影：`capabilities[].id/description/params/status` → MCP 工具 + inputSchema（LLM 直接可见）
 - 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
-- 套件根 = 本 skill 的 `../../`（仓库根: cli/schema/e2e/...）。CLI: `node ../../cli/bin/mcp-pipeline.js <subcmd>`（`validate`/`serve`/`invoke`）
+- 套件根 = 本 skill 的 `../../`（仓库根: cli/e2e/...）。CLI: `node ../../cli/bin/mcp-pipeline.js <subcmd>`（`serve`/`invoke`）；analysis 校验只使用本目录的 `validate-analysis.mjs`。
 
 ## 输出规格
 
