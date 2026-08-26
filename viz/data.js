@@ -1,11 +1,15 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-08-20T02:43:38.840Z",
+ "generatedAt": "2026-08-22T06:51:11.705Z",
  "version": "0.1.23",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",
   "registry": "bridge-executor/registries/registry.json",
   "probe": "tmp/car-backup/probe-full-results.json"
+ },
+ "title": {
+  "input": "bridge 应用源码",
+  "output": "MCP 工具套件"
  },
  "app": {
   "name": "bridge",
@@ -15,16 +19,17 @@ window.__PIPELINE_DATA__ = {
   ]
  },
  "stats": {
-  "totalCaps": 29,
+  "totalCaps": 36,
   "verified": 27,
-  "probe": 0,
+  "probe": 7,
   "broken": 2,
-  "active": 27,
-  "serveTools": 31,
+  "active": 34,
+  "serveTools": 38,
   "byMechanism": {
    "execmd": 23,
    "mapnav": 1,
-   "carcontrol": 5
+   "carcontrol": 5,
+   "intent": 7
   },
   "registryTools": 27
  },
@@ -828,6 +833,313 @@ window.__PIPELINE_DATA__ = {
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
    "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+  },
+  {
+   "id": "open_air_front_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开空调/空调前排\"（空调前排页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开空调/空调前排\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "air",
+    "subTabName": "frontSeat"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_air_rear_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开空调后排\"（空调后排页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开空调后排\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "air",
+    "subTabName": "rearSeat"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_heat_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开座椅加热/通风\"（座椅通风加热页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅加热/通风\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "heatVent"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_massage_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开座椅按摩\"（座椅按摩页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅按摩\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "massage"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_mode_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开座椅模式\"（座椅模式页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开座椅模式\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "mode"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_seat_position_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"调节座椅位置\"（座椅位置调节页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"调节座椅位置\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "seat",
+    "subTabName": "position"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
+  },
+  {
+   "id": "open_light_page",
+   "domain": "carcontrol",
+   "object": "page",
+   "action": "open",
+   "safetyLevel": "normal",
+   "status": "probe",
+   "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json",
+   "description": "打开用户说\"打开灯光\"（灯光页, Form 1 页面跳转 fire-and-forget, 可选 display 选屏 DRIVER/PASSENGER/REAR）。用户说\"打开灯光\"时用。",
+   "params": [
+    {
+     "name": "display",
+     "type": "string",
+     "optional": true,
+     "enum": [
+      "DRIVER",
+      "PASSENGER",
+      "REAR"
+     ],
+     "description": "目标屏(默认主驾)"
+    }
+   ],
+   "mechanism": "intent",
+   "intentScreens": {
+    "pkg": "com.immotors.carcontrol",
+    "byDisplay": {
+     "DRIVER": "com.immotors.carcontrol.MainActivity",
+     "PASSENGER": "com.immotors.carcontrol.GuestScreenActivity",
+     "REAR": "com.immotors.carcontrol.RearScreenActivity"
+    }
+   },
+   "extras": [
+    {
+     "key": "ToCarControl",
+     "fromArgs": true
+    }
+   ],
+   "defaultArgs": {
+    "type": "light"
+   },
+   "servicePackage": "com.immotors.carcontrol",
+   "serviceClass": "com.immotors.carcontrol.MainActivity"
   }
  ],
  "mediaBuiltins": [
@@ -860,15 +1172,18 @@ window.__PIPELINE_DATA__ = {
    "mapnav": 1,
    "carcontrol": 5
   },
-  "missingFromRegistry": [],
+  "missingFromRegistry": [
+   "open_air_front_page",
+   "open_air_rear_page",
+   "open_seat_heat_page",
+   "open_seat_massage_page",
+   "open_seat_mode_page",
+   "open_seat_position_page",
+   "open_light_page"
+  ],
   "extraInRegistry": []
  },
  "probe": {
-  "present": true,
-  "totalCandidates": 57,
-  "verifiedThisRun": 52,
-  "allVerified": true,
-  "date": "2026-08-18",
-  "note": "all 57 carcontrol functionIds are SUPPORTED by the carcontrol service (routed+valid). This is routing-level verification only (empty args). Functional double-validation (with proper on/level/mode args) + merge into analysis requires param schemas from bridge-analyze on reverse dex (at D:IM\bridge_test\reverse, NOT on this machine) or target app source."
+  "present": false
  }
 };

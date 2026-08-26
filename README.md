@@ -6,7 +6,7 @@
 
 **B**uilding **R**eal-device **I**nterfaces via **D**eterministic **G**ated **E**xecution
 
-`analyze` › `curate` › `scaffold` › `generate` › `gates` › `build`
+`bridge-analyze` › `validate` › `serve` › `invoke`
 
 ![version](https://img.shields.io/badge/version-0.1.23-0066cc)
 ![dual-end](https://img.shields.io/badge/ends-Claude%20Code%20%7C%20Codex-7c3aed)
@@ -29,13 +29,13 @@ The pipeline below lays out the stages; the figure after it shows who does what 
 **Pipeline** — every step is a deterministic CLI subcommand or an agent skill:
 
 ```
-validate › analyze › [curate] › scaffold › generate › test › build › register › verify 🟢
+输入任意 app(源码/APK/PRD/行为观察) › bridge-analyze 产出 analysis.json › validate 校验 › serve 投影为 MCP 工具 › invoke 上车执行 🟢
   (CLI)     (skill)   (skill)    (CLI)    (skill+gates) (CLI)  (CLI)   (CLI)     (CLI)
 ```
 
 Progress persists in `.mcp-pipeline/<app>/state.json` for resume — `--from`, `--only`, `--step`, `--batch`.
 
-> The two gates (`validate_config` + `wire_check`) are inline sub-steps of `generate`, retried until both pass before the pipeline advances. `[curate]` is optional.
+> The skill is executed autonomously by the host codeagent; validation is deterministic (`validate-analysis.mjs`). Registry (car-side dispatch table) is derived from the same analysis — one artifact, dual consumption (serve projection + on-car registry).
 
 **The generation process.** Who does what: the host agent supplies judgment (extraction, wire authoring), the CLI is deterministic (scaffold, gates). Each capability is mapped to one tool definition — `name ← id`, `inputSchema ← params`, `annotations ← safety`.
 
@@ -128,7 +128,7 @@ Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
 **Claude Code**
 
 ```bash
-/plugin marketplace add https://github.com/MatCaviar/im-mcp-codeagent.git
+/plugin marketplace add https://github.com/MatCaviar/BRIDGE.git
 /plugin install im-mcp-codeagent
 ```
 
@@ -160,18 +160,11 @@ Normal plugin users usually enter through `/mcp-pipeline`; the lower-level CLI c
 
 ## 🧩 Capability selection
 
-Most apps expose far more capabilities than you want to MCP-ify. After install and initial `analyze`, **curate** lets you choose the subset — the user's pick is the first priority.
+Most apps expose far more capabilities than you want to MCP-ify. Selection happens **in the analysis itself** (no separate curate step):
 
-```bash
-# 1. Enumerate candidates deterministically (writes nothing)
-mcp-pipeline curate <analysis.json> [--prd <prd.md>]
-
-# 2. /mcp-curate proposes a subset, you choose → writes selection.json
-# 3. Scaffold generates only the chosen capabilities
-mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<app>/selection.json
-```
-
-`selection.json = { "selected": ["<cap.id>", …] }`. Re-pick any time — the generate-layer regenerates, while `conf/config.yaml` and `rpc/config.json` are preserved.
+- `capabilities[].status` — `verified` / `probe` / `broken`; serve skips `broken` by default (`--include-broken` to override)
+- Drop or keep a capability by editing `analysis.json` and re-running `validate` — the file is the single source of truth, consumed by both `serve` (tool surface) and the car-side registry
+- Callback-registration style methods (non-scalar binder params) are recorded as excluded with reasons, not silently dropped
 
 ## 🔄 Update (already installed)
 
