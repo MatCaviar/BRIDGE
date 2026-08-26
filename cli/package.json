@@ -1,8 +1,12 @@
 {
   "name": "@im/mcp-pipeline-cli",
-  "version": "0.1.23",
-  "description": "CLI tool for MCP Server generation pipeline",
+  "version": "0.1.24",
+  "description": "Host-side MCP projection and real-device invocation CLI for BRIDGE",
   "type": "module",
+  "engines": {
+    "node": ">=20.11",
+    "npm": ">=10"
+  },
   "bin": {
     "mcp-pipeline": "./bin/mcp-pipeline.js"
   },

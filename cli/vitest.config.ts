@@ -12,11 +12,6 @@ export default defineConfig({
       exclude: [
         "src/cli.ts",
         "src/types.ts",
-        "src/commands/build.ts",
-        "src/commands/curate.ts",
-        "src/commands/register.ts",
-        "src/commands/schema-preview.ts",
-        "src/commands/test.ts",
       ],
       thresholds: {
         branches: 70,
