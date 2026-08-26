@@ -51,9 +51,6 @@ class ExecutorActivity : Activity() {
     companion object {
         private const val TAG = "BridgeExecutor"
         private const val REGISTRY_FILE = "registry.json"
-        private const val DEFAULT_SVC_PKG = "com.immotors.imaudio"
-        private const val DEFAULT_SVC_CLS = "com.immotors.imaudio_service.IMAudioService"
-        private const val VIN_STUB = "S31LBM25000000010"
         private var registry: JSONObject? = null
         private var reqIdCounter = 0
     }
@@ -82,17 +79,24 @@ class ExecutorActivity : Activity() {
         val tool = lookupTool(cmd.op)
         if (tool == null) { done(cmd.reqId, false, "UNKNOWN_OP ${cmd.op}", null); return }
 
-        // intent (Form 1 startActivity) 不依赖目标 AIDL service 在场 — 直接发, 免 bind
+        // media / intent 不依赖目标 AIDL service 在场 — 直接执行, 免 bind
+        if (tool.mechanism == "media") {
+            doneWithResponse(cmd.reqId, dispatchMedia(tool)); return
+        }
         if (tool.mechanism == "intent") {
-            handler.postDelayed(timeout, timeoutMs)
-            done(cmd.reqId, true, null, dispatchIntent(tool, cmd.args)); return
+            doneWithResponse(cmd.reqId, dispatchIntent(tool, cmd.args)); return
         }
 
         val reg = loadRegistry()
         // registry 下沉: tool 级 servicePackage/serviceClass/bindAction 优先, 缺省回退顶层(单 app 旧 schema)
         val rawTool = tool.raw
-        val svcPkg = rawTool?.optString("servicePackage") ?: reg?.optString("servicePackage", DEFAULT_SVC_PKG) ?: DEFAULT_SVC_PKG
-        val svcCls = rawTool?.optString("serviceClass") ?: reg?.optString("serviceClass", DEFAULT_SVC_CLS) ?: DEFAULT_SVC_CLS
+        val svcPkg = rawTool?.optString("servicePackage", "").orEmpty()
+            .ifEmpty { reg?.optString("servicePackage", "").orEmpty() }
+        val svcCls = rawTool?.optString("serviceClass", "").orEmpty()
+            .ifEmpty { reg?.optString("serviceClass", "").orEmpty() }
+        if (svcPkg.isEmpty() || svcCls.isEmpty()) {
+            done(cmd.reqId, false, "NO_SERVICE_TARGET", null); return
+        }
         val bindAction = rawTool?.optString("bindAction", "") ?: ""
         val svc = ComponentName(svcPkg, svcCls)
         Log.i(TAG, "target=$svc action=$bindAction op=${cmd.op} method=${tool.methodName} pattern=${tool.pattern}")
@@ -106,11 +110,11 @@ class ExecutorActivity : Activity() {
                     when (tool.mechanism) {
                         "mapnav" -> {
                             val msvc = IMapCommonService.Stub.asInterface(binder)
-                            done(cmd.reqId, true, null, dispatchMapCommon(msvc, tool, cmd.args))
+                            doneWithResponse(cmd.reqId, dispatchMapCommon(msvc, tool, cmd.args))
                         }
                         "carcontrol" -> {
                             val csvc = ICustomService.Stub.asInterface(binder)
-                            done(cmd.reqId, true, null, dispatchCarControl(csvc, tool, cmd.args))
+                            doneWithResponse(cmd.reqId, dispatchCarControl(csvc, tool, cmd.args))
                         }
                         "aidl" -> {
                             // 通用反射: 接口类由 registry 的 interfaceClass 声明(任意 AIDL 多方法接口, 需编译进本 APK)
@@ -119,13 +123,13 @@ class ExecutorActivity : Activity() {
                                 done(cmd.reqId, false, "NO_INTERFACE_CLASS", null)
                             } else {
                                 val proxy = reflectAsInterface(iface, binder ?: throw IllegalStateException("null binder"))
-                                done(cmd.reqId, true, null, dispatchReflect(proxy, tool, cmd.args))
+                                doneWithResponse(cmd.reqId, dispatchReflect(proxy, tool, cmd.args))
                             }
                         }
                         else -> {
                             val service = IIMAudioService.Stub.asInterface(binder)
                             val response = dispatch(service, tool, cmd.args)
-                            done(cmd.reqId, true, null, response)
+                            doneWithResponse(cmd.reqId, response)
                         }
                     }
                 } catch (e: Exception) {
@@ -165,10 +169,27 @@ class ExecutorActivity : Activity() {
         if (!isFinishing) finish()
     }
 
-    /** Dispatch by registry mechanism: media → MediaController (system-level, any media app); else reflect
-     *  on the target AIDL by methodName (paramJson shape follows the registry pattern). */
+    /** Convert the executor response envelope into the host-visible success bit. */
+    private fun doneWithResponse(reqId: String, response: JSONObject) {
+        val rawCode = response.opt("code")
+        val code = when (rawCode) {
+            is Number -> rawCode.toInt()
+            is String -> rawCode.toIntOrNull()
+            else -> null
+        }
+        val codeOk = code == null || code == 0 || code == 200 || code == 1000
+        val explicitFailure =
+            (response.has("ok") && !response.optBoolean("ok")) ||
+            (response.has("success") && !response.optBoolean("success"))
+        val ok = codeOk && !explicitFailure
+        val error = if (ok) null else response.optString("message", "").ifEmpty {
+            if (code != null) "EXECUTOR_ERROR code=$code" else "EXECUTOR_ERROR"
+        }
+        done(reqId, ok, error, response)
+    }
+
+    /** Dispatch a bound execmd or legacy AIDL target by registry method and parameter pattern. */
     private fun dispatch(svc: IIMAudioService, tool: Tool, args: JSONObject): JSONObject {
-        if (tool.mechanism == "media") return dispatchMedia(tool, args)
         if (tool.mechanism == "execmd") return dispatchExecCmd(svc, tool, args)
         val paramJson: String? = when (tool.pattern) {
             "none" -> null
@@ -188,7 +209,7 @@ class ExecutorActivity : Activity() {
 
     /** media mechanism: control the active MediaSession via the standard MediaController (app-agnostic —
      *  no target AIDL needed; works for any media app that exposes a session). methodName = transport action. */
-    private fun dispatchMedia(tool: Tool, args: JSONObject): JSONObject {
+    private fun dispatchMedia(tool: Tool): JSONObject {
         val action = tool.methodName
         val mgr = getSystemService(MediaSessionManager::class.java)
         // Prefer a session that reports a playback state (most likely the active player); else any session.
@@ -213,14 +234,15 @@ class ExecutorActivity : Activity() {
     }
 
     /** intent 机制 (Form 1 startActivity, fire-and-forget 页面跳转, 如 CarControl 空调/座椅/灯光)。
-     *  registry tool: component{pkg,cls}(可选) 或 registry.intentScreens{pkg,byDisplay{DRIVER/PASSENGER/REAR->cls}};
+     *  registry tool: component{pkg,cls}(可选) 或 intentScreens{pkg,byDisplay{DRIVER/PASSENGER/REAR->cls}};
+     *  兼容旧 registry 顶层 intentScreens，但新产物以工具级配置为准。
      *  extras[{key, fromArgs?|value?}]; args(默认值); displayArg/displayDefault 选屏。
      *  CarControl 契约: 单个 extra "ToCarControl" = JSON{type,subTabName}。*/
     private fun dispatchIntent(tool: Tool, args: JSONObject): JSONObject {
         val raw = tool.raw
         val intent = Intent()
         val reg = loadRegistry()
-        val screens = reg?.optJSONObject("intentScreens")
+        val screens = raw?.optJSONObject("intentScreens") ?: reg?.optJSONObject("intentScreens")
         val displayArg = raw?.optString("displayArg", "display") ?: "display"
         val display = (args.optString(displayArg).ifEmpty { raw?.optString("displayDefault", "") ?: "" }).uppercase()
 
@@ -504,7 +526,8 @@ class ExecutorActivity : Activity() {
         for (i in 0 until tool.devicePaths.length()) {
             val path = tool.devicePaths.getString(i)
             val leaf = path.substringAfterLast(".")
-            val value = resolveDevice(leaf) ?: continue
+            val value = resolveDevice(leaf)
+                ?: throw IllegalStateException("DEVICE_SOURCE_UNAVAILABLE $leaf")
             setPath(env, path, value)
         }
         return env
@@ -519,8 +542,8 @@ class ExecutorActivity : Activity() {
         val sp = Class.forName("android.os.SystemProperties")
         val get = sp.getMethod("get", String::class.java, String::class.java)
         val v = get.invoke(null, "persist.sys.vin", "") as String
-        if (v.isNotEmpty()) v else VIN_STUB
-    } catch (_: Exception) { VIN_STUB }
+        v.takeIf { it.isNotEmpty() }
+    } catch (_: Exception) { null }
 
     private fun setPath(root: JSONObject, path: String, value: String) {
         val segs = path.split(".")
