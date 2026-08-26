@@ -1,11 +1,9 @@
-import { validateCommand } from "./commands/validate.js";
 import { invokeCommand } from "./commands/invoke.js";
 import { serveCommand } from "./commands/serve.js";
 
 type CommandHandler = (args: string[]) => Promise<void>;
 
 const COMMANDS: Record<string, CommandHandler> = {
-  validate: validateCommand,
   invoke: invokeCommand,
   serve: serveCommand,
 };
@@ -16,7 +14,6 @@ export async function dispatch(argv: string[]): Promise<number> {
   if (!command) {
     process.stderr.write("Usage: mcp-pipeline <command> [options]\n\n");
     process.stderr.write("Commands:\n");
-    process.stderr.write("  validate   Validate analysis.json against schema\n");
     process.stderr.write("  invoke     Invoke a tool on the car: --op <id> --device <serial> [--args '<json>' --user --package --timeout --req-id --json]\n");
     process.stderr.write("  serve      Run the MCP server (stdio): --analysis <analysis.json> --device <serial> [--user --package --include-broken]\n");
     return 1;
