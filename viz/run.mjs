@@ -21,27 +21,52 @@ import { createServer } from "http";
 import { spawn, execFile } from "child_process";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, join, basename } from "path";
+import { dirname, join, basename, resolve } from "path";
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const VIZ = join(ROOT, "viz");
-const ADB = join(ROOT, "tools", "adb", process.platform === "win32" ? "adb.exe" : "adb");
+const VIZ = dirname(fileURLToPath(import.meta.url));
+const argValue = (name) => {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+};
+const PROJECT_ROOT = resolve(argValue("--project-root") || dirname(VIZ));
+const ROOT = resolve(argValue("--suite-root") || process.env.BRIDGE_SUITE_ROOT || PROJECT_ROOT);
+const BUNDLED_ADB = join(ROOT, "tools", "adb", "adb.exe");
+const ADB = process.env.BRIDGE_ADB ||
+  (process.platform === "win32" && existsSync(BUNDLED_ADB) ? BUNDLED_ADB : (process.platform === "win32" ? "adb.exe" : "adb"));
 const CLI = join(ROOT, "cli", "bin", "mcp-pipeline.js");
 const VALIDATE = join(ROOT, "skills", "bridge-analyze", "validate-analysis.mjs");
 const GEN_REG = join(ROOT, "e2e", "analysis-to-registry.mjs");
-const EXEC_PKG = "com.immotors.bridge.executor";
-const EXEC_ACT = ".ExecutorActivity";
+const EXEC_PKG = process.env.BRIDGE_EXECUTOR_PACKAGE || "com.immotors.bridge.executor";
+const EXEC_ACT = process.env.BRIDGE_EXECUTOR_ACTIVITY || ".ExecutorActivity";
+const MEDIA_BUILTINS = [
+  { id: "media_next", action: "next", description: "Control media playback: next on the active session (切下一首)" },
+  { id: "media_prev", action: "prev", description: "Control media playback: prev on the active session (切上一首)" },
+  { id: "media_play", action: "play", description: "Control media playback: play on the active session (播放)" },
+  { id: "media_pause", action: "pause", description: "Control media playback: pause on the active session (暂停)" },
+];
 
-// 分析目标（可经 POST /api/target 切换；默认 imaudio fixture 链路）
+function registryForAnalysis(analysisPath) {
+  const dir = dirname(analysisPath);
+  const stem = basename(analysisPath, ".json");
+  if (stem === "analysis") return join(dir, "registry.json");
+  if (stem.startsWith("analysis-")) return join(dir, `registry-${stem.slice("analysis-".length)}.json`);
+  return join(dir, `registry-${stem}.json`);
+}
+
+const analysisArg = argValue("--analysis");
+const resolvedAnalysis = analysisArg ? resolve(PROJECT_ROOT, analysisArg) : join(ROOT, "e2e", "bridge-analysis.json");
+
+// 分析目标（可经启动参数或 POST /api/target 切换；套件模式默认使用仓库样例）
 let TARGET = {
-  analysis: join(ROOT, "e2e", "bridge-analysis.json"),
-  registry: join(ROOT, "bridge-executor", "registries", "registry.json"),
-  srcDir: join(ROOT, "bridge-executor", "src"),                                                          // 执行器契约面
-  adapter: join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt"),                 // 被分析目标源码
+  analysis: resolvedAnalysis,
+  registry: argValue("--registry")
+    ? resolve(PROJECT_ROOT, argValue("--registry"))
+    : (analysisArg ? registryForAnalysis(resolvedAnalysis) : join(ROOT, "bridge-executor", "registries", "registry.json")),
+  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "bridge-executor", "src")),
+  adapter: argValue("--adapter") ? resolve(PROJECT_ROOT, argValue("--adapter")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt")),
 };
 
-const argPort = process.argv.indexOf("--port");
-const PORT = Number(argPort > 0 ? process.argv[argPort + 1] : process.env.PORT || 8650);
+const PORT = Number(argValue("--port") || process.env.PORT || 8650);
 const HOST = "127.0.0.1";
 
 const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, serveLog: [] };
@@ -79,28 +104,35 @@ const ps = (cmd) =>
     execFile("powershell.exe", ["-NoProfile", "-Command", cmd], { windowsHide: true },
       (e, stdout) => resolve(e ? "" : String(stdout).trim())));
 
-/* ---------- 车探测（WLAN DNS 优先，网关兜底——本车热点 DNS 转发为公网 DNS） ---------- */
-async function probeCandidate(ip) {
-  await adbRun(["connect", `${ip}:5555`]);
+/* ---------- 设备探测（显式配置/已连接设备优先，Windows 热点路由兜底） ---------- */
+async function probeCandidate(serial) {
+  if (/^\d+(?:\.\d+){3}:\d+$/.test(serial)) await adbRun(["connect", serial]);
   await sleep(350);
-  const r = await adbFast(["-s", `${ip}:5555`, "shell", "getprop ro.product.model"]);
-  return r.ok && r.output.trim() ? { ip, model: r.output.trim() } : null;
+  const r = await adbFast(["-s", serial, "shell", "getprop ro.product.model"]);
+  return r.ok && r.output.trim() ? { serial, model: r.output.trim() } : null;
 }
 async function detectCar() {
   const candidates = [];
-  const dns = await ps("(Get-DnsClientServerAddress -AddressFamily IPv4 -InterfaceAlias 'WLAN' | Select-Object -First 1).ServerAddresses[0]");
-  if (dns) candidates.push(dns);
-  const gw = await ps("(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Where-Object {$_.InterfaceAlias -eq 'WLAN'} | Select-Object -First 1).NextHop");
-  if (gw && !candidates.includes(gw)) candidates.push(gw);
+  if (process.env.BRIDGE_DEVICE) candidates.push(process.env.BRIDGE_DEVICE.trim());
+  const devices = await adbFast(["devices"]);
+  const connected = devices.output.split(/\r?\n/).map((line) => line.match(/^(\S+)\s+device$/)?.[1]).filter(Boolean);
+  if (connected.length === 1 && !candidates.includes(connected[0])) candidates.push(connected[0]);
+  if (candidates.length === 0 && process.platform === "win32") {
+    const network = await ps("$n=Get-NetIPConfiguration|Where-Object{$_.NetAdapter.Status -eq 'Up'};$n|ForEach-Object{if($_.IPv4DefaultGateway){$_.IPv4DefaultGateway.NextHop};if($_.DNSServer){$_.DNSServer.ServerAddresses}}");
+    for (const ip of network.split(/\r?\n/).map((v) => v.trim()).filter((v) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(v))) {
+      const serial = `${ip}:5555`;
+      if (!candidates.includes(serial)) candidates.push(serial);
+    }
+  }
   const hits = await Promise.all(candidates.map(probeCandidate)); // 并行探测
   const hit = hits.find(Boolean);
   if (hit) {
-    state.carIp = hit.ip;
+    state.carIp = hit.serial;
     state.carModel = hit.model;
     state.carFailedAt = 0;
-    return { ok: true, carIp: hit.ip, carModel: hit.model };
+    return { ok: true, carIp: hit.serial, carModel: hit.model };
   }
-  return { ok: false, error: "车离线（未在 WLAN DNS/网关发现 adb 设备）" };
+  return { ok: false, error: "未发现唯一 adb 设备（请先 adb connect，或设置 BRIDGE_DEVICE）" };
 }
 async function requireCar() {
   if (state.carIp) return { ok: true, carIp: state.carIp, carModel: state.carModel };
@@ -112,14 +144,68 @@ async function requireCar() {
   if (!d.ok) state.carFailedAt = Date.now();
   return d;
 }
-async function currentUser(ip) {
-  const r = await adbRun(["-s", `${ip}:5555`, "shell", "am get-current-user"]);
+async function currentUser(serial) {
+  const r = await adbRun(["-s", serial, "shell", "am get-current-user"]);
   return r.ok ? r.output.trim() : "10";
 }
 
 /* ---------- 阶段执行 ---------- */
 const read = (p) => { try { return readFileSync(p, "utf-8"); } catch { return ""; } };
 const stat = (p) => { try { return statSync(p); } catch { return null; } };
+function targetViewData() {
+  const analysis = JSON.parse(readFileSync(TARGET.analysis, "utf8"));
+  const caps = analysis.capabilities ?? [];
+  const active = caps.filter((cap) => cap.status !== "broken");
+  const byStatus = {}, byMechanism = {};
+  for (const cap of caps) {
+    byStatus[cap.status ?? "probe"] = (byStatus[cap.status ?? "probe"] ?? 0) + 1;
+    byMechanism[cap.mechanism ?? "execmd"] = (byMechanism[cap.mechanism ?? "execmd"] ?? 0) + 1;
+  }
+  let registryTools = [];
+  try { registryTools = JSON.parse(readFileSync(TARGET.registry, "utf8")).tools ?? []; } catch { /* optional */ }
+  const registryByMechanism = {};
+  for (const tool of registryTools) {
+    const mechanism = tool.mechanism ?? "execmd";
+    registryByMechanism[mechanism] = (registryByMechanism[mechanism] ?? 0) + 1;
+  }
+  const activeIds = new Set(active.map((cap) => cap.id));
+  const registryIds = new Set(registryTools.map((tool) => tool.id));
+  let version = "";
+  try { version = JSON.parse(readFileSync(join(ROOT, ".claude-plugin", "plugin.json"), "utf8")).version ?? ""; } catch { /* optional */ }
+  return {
+    generatedAt: new Date().toISOString(),
+    version,
+    sources: {
+      analysis: TARGET.analysis.replace(/\\/g, "/"),
+      registry: registryTools.length ? TARGET.registry.replace(/\\/g, "/") : "",
+    },
+    title: {
+      input: `${analysis.app?.name ?? "应用"} ${analysis.app?.framework === "apk-reverse" ? "APK" : "应用源码"}`,
+      output: "MCP 工具套件",
+    },
+    app: analysis.app ?? {},
+    capabilities: caps,
+    stats: {
+      totalCaps: caps.length,
+      verified: byStatus.verified ?? 0,
+      probe: byStatus.probe ?? 0,
+      broken: byStatus.broken ?? 0,
+      active: active.length,
+      serveTools: active.length + MEDIA_BUILTINS.length,
+      byMechanism,
+      registryTools: registryTools.length,
+    },
+    registry: {
+      present: registryTools.length > 0,
+      tools: registryTools.length,
+      byMechanism: registryByMechanism,
+      missingFromRegistry: [...activeIds].filter((id) => !registryIds.has(id)),
+      extraInRegistry: [...registryIds].filter((id) => !activeIds.has(id)),
+    },
+    mediaBuiltins: MEDIA_BUILTINS,
+    probe: { present: false },
+  };
+}
 const extractMethods = (src) =>
   [...src.matchAll(/(?:oneway\s+)?[\w<>\[\].,\s]+\s(\w+)\s*\([^)]*\)\s*(?:throws[\s\w.]*)?;/g)]
     .map((m) => m[1]).filter((v, i, arr) => arr.indexOf(v) === i);
@@ -148,7 +234,7 @@ async function stageInputs() {
     }),
     ``,
     `【说明】`,
-    `  完整逆向 dex dump（imaudio-dex / map-dex / ccs-dex 等，~1.7GB）不入库，在交接机 D:/IM/bridge_test/reverse/`,
+    `  完整逆向 dex dump（imaudio-dex / map-dex / ccs-dex 等，~1.7GB）不入库；来源与交接位置见 reverse/README.md`,
     `  本阶段为输入盘点（bridge-analyze 输入契约：任意形态）；真正"吃"这些原料的是 ② analyze（源码扫描 + 契约核对）`,
   ].join("\n");
   return { ok: true, output: out };
@@ -248,18 +334,20 @@ async function stageDeploy() {
   const car = await requireCar();
   if (!car.ok) return { ok: false, error: car.error };
   const U = await currentUser(car.carIp);
-  const owner = `u${U}_a206`;
   const fdir = `/data/user/${U}/${EXEC_PKG}/files`;
   const a = await adbRun(["push", TARGET.registry, "/data/local/tmp/__reg.json"]);
   if (!a.ok) return { ok: false, error: `adb push 失败: ${a.output.slice(-160)}` };
-  const b = await adbRun(["-s", `${car.carIp}:5555`, "shell",
-    `cp /data/local/tmp/__reg.json ${fdir}/registry.json && chown ${owner}:${owner} ${fdir}/registry.json && chmod 666 ${fdir}/registry.json && echo deployed`]);
+  const b = await adbRun(["-s", car.carIp, "shell",
+    `cp /data/local/tmp/__reg.json ${fdir}/registry.json && chmod 666 ${fdir}/registry.json && echo deployed`]);
   if (!b.ok || !b.output.includes("deployed")) return { ok: false, error: `部署失败: ${(b.output || "").slice(-160)}` };
-  return { ok: true, output: `deployed → ${fdir}/registry.json (车 ${car.carIp}:5555)` };
+  return { ok: true, output: `deployed → ${fdir}/registry.json (设备 ${car.carIp})` };
 }
 async function stageServeStart(args) {
   if (state.serveProc) return { ok: true, output: "serve 已在运行", already: true };
-  // serve 启动只注册工具面（31 tools），--device 仅在 tools/call 时才连车；
+  const analysis = JSON.parse(readFileSync(TARGET.analysis, "utf8"));
+  const active = (analysis.capabilities ?? []).filter((c) => c.status !== "broken").length;
+  const serveTools = active + MEDIA_BUILTINS.length;
+  // serve 启动只注册工具面，--device 仅在 tools/call 时才连车；
   // 故 MCP server 生成不依赖车在线。默认用占位设备串。
   const device = (args && args.device) || "viz-no-car";
   const p = spawn(process.execPath, [CLI, "serve", "--analysis", TARGET.analysis, "--device", device],
@@ -271,7 +359,7 @@ async function stageServeStart(args) {
   p.on("close", (code) => { pushServeLog(`[serve 进程退出 code=${code}]`); state.serveProc = null; });
   await sleep(1300);
   if (!state.serveProc) return { ok: false, error: `serve 启动即退出: ${state.serveLog.join(" ").slice(-240)}` };
-  return { ok: true, output: `serve 已启动（pid ${p.pid}，--device ${device}）\nMCP Server 就绪，工具面 31 tools 注册（broken 2 略过 + media 内置 4）\n${state.serveLog.slice(0, 6).join("\n")}` };
+  return { ok: true, output: `serve 已启动（pid ${p.pid}，--device ${device}）\nMCP Server 就绪，工具面 ${serveTools} tools 注册（active ${active} + media 内置 4）\n${state.serveLog.slice(0, 6).join("\n")}` };
 }
 function pushServeLog(s) {
   s.split("\n").filter(Boolean).slice(-20).forEach((l) => {
@@ -288,7 +376,7 @@ async function stageServeStop() {
 async function stageCarcheck() {
   const car = await requireCar();
   if (!car.ok) return { ok: false, error: car.error };
-  return { ok: true, output: `车在线 ${car.carIp}:5555 · model ${car.carModel}` };
+  return { ok: true, output: `设备在线 ${car.carIp} · model ${car.carModel}` };
 }
 async function stageInvoke(args) {
   const op = args.op || "";
@@ -296,21 +384,20 @@ async function stageInvoke(args) {
   const car = await requireCar();
   if (!car.ok) return { ok: false, error: car.error };
   const U = await currentUser(car.carIp);
-  const owner = `u${U}_a206`;
   const fdir = `/data/user/${U}/${EXEC_PKG}/files`;
   const reqId = `rt${Date.now()}`;
   writeFileSync(join(ROOT, "viz", ".cmd.json"),
     JSON.stringify({ reqId, op, args: args.args || {} }));
   const a = await adbRun(["push", join(ROOT, "viz", ".cmd.json"), "/data/local/tmp/__rt_cmd.json"]);
   if (!a.ok) return { ok: false, error: `adb push 失败: ${a.output.slice(-120)}` };
-  const b = await adbRun(["-s", `${car.carIp}:5555`, "shell",
-    `cp /data/local/tmp/__rt_cmd.json ${fdir}/imrpc/cmd.json && chown ${owner}:${owner} ${fdir}/imrpc/cmd.json && chmod 660 ${fdir}/imrpc/cmd.json && rm -f ${fdir}/imrpc/result.json`]);
+  const b = await adbRun(["-s", car.carIp, "shell",
+    `cp /data/local/tmp/__rt_cmd.json ${fdir}/imrpc/cmd.json && chmod 666 ${fdir}/imrpc/cmd.json && rm -f ${fdir}/imrpc/result.json`]);
   if (!b.ok) return { ok: false, error: "写入车端信箱失败" };
-  await adbRun(["-s", `${car.carIp}:5555`, "shell", "am start --user", U, "-n", `${EXEC_PKG}/${EXEC_ACT}`]);
+  await adbRun(["-s", car.carIp, "shell", "am start --user", U, "-n", `${EXEC_PKG}/${EXEC_ACT}`]);
   const t0 = Date.now();
   while (Date.now() - t0 < 9000) {
     await sleep(450);
-    const c = await adbRun(["-s", `${car.carIp}:5555`, "shell", `cat ${fdir}/imrpc/result.json 2>/dev/null`]);
+    const c = await adbRun(["-s", car.carIp, "shell", `cat ${fdir}/imrpc/result.json 2>/dev/null`]);
     const out = c.output.trim();
     if (out) return { ok: true, output: `invoke ${op} → ${out}` };
   }
@@ -450,12 +537,11 @@ createServer(async (req, res) => {
         for await (const c of req) body += c;
         const t = JSON.parse(body || "{}");
         if (t.analysis) {
-          TARGET.analysis = join(ROOT, String(t.analysis));
-          const stem = basename(TARGET.analysis, ".json").replace(/^analysis-/, "");
-          TARGET.registry = join(dirname(TARGET.analysis), `registry-${stem}.json`);
+          TARGET.analysis = resolve(PROJECT_ROOT, String(t.analysis));
+          TARGET.registry = registryForAnalysis(TARGET.analysis);
         }
-        if (t.src) TARGET.srcDir = String(t.src);
-        if (t.adapter) TARGET.adapter = String(t.adapter);
+        if (t.src) TARGET.srcDir = resolve(PROJECT_ROOT, String(t.src));
+        if (t.adapter) TARGET.adapter = resolve(PROJECT_ROOT, String(t.adapter));
       }
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({
@@ -463,6 +549,7 @@ createServer(async (req, res) => {
         registry: TARGET.registry.replace(/\\/g, "/"),
         srcDir: TARGET.srcDir.replace(/\\/g, "/"),
         adapter: TARGET.adapter.replace(/\\/g, "/"),
+        data: targetViewData(),
       }));
     }
     if (url.pathname === "/api/session" && req.method === "GET") {

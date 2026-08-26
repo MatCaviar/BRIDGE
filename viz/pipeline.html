@@ -516,7 +516,7 @@ function renderFlow(S) {
       "摸清输入形态 -> 枚举能力（id / params / status / mechanism）-> 写 description -> 产出 analysis.json -> 验证修正",
       ["skills/bridge-analyze/SKILL.md　（host agent 判断 ＋ 确定性校验器）"]),
     drop("n3", false),
-    n("n3", "③", "ledger", `<code>${(window.__PIPELINE_DATA__ && window.__PIPELINE_DATA__.sources && window.__PIPELINE_DATA__.sources.analysis) || "e2e/bridge-analysis.json"}</code> · 唯一真相源`,
+    n("n3", "③", "ledger", `<code>${(D.sources && D.sources.analysis) || "analysis.json"}</code> · 唯一真相源`,
       `<b class="cnt" data-count="${S.totalCaps}">0</b> capabilities（verified <b class="cnt" data-count="${S.verified}">0</b> · broken <b class="cnt" data-count="${S.broken}">0</b>）-- serve 字段 ＋ 车端机制字段，<b>一份产物双用</b>`),
     drop("n4", false),
     `<div class="forkbar" data-for="n4"></div>`,
@@ -528,11 +528,11 @@ function renderFlow(S) {
        <div class="fbranch">${n("n4a", "④", "projector", "甲 · serve 投影（本机 MCP Server）",
          `MCP 工具面 <b class="cnt" data-count="${S.serveTools}">0</b> tools ＝ 非broken <b class="cnt" data-count="${S.active}">0</b> ＋ media 内置四件（broken 略过）<br>` +
          `tools/call -> invoke -> adb push cmd.json -> 车端 imrpc 信箱 -> ExecutorActivity -> 轮询 result.json`,
-         ["node cli/bin/mcp-pipeline.js serve --analysis " + ((window.__PIPELINE_DATA__ && window.__PIPELINE_DATA__.sources && window.__PIPELINE_DATA__.sources.analysis) || "e2e/bridge-analysis.json") + " --device <车IP>:5555"])}</div>
+         ["node cli/bin/mcp-pipeline.js serve --analysis " + ((D.sources && D.sources.analysis) || "analysis.json") + " --device <serial>"])}</div>
        <div class="fbranch">${n("n4b", "④", "cardfile", "乙 · registry 生成（车端分派表）",
          `registry.json <b class="cnt" data-count="${reg ? reg.tools : 0}">0</b> tools（跳过 media_*/broken；机制字段投影）`,
-         ["node e2e/analysis-to-registry.mjs e2e/bridge-analysis.json bridge-executor/registries/registry.json",
-          "adb push bridge-executor/registries/registry.json /data/user/10/com.immotors.bridge.executor/files/registry.json"])}</div>
+          ["node e2e/analysis-to-registry.mjs <analysis.json> <registry.json>",
+           "adb push <registry.json> <executor-filesDir>/registry.json"])}</div>
      </div>`,
     `<div class="forkcols">
        <div class="fcell">${drop("n5", false)}</div>
@@ -541,7 +541,7 @@ function renderFlow(S) {
     `<div class="forkbar" data-for="n5"></div>`,
     drop("n5", true),
     n("n5", "⑤", "engine", "车端 bridge_executor · 按机制分派",
-      `com.immotors.bridge.executor · files/registry.json -- execmd <b class="cnt" data-count="${regMech.execmd ?? 0}">0</b> · carcontrol <b class="cnt" data-count="${regMech.carcontrol ?? 0}">0</b> · mapnav <b class="cnt" data-count="${regMech.mapnav ?? 0}">0</b> · media <b>内置</b>`),
+      `registry.json -- execmd <b class="cnt" data-count="${regMech.execmd ?? 0}">0</b> · carcontrol <b class="cnt" data-count="${regMech.carcontrol ?? 0}">0</b> · mapnav <b class="cnt" data-count="${regMech.mapnav ?? 0}">0</b> · media <b>内置</b>`),
     drop("n6", false),
     n("n6", "⑥", "gauge", "真实车机结果",
       `result.json <code>{reqId, ok, data}</code> -- 音量 / 音场 / 切歌 / 导航 / 座椅… 真实生效`),
@@ -559,11 +559,10 @@ function renderSteps(S) {
   $("steps").innerHTML = [
     st(1, "schema 校验", "validate-analysis.mjs：必填字段 / id 唯一 / params 类型 / 机制字段一致性",
       `PASS（${S.totalCaps} caps / ${S.active} active / serve ${S.serveTools}）`,
-      "node skills/bridge-analyze/validate-analysis.mjs " + ((window.__PIPELINE_DATA__ && window.__PIPELINE_DATA__.sources && window.__PIPELINE_DATA__.sources.analysis) || "e2e/bridge-analysis.json")),
+      "node skills/bridge-analyze/validate-analysis.mjs " + ((D.sources && D.sources.analysis) || "analysis.json")),
     st(2, "serve 加载", "serve 启动后工具数必须 ＝ 非broken ＋ media 四件", `当前：${S.serveTools} ＝ ${S.active} ＋ 4 ✓`),
-    st(3, "契约核对", "validate_aidl：registry 与 AIDL 契约（事务码 / typed-parcelable）核对",
-      null, "mcp-pipeline validate_aidl <registry.json> <aidlDir> <adapter> <types>"),
-    st(4, "实测", "invoke 逐工具实车调用：通过 -> verified / 不通 -> broken（结果回写）",
+    st(3, "契约核对", "逐项比对 registry / AIDL / manifest / adapter 的 methodName、service component、bindAction 与事务码；输出可审查证据"),
+    st(4, "实测", "invoke 路由成功只记 route_ok；观察到预期物理效果或可信状态回读后，才可提升为 verified",
       null, "mcp-pipeline invoke --op <id> --device <serial>"),
     st(5, "报告", "工具数 / 机制分布 / verified·probe·broken / 证据 / 下一步"),
   ].join("");
@@ -596,6 +595,7 @@ let fMech = "all", fStatus = "all", fQ = "";
 const allRows = [];
 
 function buildRows() {
+  allRows.length = 0;
   for (const c of D.capabilities) {
     allRows.push({ kind: "cap", id: c.id, mech: c.mechanism || "execmd", status: c.status || "probe",
                    safety: c.safetyLevel || "-", params: c.params || [], src: c.sourceRef || "", cap: c });
@@ -785,6 +785,10 @@ async function applyTargetFromUrl() {
     const r = await fetch("/api/target", { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ analysis: q2.get("analysis") || undefined, src: q2.get("src") || undefined, adapter: q2.get("adapter") || undefined }) });
     const t = await r.json();
+    if (t.data) {
+      Object.assign(D, t.data);
+      renderData();
+    }
     await fetch("/api/session/event", { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ cls: "st", msg: `　· 分析目标: ${(t.analysis || "").split("/").pop()} ｜ 被分析源码: ${(t.adapter || "").split("/").pop()} ｜ 契约面: ${(t.srcDir || "").split("/").slice(-2).join("/")}` }) });
   } catch (e) { /* 忽略 */ }
@@ -798,7 +802,7 @@ async function refreshServeChip() {
 }
 
 /* ---------- 渲染入口（置于所有 let/const 声明之后，避免暂时性死区） ---------- */
-function render() {
+function renderData() {
   const S = D.stats;
   $("ver-badge").textContent = "BRIDGE-" + (D.version || "");
   $("gen-at").textContent = (D.generatedAt || "").replace("T", " ").slice(0, 10);
@@ -820,7 +824,7 @@ function render() {
     m(S.totalCaps, "capabilities 总数"),
     m(S.verified, "verified", "ok"),
     m(S.broken, "broken（serve 略过）", "bad"),
-    m(S.serveTools, "serve 工具面（27＋4）", "gold"),
+    m(S.serveTools, `serve 工具面（${S.active}＋${S.serveTools - S.active}）`, "gold"),
     m(S.registryTools, "车端 registry tools"),
   ].join("");
   $("stats").querySelectorAll(".num[data-count]").forEach((el) => countUp(el, +el.dataset.count, 900));
@@ -831,6 +835,10 @@ function render() {
   renderSteps(S);
   renderPanels();
   renderTools();
+}
+
+function render() {
+  renderData();
 
   /* 可视化跟随：载入即订阅会话（skill 执行驱动；刷新不丢进度） */
   window.addEventListener("beforeunload", () => {
