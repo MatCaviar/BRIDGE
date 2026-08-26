@@ -6,12 +6,21 @@ android {
     namespace = "com.immotors.bridge.executor"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
-    signingConfigs {
-        create("bridgeDebug") {
-            storeFile = file("${rootProject.projectDir}/keystore/8797_platform.jks")
-            storePassword = "<KEYSTORE_PASSWORD>"
-            keyAlias = "8797"
-            keyPassword = "<KEYSTORE_PASSWORD>"
+    val bridgeKeystorePath = providers.gradleProperty("bridgeKeystore")
+        .orElse(providers.environmentVariable("BRIDGE_KEYSTORE"))
+        .orNull
+    val bridgeSigning = bridgeKeystorePath?.let { path ->
+        signingConfigs.create("bridge") {
+            storeFile = file(path)
+            storePassword = providers.gradleProperty("bridgeStorePassword")
+                .orElse(providers.environmentVariable("BRIDGE_KEYSTORE_PASSWORD"))
+                .orNull
+            keyAlias = providers.gradleProperty("bridgeKeyAlias")
+                .orElse(providers.environmentVariable("BRIDGE_KEY_ALIAS"))
+                .getOrElse("bridge")
+            keyPassword = providers.gradleProperty("bridgeKeyPassword")
+                .orElse(providers.environmentVariable("BRIDGE_KEY_PASSWORD"))
+                .orNull
             enableV1Signing = true
             enableV2Signing = true
         }
@@ -27,7 +36,7 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("bridgeDebug")
+            bridgeSigning?.let { signingConfig = it }
         }
     }
 
