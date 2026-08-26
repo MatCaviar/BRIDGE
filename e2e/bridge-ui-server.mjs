@@ -8,56 +8,31 @@
  * to click. It is app-agnostic: any app, any screen, driven by text labels. The LLM uses it like
  * a human: look at the screen (ui_dump) and tap what it sees (ui_tap_text).
  *
- * Device serial is auto-detected (car hotspot DNS = private-IP WLAN DNS) and re-validated on
- * every call (hotspot reconnects change the IP / adbd may restart). Override with env BRIDGE_DEVICE.
+ * Device serial is resolved from BRIDGE_DEVICE, one connected adb device, or the current hotspot route,
+ * and re-validated on every call. BRIDGE_ADB can select a non-default adb binary.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { spawn, execFileSync } from "child_process";
+import { spawn } from "child_process";
+import { discoverAdbDevice, isAdbDeviceOnline, resolveAdbBinary } from "./device-discovery.mjs";
 
-const ADB = process.platform === "win32" ? "adb.exe" : "adb";
+const ADB = resolveAdbBinary();
+const ANDROID_USER = process.env.BRIDGE_USER || "10";
 
 /** 动态探测车热点 IP(私有网段) — 热点重连 IP 会漂移, 不能写死 */
 let DEVICE = process.env.BRIDGE_DEVICE || "";
-function isPrivateIp(ip) {
-  const p = ip.split(".").map(Number);
-  if (p.length !== 4 || p.some((n) => Number.isNaN(n))) return false;
-  const [a, b] = p;
-  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-}
-function detectDevice() {
-  try {
-    const out = execFileSync("powershell.exe", [
-      "-NoProfile", "-Command",
-      "(Get-DnsClientServerAddress -AddressFamily IPv4 -InterfaceAlias 'WLAN' | Select-Object -First 1).ServerAddresses[0]",
-    ], { encoding: "utf8", timeout: 10000 });
-    const ip = out.trim();
-    if (isPrivateIp(ip)) {
-      const serial = `${ip}:5555`;
-      try { execFileSync(ADB, ["connect", serial], { timeout: 10000 }); } catch { /* next call retries */ }
-      return serial;
-    }
-  } catch { /* no hotspot */ }
-  return "";
-}
-function adbHas(serial) {
-  try {
-    const out = execFileSync(ADB, ["devices"], { encoding: "utf8", timeout: 8000 });
-    return out.split(/\r?\n/).some((l) => l.includes(serial) && l.includes("device") && !l.includes("offline"));
-  } catch { return false; }
-}
 function ensureDevice() {
   // 每次调用都验证: 缓存 IP 不在线(热点重连 IP 漂移/adbd 重启) → 强制重新探测
-  if (DEVICE && adbHas(DEVICE)) return DEVICE;
-  DEVICE = detectDevice();
+  if (DEVICE && isAdbDeviceOnline(DEVICE, ADB)) return DEVICE;
+  DEVICE = discoverAdbDevice(ADB)?.serial || "";
   return DEVICE;
 }
 
 function runAdb(args) {
   return new Promise((resolve, reject) => {
     const serial = ensureDevice();
-    if (!serial) return reject(new Error("no car hotspot (WLAN DNS not a device IP)"));
+    if (!serial) return reject(new Error("no unique adb device; connect one or set BRIDGE_DEVICE"));
     const p = spawn(ADB, ["-s", serial, ...args], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let out = "";
     p.stdout.on("data", (d) => (out += d.toString()));
@@ -183,7 +158,7 @@ server.registerTool(
     },
   },
   async ({ pkg, activity, uri, action, extras, display }) => {
-    let am = "am start --user 10";
+    let am = `am start --user ${ANDROID_USER}`;
     if (action) {
       am += ` -a ${action}`;
       if (uri) am += ` -d ${uri}`;
