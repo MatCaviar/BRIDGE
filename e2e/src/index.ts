@@ -14,10 +14,12 @@ import { createLLMClient } from "./llm/factory.js";
 import { run } from "./orchestrator.js";
 import * as logger from "./utils/logger.js";
 
+const E2E_ROOT = path.resolve(import.meta.dirname, "..");
+
 async function main(): Promise<void> {
   // Parse CLI args
   const args = process.argv.slice(2);
-  let configPath = path.resolve("config.yaml");
+  let configPath = path.join(E2E_ROOT, "config-cockpit.yaml");
 
   for (let i = 0; i < args.length; i++) {
     if ((args[i] === "--config" || args[i] === "-c") && args[i + 1]) {

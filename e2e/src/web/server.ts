@@ -19,13 +19,16 @@ import { createLLMClient } from "../llm/factory.js";
 import { runObservable } from "./observable.js";
 import type { DashboardEvent } from "./events.js";
 
+const E2E_ROOT = path.resolve(import.meta.dirname, "../..");
+const ASR_URL = process.env.BRIDGE_ASR_URL || "http://127.0.0.1:8765/asr";
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 function parseArgs(): { configPath: string; port: number } {
   const args = process.argv.slice(2);
-  let configPath = path.resolve("config-qwen.yaml");
+  let configPath = path.join(E2E_ROOT, "config-cockpit.yaml");
   let port = 3000;
 
   for (let i = 0; i < args.length; i++) {
@@ -160,7 +163,7 @@ app.post("/api/asr", express.raw({ type: "audio/*", limit: "50mb" }), async (req
   const audio = req.body as Buffer;
   if (!audio || audio.length < 100) { res.status(400).json({ error: "empty audio" }); return; }
   try {
-    const r = await fetch("http://127.0.0.1:8765/asr", {
+    const r = await fetch(ASR_URL, {
       method: "POST",
       headers: { "Content-Type": "audio/wav" },
       body: new Uint8Array(audio),
@@ -239,9 +242,9 @@ app.get("/api/events/:sessionId", (req, res) => {
 
 // Serve dashboard HTML
 app.get("/", (_req, res) => {
-  const htmlPath = path.resolve("dashboard/index.html");
+  const htmlPath = path.join(E2E_ROOT, "dashboard/index.html");
   if (!fs.existsSync(htmlPath)) {
-    res.status(500).send("dashboard/index.html not found. Run from mcp-gateway root.");
+    res.status(404).send("dashboard/index.html not found.");
     return;
   }
   res.sendFile(htmlPath);
@@ -249,9 +252,9 @@ app.get("/", (_req, res) => {
 
 // 座舱智能体 App (点阵动画 + 全量状态)
 app.get("/cockpit", (_req, res) => {
-  const cockpitPath = path.resolve("dashboard/cockpit.html");
+  const cockpitPath = path.join(E2E_ROOT, "dashboard/cockpit.html");
   if (!fs.existsSync(cockpitPath)) {
-    res.status(500).send("dashboard/cockpit.html not found. Run from mcp-gateway root.");
+    res.status(404).send("dashboard/cockpit.html not found.");
     return;
   }
   res.sendFile(cockpitPath);

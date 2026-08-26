@@ -12,12 +12,13 @@ mcp_servers:
     transport: stdio
     command: node
     # bridge-serve-wrapper: 动态探测热点 IP + 断线自愈(车热点 IP 每次重连会漂移); -- 后为 serve 实际参数
-    args: ["D:/IM/mcp-gateway/bridge-serve-wrapper.mjs", "--", "C:/Users/matca/.claude/plugins/cache/im-mcp-marketplace/im-mcp-codeagent/0.1.8/cli/bin/mcp-pipeline.js", "serve", "--analysis", "D:/IM/mcp-gateway/bridge-analysis.json", "--timeout", "20000"]
+    # 相对路径自动按本配置文件所在目录解析，可从任意工作目录启动。
+    args: ["bridge-serve-wrapper.mjs", "--", "../cli/bin/mcp-pipeline.js", "serve", "--analysis", "bridge-analysis.json", "--timeout", "20000"]
   - name: bridge-ui
     transport: stdio
     command: node
     # app 型能力: adb 驱动车机 UI (ui_launch/ui_dump/ui_tap_text/...), 任何 app 通用
-    args: ["D:/IM/mcp-gateway/bridge-ui-server.mjs"]
+    args: ["bridge-ui-server.mjs"]
 
 # 状态类 app 的 UI 同步: 工具执行成功后, 自动点击"当前状态"对应控件(走 app 交互路径刷新 UI, 无感)
 # arg_key = 从工具 args 取状态值; map = 状态值 -> 控件文本(bridge-ui ui_tap_text)
