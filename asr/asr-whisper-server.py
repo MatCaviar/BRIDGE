@@ -1,18 +1,30 @@
 """
 Local faster-whisper ASR server for the BRIDGE cockpit.
 POST /asr  (body = raw 16k-mono 16-bit PCM WAV) -> {"text": "...", "error": ""}
-No API key; no network at runtime (model cached under HF_HOME on D: on first run).
-Run:  D:/IM/asr-whisper/Scripts/python.exe D:/IM/asr-whisper-server.py
+No API key; the first run downloads the model, then reuses the local HF_HOME cache.
+Run from the repository root: python asr/asr-whisper-server.py
 """
 import os
 import time
+from pathlib import Path
 
-# Keep the model cache off the C: drive.
-os.environ.setdefault("HF_HOME", r"D:\IM\asr-whisper\hf-cache")
+def default_cache_root() -> Path:
+    if os.environ.get("BRIDGE_CACHE_DIR"):
+        return Path(os.environ["BRIDGE_CACHE_DIR"]).expanduser()
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "BRIDGE" / "cache"
+    if os.uname().sysname == "Darwin":
+        return Path.home() / "Library" / "Caches" / "BRIDGE"
+    return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "bridge"
+
+
+# Keep model data outside versioned plugin directories; HF_HOME remains the standard override.
+os.environ.setdefault("HF_HOME", str(default_cache_root() / "huggingface"))
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", os.environ["HF_HOME"])
-# huggingface.co is unreachable from CN networks (TLS reset via proxy) -> use the mirror.
-os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
-# Disable the Xet CAS backend (cas-server.xethub.hf.co is blocked/401 in CN) -> plain HTTPS via the mirror.
+# Optional regional mirror; otherwise preserve Hugging Face's standard endpoint.
+if os.environ.get("BRIDGE_HF_ENDPOINT"):
+    os.environ.setdefault("HF_ENDPOINT", os.environ["BRIDGE_HF_ENDPOINT"])
+# Plain HTTPS is more predictable across restricted networks; callers can override it.
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 import numpy as np
