@@ -90,7 +90,9 @@ const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, se
 const E2E_DIR = join(ROOT, "e2e");
 const E2E_BASE = (process.env.BRIDGE_E2E_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
 const E2E_TARGET = new URL(E2E_BASE);
-const gw = { proc: null, phase: "", starting: false, log: [], apiKey: "", needsKey: false };
+const gw = { proc: null, phase: "", starting: false, log: [], apiKey: "", needsKey: false,
+  // 自动端到端测试实时状态(cockpit 轮询渲染; 不写入管线会话日志, 管线页保持纯净)
+  tests: { running: false, total: 0, index: 0, current: "", results: [], updatedAt: 0 } };
 function gwLog(line) {
   gw.log.push(line);
   if (gw.log.length > 60) gw.log.splice(0, gw.log.length - 60);
@@ -215,6 +217,88 @@ async function ensureGateway() {
   gw.starting = true;
   bootstrapGateway(); // 后台执行, 阶段经 /api/e2e 与 /e2e 503 响应可见
   return { ok: false, starting: true, phase: gw.phase };
+}
+/** 单条端到端测试: 真实 LLM 回合, 判定 = 期望工具是否被选中(expect 为空则只记录) */
+async function runOneE2eTest(message, expect) {
+  const out = { message, expect: expect || "", called: [], final: "", pass: !expect };
+  try {
+    const r = await fetch(`${E2E_BASE}/api/run`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    const { sessionId } = await r.json();
+    if (!sessionId) throw new Error(String((await r.json().catch(() => ({}))).error || "no sessionId"));
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 90000);
+    const s = await fetch(`${E2E_BASE}/api/events/${sessionId}`, { signal: ac.signal });
+    const reader = s.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+        if (!dataLine) continue;
+        let ev;
+        try { ev = JSON.parse(dataLine.slice(6)); } catch { continue; }
+        if (ev.type === "tool_call_started" && ev.toolName) out.called.push(ev.toolName);
+        if (ev.type === "session_completed") out.final = String(ev.finalText || "");
+        if (ev.type === "session_error") out.final = "会话错误: " + String(ev.error || "");
+        if (ev.type === "session_completed" || ev.type === "session_error") {
+          clearTimeout(timer);
+          try { ac.abort(); } catch { /* already closed */ }
+          out.pass = !expect || out.called.includes(expect);
+          return out;
+        }
+      }
+    }
+    clearTimeout(timer);
+  } catch (e) {
+    out.final = "测试执行异常: " + String(e.message || e);
+  }
+  out.pass = !expect || (expect && out.called.includes(expect));
+  return out;
+}
+/** host codeagent 驱动的自动端到端测试: 顺序执行, 实时状态供 cockpit 展示(自动跟随逐轮),
+ * 判定 = LLM 是否选中期望工具(以发现问题为导向); 不写管线会话日志。 */
+async function runE2eTests(tests) {
+  gw.tests = { running: true, total: tests.length, index: 0, current: "", results: [], updatedAt: Date.now() };
+  state.showE2E = true; // 测试开始即把用户页面自动切到 cockpit, 逐轮实时观看
+  const finish = (result) => {
+    gw.tests.running = false;
+    gw.tests.updatedAt = Date.now();
+    return result;
+  };
+  if (!(await gwProbe())) {
+    ensureGateway();
+    for (let i = 0; i < 90 && !(await gwProbe()); i++) await sleep(1000);
+  }
+  if (!(await gwProbe())) {
+    const why = gw.needsKey ? "缺少 LLM API key — 页面会向用户询问, 补 key 后重试" : "网关未能启动(见后端日志)";
+    return finish({ ok: false, needsKey: gw.needsKey, error: why });
+  }
+  const results = [];
+  for (const [i, t] of tests.entries()) {
+    const expect = t.expectTool || "";
+    gw.tests.index = i + 1;
+    gw.tests.current = t.message;
+    gw.tests.updatedAt = Date.now();
+    const r = await runOneE2eTest(t.message, expect);
+    results.push(r);
+    gw.tests.results = results;
+    gw.tests.updatedAt = Date.now();
+  }
+  const passed = results.filter((r) => r.pass).length;
+  const failed = results.filter((r) => !r.pass);
+  return finish({
+    ok: true, pass: passed, total: results.length, results,
+    note: failed.length ? `未通过 ${failed.length} 条(期望工具未被选中 → 优化对应 description 后 POST /api/e2e/restart 重测)` : "全部通过",
+  });
 }
 /** 同源代理: /e2e/* → gateway(*)。HTML 响应注入 fetch/EventSource 前缀补丁, 让页面内
  *  的 /api/* 调用与 SSE 落回 /e2e/api/*; 其余(含 SSE 流)原样透传。 */
@@ -791,6 +875,28 @@ const handler = async (req, res) => {
         showE2E: state.showE2E === true,
       }));
     }
+    if (url.pathname === "/api/e2e/restart" && req.method === "POST") {
+      // host codeagent 优化 description 后重启网关, 使新生成的配置(含 system_prompt 工具清单)生效
+      if (gw.proc) { try { gw.proc.kill(); } catch (e) { /* already dead */ } gw.proc = null; }
+      gwLog("按请求重启网关(应用更新后的 analysis)");
+      ensureGateway();
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    if (url.pathname === "/api/e2e/test" && req.method === "POST") {
+      // 自动端到端测试(同步响应, 通常 1-2 分钟): 逐条实时写入 /api/session(n6), cockpit 自动跟随展示
+      let body = "";
+      for await (const c of req) body += c;
+      let tests = [];
+      try { tests = (JSON.parse(body || "{}").tests || []).filter((t) => t && t.message); } catch (e) { tests = []; }
+      if (!tests.length) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        return res.end(JSON.stringify({ ok: false, error: "tests 为空(需 [{message, expectTool}])" }));
+      }
+      const result = await runE2eTests(tests);
+      res.writeHead(result.ok ? 200 : 503, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify(result));
+    }
     if (url.pathname === "/api/e2e/show" && req.method === "POST") {
       state.showE2E = true;
       ensureGateway();
@@ -860,6 +966,11 @@ const handler = async (req, res) => {
       ensureGateway();
       let sub = url.pathname.replace(/^\/e2e/, "");
       if (!sub || sub === "/") sub = "/cockpit";
+      // 测试实时状态由本后端直接供给(cockpit 进度条轮询), 不转发网关
+      if (sub === "/api/tests") {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        return res.end(JSON.stringify(gw.tests));
+      }
       if (!(await gwProbe())) {
         res.writeHead(503, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
         res.end(JSON.stringify({ ok: false, starting: gw.starting, phase: gw.phase, log: gw.log.slice(-6) }));

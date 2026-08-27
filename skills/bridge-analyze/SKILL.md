@@ -143,11 +143,16 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 - 节点：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry / `n5` 车端部署·自检 / `n6` 实测
 - `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不写台本；`skipped`（如车离线）注明原因。
 
-**收尾 · 端到端自动演示（验证协议通过后必做 — 全自动，不让用户做任何操作）**：
+**收尾 · 自动端到端测试（验证协议通过后必做 — 全自动，不让用户做任何操作）**：
 
-1. `POST $BRIDGE_VIZ_URL/api/e2e` — 触发网关自动拉起（依赖安装/构建/配置生成/启动全自动，首次约 1 分钟）；轮询同一接口至 `gateway.ok`。若返回 `needsKey`：页面会向用户弹窗询问 LLM key，在最终报告中说明即可，不阻断其余步骤；
-2. `POST $BRIDGE_VIZ_URL/e2e/api/run`，body `{"message":"用一句话介绍你现在能控制哪些功能"}` — 真实走一轮 LLM↔工具链路（schema 注入 → 工具选择 → 无车机时如实报设备不可达）；把 sessionId 与最终回复摘要写进报告；
-3. `POST $BRIDGE_VIZ_URL/api/e2e/show` — 用户已打开的可视化页经后端信号**自动切换**到端到端视图（页面 1s 轮询，无需用户点击）。
+1. **由 analysis 通用构造测试集**（禁止写死任何 app/查询）：
+   - 模拟座舱用户语音指令，抽代表能力 4-8 个：每个 domain ≥1、每种 mechanism ≥1、含 1 个 readonly；
+   - 每条 query 取自该 capability `description` 里的触发场景（"用户说'X'"中的 X 原句）；description 无引号场景时，用 `<action> <object>` 组一个简短祈使句；
+   - **query 必须可直接执行**：描述里的参数占位符（X/N/数字等）替换为具体示例值（优先 enum 首值、次选描述中的示例值），有必填参数的能力其 query 必须带值——否则 LLM 会合理追问参数，属测试构造缺陷而非描述缺陷（实测教训）；
+   - `expectTool` = 该 capability id（判定预言：LLM 是否选中正确工具）；另加 1 条总览 query（"你现在能控制哪些功能"）不带 expectTool。
+2. `POST $BRIDGE_VIZ_URL/api/e2e/test` body `{"tests":[{"message":"…","expectTool":"<id>"},…]}` — 后端顺序执行真实 LLM↔工具回合并**同步返回逐条判定**（通常 1-2 分钟）。测试开始即自动把用户页面切到 cockpit：每轮会话自动跟随实时展示（模拟用户指令 → 思考 → 工具调用 → 回复），顶部进度条逐条 ✓/✗（悬停见期望 vs 实际选中）——**不写入管线日志，管线页保持纯净**。接口返回 `needsKey` 时页面向用户询问 key，报告说明即可。
+3. **以发现问题为导向，失败即自行优化**：某条 ✗（LLM 未选中期望工具）= 该 capability 描述区分度不足 → 改写其 description（触发场景更明确、与近义能力可区分），重新导出 function-schema，`POST $BRIDGE_VIZ_URL/api/e2e/restart`（网关按新 analysis 重建配置）后**仅重测失败项**；最多迭代 2 轮。执行类错误（如设备不可达）如实呈现在 cockpit，属环境问题则记录并说明，不算描述失败。
+4. 把通过率、发现的问题与修正记录写进报告。
 
 ## 产物去向
 

@@ -94,6 +94,15 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
 @media(max-width:900px){main{grid-template-columns:1fr}.right{display:none}}
+/* 自动端到端测试进度条(host codeagent 驱动, 逐条实时) */
+#agent-tests{margin:10px 12px 0;padding:9px 12px;border:1px solid rgba(64,136,235,.35);border-radius:12px;background:linear-gradient(135deg,rgba(64,136,235,.12),rgba(64,136,235,.04));animation:rise .35s ease}
+#agent-tests .athead{font-size:12px;color:#9cc4f5;letter-spacing:.06em}
+#agent-tests .athead b{color:#e8f2ff;font-family:Consolas,monospace}
+#agent-tests .atcur{font-size:12px;color:#c9d8ec;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#agent-tests .atrow{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+#agent-tests .atchip{font-family:Consolas,monospace;font-size:11px;padding:2px 8px;border-radius:999px;cursor:default;border:1px solid}
+#agent-tests .atchip.ok{color:#7bd88f;border-color:rgba(123,216,143,.45);background:rgba(123,216,143,.10)}
+#agent-tests .atchip.bad{color:#ff9d7a;border-color:rgba(255,157,122,.5);background:rgba(255,157,122,.10)}
 </style>
 </head>
 <body>
@@ -119,6 +128,7 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
   <main>
     <!-- LEFT: chat + command -->
     <div class="left glass">
+      <div id="agent-tests" hidden></div>
       <div id="chat"></div>
       <div class="cmd">
         <button class="btn" id="mic-btn" title="语音输入：说“调音量到20”“切歌”“切换到K歌房”" aria-label="语音输入">
@@ -434,6 +444,7 @@ async function health(){
 }
 async function runAgent(message){
   if(state.isRunning)return;state.isRunning=true;micBtn.disabled=sendBtn.disabled=true;
+  window.__userEngaged=true; // 用户亲自发言 — 停止自动跟随
   chip('chip-llm','busy','思考中');kv('st-voice','处理中','warn');
   addMsg('user',message);input.value='';
   try{
@@ -443,6 +454,46 @@ async function runAgent(message){
     connectSSE(sessionId);
   }catch(e){addMsg('agent','连接失败: '+e.message);reset();}
 }
+/* 自动跟随: host codeagent 驱动的端到端测试(/api/e2e/test)逐轮在页面实时呈现 —
+   用户一旦亲自发言即永久停止; 只跟随页面加载之后出现的新会话。 */
+window.__userEngaged=false;
+(function autoFollow(){
+  let baseline=null,lastId=null;
+  setInterval(async()=>{
+    if(window.__userEngaged||state.es||state.isRunning)return;
+    try{
+      const r=await fetch('/api/sessions',{cache:'no-store'});if(!r.ok)return;
+      const d=await r.json();const top=(d.sessions||[])[0];if(!top)return;
+      if(baseline===null){baseline=top.id;return;}
+      if(top.id===baseline||top.id===lastId)return;
+      lastId=top.id;
+      state.sessionId=top.id;state.isRunning=true;micBtn.disabled=sendBtn.disabled=true;
+      addMsg('user',top.message||'(agent 测试回合)');
+      connectSSE(top.id);
+    }catch(e){/* 网关未启动等 — 静默 */}
+  },2500);
+})();
+/* 自动端到端测试进度条: 轮询 viz 后端测试状态(逐条 ✓/✗, 期望 vs 实际选中) — 以发现问题为导向 */
+(function agentTests(){
+  const el=document.getElementById('agent-tests');
+  if(!el)return;
+  let lastKey='';
+  setInterval(async()=>{
+    try{
+      const r=await fetch('/api/tests',{cache:'no-store'});if(!r.ok)return;
+      const t=await r.json();
+      const key=JSON.stringify([t.running,t.total,t.index,t.results.length]);
+      if(!t.total||key===lastKey)return;
+      lastKey=key;
+      const chips=(t.results||[]).map((x,i)=>`<span class="atchip ${x.pass?'ok':'bad'}" title="期望: ${x.expect||'(总览)'}&#10;选中: ${x.called.join(',')||'无'}&#10;${String(x.final||'').slice(0,80).replace(/"/g,'&quot;')}">${i+1} ${x.pass?'✓':'✗'}</span>`).join('');
+      const done=(t.results||[]).filter(x=>x.pass).length;
+      el.hidden=false;
+      el.innerHTML=`<div class="athead">${t.running?'⏩ 自动端到端测试':'■ 自动端到端测试'} <b>${t.running?t.index:(t.results||[]).length}/${t.total}</b>${t.running?'':' · 通过 '+done+'/'+t.total}</div>`+
+        (t.running&&t.current?`<div class="atcur">正在模拟: “${String(t.current).slice(0,40)}”</div>`:'')+
+        `<div class="atrow">${chips}</div>`;
+    }catch(e){/* 静默 */}
+  },1000);
+})();
 function connectSSE(sessionId){
   const es=new EventSource('/api/events/'+encodeURIComponent(sessionId));state.es=es;
   es.addEventListener('tools_discovered',e=>{const d=JSON.parse(e.data);renderRegistry(d.tools||[]);kv('st-tools',String((d.tools||[]).length),'ok');});
