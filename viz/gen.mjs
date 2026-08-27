@@ -99,6 +99,12 @@ if (registryJson) {
     present: true,
     tools: regTools.length,
     byMechanism: regByMech,
+    // 配对全景消费: 每个车端 registry 条目(与 capability/function schema 同 id 配对)
+    entries: regTools.map((t) => ({
+      id: t.id, mechanism: t.mechanism ?? "execmd", methodName: t.methodName ?? "",
+      pattern: t.pattern ?? "", dataClass: t.dataClass ?? null, form: t.form ?? "",
+      status: t.status ?? "probe", sourceRef: t.sourceRef ?? "",
+    })),
     missingFromRegistry: [...activeIds].filter((id) => !regIds.has(id)),
     extraInRegistry: [...regIds].filter((id) => !activeIds.has(id)),
   };
@@ -145,6 +151,15 @@ const payload = {
   capabilities: caps,
   mediaBuiltins: MEDIA_BUILTINS,
   registry,
+  // 交付物 · 上游 Agent function schema(注入 e2e LLM 的同一份) — 配对全景与交付清单消费
+  functionSchemaDeliverable: functionSchema
+    ? {
+        path: functionSchemaPath.split(sep).join("/"),
+        count: functionSchema.functions.length,
+        schemaVersion: functionSchema.schemaVersion ?? "",
+        functions: functionSchema.functions,
+      }
+    : null,
   probe,
 };
 

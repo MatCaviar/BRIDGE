@@ -385,9 +385,17 @@ function targetViewData() {
       present: registryTools.length > 0,
       tools: registryTools.length,
       byMechanism: registryByMechanism,
+      entries: registryTools.map((t) => ({
+        id: t.id, mechanism: t.mechanism ?? "execmd", methodName: t.methodName ?? "",
+        pattern: t.pattern ?? "", dataClass: t.dataClass ?? null, form: t.form ?? "",
+        status: t.status ?? "probe", sourceRef: t.sourceRef ?? "",
+      })),
       missingFromRegistry: [...activeIds].filter((id) => !registryIds.has(id)),
       extraInRegistry: [...registryIds].filter((id) => !activeIds.has(id)),
     },
+    functionSchemaDeliverable: functionSchemas.length
+      ? { path: TARGET.functionSchema.replace(/\\/g, "/"), count: functionSchemas.length, functions: functionSchemas }
+      : null,
     mediaBuiltins: MEDIA_BUILTINS,
     probe: { present: false },
   };

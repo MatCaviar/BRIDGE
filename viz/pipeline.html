@@ -285,6 +285,82 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
   #e2e-overlay{position:fixed;inset:0;z-index:50;background:var(--bg)}
   #e2e-overlay[hidden]{display:none}
   #e2e-frame{width:100%;height:100%;border:0;background:#fff}
+  /* ===== PART 06 交付物 · 配对全景 ===== */
+  .dl-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(238px,1fr)); gap:.9rem; margin-bottom:1.05rem; }
+  .dl-card { position:relative; overflow:hidden; background:linear-gradient(160deg,#fff 55%,#f3f8ff 100%);
+    border:1px solid var(--n200); border-radius:11px; padding:.92rem 1.02rem .8rem;
+    opacity:0; transform:translateY(14px); filter:blur(4px);
+    animation:dl-in .55s cubic-bezier(.22,.8,.32,1) forwards;
+    transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+  .dl-card:hover { transform:translateY(-3px); box-shadow:0 10px 26px -12px rgba(64,136,235,.38); border-color:var(--primary-200); }
+  .dl-card::after { content:""; position:absolute; top:0; left:-70%; width:45%; height:100%;
+    background:linear-gradient(105deg,transparent,rgba(64,136,235,.12),transparent);
+    transform:skewX(-18deg); transition:left .65s ease; pointer-events:none; }
+  .dl-card:hover::after { left:125%; }
+  .dl-card .dl-role { font-size:.72rem; letter-spacing:.14em; color:var(--primary-600); font-weight:700; }
+  .dl-card .dl-name { font-family:var(--mono); font-size:.82rem; color:var(--t2); margin:.18rem 0 .3rem; word-break:break-all; }
+  .dl-card .dl-num { font-size:1.5rem; font-weight:700; color:var(--primary-700); line-height:1.2; }
+  .dl-card .dl-num small { font-size:.76rem; color:var(--t3); font-weight:500; margin-left:.28rem; }
+  .dl-card .dl-note { font-size:.74rem; color:var(--t3); margin-top:.12rem; line-height:1.5; }
+  .dl-card.missing { opacity:.9; filter:none; transform:none; background:var(--n50); }
+  .dl-card.missing .dl-num { color:var(--n400); }
+  @keyframes dl-in { to { opacity:1; transform:none; filter:none; } }
+
+  .pair-wrap { display:grid; grid-template-columns:222px minmax(0,1fr); gap:1rem; border:1px solid var(--primary-100);
+    background:linear-gradient(180deg,#fbfdff,#f6faff); border-radius:12px; padding:.9rem; outline:none;
+    transition:border-color .25s, box-shadow .25s; }
+  .pair-wrap:focus-within { border-color:var(--primary-200); box-shadow:0 0 0 4px rgba(64,136,235,.08); }
+  .pair-side { display:flex; flex-direction:column; gap:.55rem; min-width:0; }
+  #pair-search { border:1px solid var(--n200); border-radius:8px; padding:.45rem .7rem; font-size:.84rem;
+    font-family:var(--sans); color:var(--t1); background:#fff; outline:none; transition:border-color .2s, box-shadow .2s; }
+  #pair-search:focus { border-color:var(--primary-200); box-shadow:0 0 0 3px rgba(64,136,235,.13); }
+  .pair-list { flex:1; overflow-y:auto; max-height:432px; border:1px solid var(--n200); border-radius:8px; background:#fff; }
+  .pair-item { position:relative; padding:.48rem .7rem .48rem .95rem; font-size:.82rem; cursor:pointer; color:var(--t2);
+    font-family:var(--mono); border-bottom:1px solid var(--n100);
+    transition:background .18s, color .18s, padding-left .18s; }
+  .pair-item::before { content:""; position:absolute; left:0; top:22%; bottom:22%; width:3px; border-radius:3px;
+    background:var(--primary-500); transform:scaleY(0); transition:transform .22s cubic-bezier(.22,.8,.32,1); }
+  .pair-item:hover { background:var(--primary-50); color:var(--t1); padding-left:1.05rem; }
+  .pair-item.on { background:var(--primary-50); color:var(--primary-900); font-weight:600; }
+  .pair-item.on::before { transform:scaleY(1); }
+  .pi-st { float:right; font-size:.66rem; padding:0 .38rem; border-radius:5px; border-width:1px; border-style:solid; }
+  .pair-kbd { font-size:.7rem; color:var(--t3); text-align:center; letter-spacing:.05em; }
+
+  .pair-stage { position:relative; min-width:0; }
+  .pair-links { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; z-index:1; }
+  .pair-cols { position:relative; z-index:2; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1.7rem; }
+  .pcol { background:#fff; border:1px solid var(--n200); border-radius:11px; padding:.82rem .9rem; min-height:236px;
+    box-shadow:0 3px 14px -8px rgba(26,54,93,.2); animation:dl-in .5s cubic-bezier(.22,.8,.32,1) both; }
+  .pcol h4 { font-size:.78rem; color:var(--primary-700); font-weight:700; display:flex; align-items:center; gap:.42rem;
+    margin-bottom:.5rem; letter-spacing:.02em; }
+  .pcol h4 .dot { width:8px; height:8px; border-radius:50%; background:var(--primary-200);
+    box-shadow:0 0 0 3px rgba(64,136,235,.14); flex:none; }
+  .pcol .pid { font-family:var(--mono); font-size:.92rem; font-weight:600; color:var(--primary-900); word-break:break-all; }
+  .pcol .ptag { display:inline-block; font-size:.67rem; padding:.07rem .42rem; border-radius:5px; margin:.24rem .24rem 0 0;
+    border:1px solid var(--n200); color:var(--t2); background:var(--n50); }
+  .pcol .ptag.st-verified { color:var(--success); border-color:#c4e7cd; background:var(--success-50); }
+  .pcol .ptag.st-probe { color:var(--gold); border-color:#e6d5ae; background:#fdf9ef; }
+  .pcol .ptag.st-broken { color:var(--danger); border-color:#e7c4c4; background:var(--danger-50); }
+  .pcol .pdesc { font-size:.75rem; color:var(--t2); line-height:1.62; margin-top:.5rem; max-height:148px;
+    overflow-y:auto; padding-right:.2rem; scrollbar-width:thin; }
+  .pcol .pargs { margin-top:.5rem; font-size:.72rem; }
+  .pcol .pargs .ar { display:flex; gap:.4rem; padding:.15rem 0; border-bottom:1px dashed var(--n100); align-items:baseline; }
+  .pcol .pargs .ar b { font-family:var(--mono); font-weight:600; color:var(--t1); flex:none; }
+  .pcol .pargs .ar span { color:var(--t3); }
+  .pcol .pargs .ar .req { color:var(--danger); font-weight:700; flex:none; }
+  .pcol .pkv { font-size:.73rem; color:var(--t2); margin-top:.42rem; line-height:1.55; }
+  .pcol .pkv b { font-family:var(--mono); color:var(--t1); font-weight:600; }
+  .pcol.none { display:flex; align-items:center; justify-content:center; color:var(--t3); font-size:.78rem;
+    text-align:center; padding:1rem; border-style:dashed; background:transparent; box-shadow:none; }
+  .pcol.hl { border-color:var(--primary-200); box-shadow:0 6px 22px -10px rgba(64,136,235,.42); }
+  .pair-jump { margin-top:.55rem; font-size:.73rem; color:var(--primary-600); background:var(--primary-50);
+    border:1px solid var(--primary-100); border-radius:6px; padding:.22rem .62rem; cursor:pointer;
+    transition:background .2s, transform .2s, box-shadow .2s; }
+  .pair-jump:hover { background:var(--primary-100); transform:translateY(-1px); box-shadow:0 4px 10px -4px rgba(64,136,235,.4); }
+  @media (prefers-reduced-motion: reduce) {
+    .dl-card, .pcol, .pair-item, .pair-item::before { animation:none; transition:none; }
+    .dl-card, .pcol { opacity:1; transform:none; filter:none; }
+  }
 </style>
 </head>
 <body>
@@ -411,6 +487,24 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
+    </div>
+    <div class="section" id="deliverables">
+      <div class="section-header">
+        <span class="section-number">PART 06</span><span class="section-title">交付物 · 配对全景</span>
+        <span class="section-sub" id="dl-sub">同一能力的四重投影 — analysis ↔ function schema ↔ registry ↔ MCP 工具面</span>
+      </div>
+      <div class="dl-cards" id="dl-cards"></div>
+      <div class="pair-wrap" id="pair-wrap" tabindex="0" aria-label="交付物配对浏览器">
+        <div class="pair-side">
+          <input id="pair-search" placeholder="检索能力 id…" autocomplete="off">
+          <div class="pair-list" id="pair-list"></div>
+          <div class="pair-kbd">↑ ↓ 切换 · 点击选择</div>
+        </div>
+        <div class="pair-stage" id="pair-stage">
+          <svg class="pair-links" id="pair-links" aria-hidden="true"></svg>
+          <div class="pair-cols" id="pair-cols"></div>
+        </div>
+      </div>
     </div>
       </main>
     </div>
@@ -644,6 +738,7 @@ function detailHtml(r) {
     ${wire}
     <div class="sect">service 绑定</div><div class="kv">${kv("servicePackage", c.servicePackage)}${kv("serviceClass", c.serviceClass)}${kv("bindAction", c.bindAction)}</div>
     <div class="sect">溯源</div><div class="kv">${kv("sourceRef", c.sourceRef)}${kv("domain/object/action", [c.domain, c.object, c.action].filter(Boolean).join(" / "))}</div>
+    <button class="pair-jump" data-id="${esc(r.id)}">⇄ 在配对全景中查看</button>
   </td></tr>`;
 }
 
@@ -684,6 +779,18 @@ function renderTools() {
        <td class="psum">${esc(r.safety)}</td><td class="psum">${psum(r.params)}</td><td class="src">${esc(r.src)}</td>
      </tr>${r.expanded ? detailHtml(r) : ""}`).join("");
 
+  if (!pairJumpBound) {
+    pairJumpBound = true;
+    const tb = $("tbody");
+    if (tb) tb.addEventListener("click", (ev) => {
+      const b = ev.target.closest(".pair-jump");
+      if (!b) return;
+      ev.stopPropagation();
+      selectPair(b.dataset.id);
+      const sec = $("deliverables");
+      if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
   $("tbody").querySelectorAll("tr.row").forEach((tr) => {
     tr.onclick = () => {
       const r = allRows.find((x) => x.id === tr.dataset.id);
@@ -845,6 +952,192 @@ function renderStats() {
   }
 }
 
+/* ---------- PART 06 交付物 · 配对全景(通用: 数据驱动, 产物缺失优雅降级) ---------- */
+function fnDeliverableView() {
+  if (D.functionSchemaDeliverable && (D.functionSchemaDeliverable.functions || []).length)
+    return D.functionSchemaDeliverable;
+  if (Array.isArray(D.functionSchemas) && D.functionSchemas.length)
+    return { path: (D.sources && D.sources.functionSchema) || "", count: D.functionSchemas.length, functions: D.functionSchemas };
+  return null;
+}
+function regEntryMap() {
+  const m = new Map();
+  for (const t of (D.registry && D.registry.entries) || []) m.set(t.id, t);
+  return m;
+}
+let pairSel = null, pairQ = "", pairResizeBound = false, pairJumpBound = false;
+function pairEntries() {
+  const fnv = fnDeliverableView();
+  const fnMap = new Map((fnv ? fnv.functions : []).map((f) => [f.name, f]));
+  const regMap = regEntryMap();
+  return (D.capabilities || [])
+    .filter((c) => c.status !== "broken")
+    .map((c) => ({ cap: c, fn: fnMap.get(c.id) || null, reg: regMap.get(c.id) || null }));
+}
+function pairTag(v, cls) { return `<span class="ptag${cls ? " " + cls : ""}">${esc(v)}</span>`; }
+function pairArgsHtml(fn) {
+  const args = (fn && fn.arguments) || {};
+  const keys = Object.keys(args);
+  if (!keys.length) return "";
+  return `<div class="pargs">` + keys.map((k) => {
+    const a = args[k] || {};
+    const opt = a.options && a.options.length ? ` <span>(${a.options.length} 枚举)</span>` : "";
+    return `<div class="ar"><b>${esc(k)}</b>${a.required ? '<span class="req">*</span>' : ""}<span>:${esc(a.type || "?")}${opt}</span></div>`;
+  }).join("") + `</div>`;
+}
+function renderDeliverables() {
+  if (!$("deliverables")) return;
+  const fnv = fnDeliverableView();
+  const S = D.stats || {};
+  const card = (role, name, num, unit, note, missing, delay) =>
+    `<div class="dl-card${missing ? " missing" : ""}" style="animation-delay:${delay}ms">
+       <div class="dl-role">${esc(role)}</div><div class="dl-name">${esc(name)}</div>
+       <div class="dl-num" data-count="${num}">0<small>${esc(unit)}</small></div>
+       <div class="dl-note">${esc(note)}</div></div>`;
+  $("dl-cards").innerHTML = [
+    card("DELIVERABLE 01 · 唯一真相源", (D.sources && D.sources.analysis) || "analysis.json",
+      S.totalCaps ?? 0, "capabilities", "serve 字段 + 车端机制字段 — 全部下游产物的源头", false, 0),
+    card("DELIVERABLE 02 · 上游 Agent 注入面", (fnv && fnv.path) || "function-schema.json",
+      fnv ? fnv.count : 0, "functions",
+      fnv ? "注入 e2e LLM / 上游 Agent 的函数定义 — 即右侧配对第②列" : "待产出: mcp-pipeline schema --format bridge", !fnv, 90),
+    card("DELIVERABLE 03 · 车端执行 registry", (D.sources && D.sources.registry) || "registry.json",
+      S.registryTools ?? 0, "tools", "机制字段投影(analysis-to-registry) — 车端执行器消费", !(S.registryTools > 0), 180),
+    card("DELIVERABLE 04 · MCP 工具面", "serve tools/list 投影",
+      S.serveTools ?? 0, "tools", "非 broken capabilities + media 内置 4 — 与 ② 同源一致", false, 270),
+  ].join("");
+  const io = new IntersectionObserver((ents) => ents.forEach((en) => {
+    if (en.isIntersecting) {
+      en.target.querySelectorAll(".dl-num[data-count]").forEach((el) => countUp(el, +el.dataset.count, 800));
+      io.unobserve(en.target);
+    }
+  }), { threshold: 0.35 });
+  io.observe($("dl-cards"));
+  renderPairList();
+  if (!pairSel) { const e0 = pairEntries()[0]; if (e0) pairSel = e0.cap.id; }
+  renderPairCols();
+  requestAnimationFrame(() => requestAnimationFrame(drawPairLinks));
+  if (!pairResizeBound) {
+    pairResizeBound = true;
+    window.addEventListener("resize", () => drawPairLinks());
+  }
+}
+function renderPairList() {
+  const list = $("pair-list"); if (!list) return;
+  const q = pairQ.toLowerCase();
+  const rows = pairEntries().filter((e) => !q || e.cap.id.toLowerCase().includes(q));
+  list.innerHTML = rows.map((e) =>
+    `<div class="pair-item${e.cap.id === pairSel ? " on" : ""}" data-id="${esc(e.cap.id)}">${esc(e.cap.id)}
+       <span class="pi-st" style="color:${e.cap.status === "verified" ? "#3f7f55" : e.cap.status === "broken" ? "#9f5555" : "#c8a66c"}">${esc(e.cap.status || "probe")}</span></div>`).join("")
+    || `<div style="padding:.8rem;font-size:.78rem;color:var(--t3)">无匹配能力</div>`;
+  list.querySelectorAll(".pair-item").forEach((it) => {
+    it.onclick = () => selectPair(it.dataset.id);
+  });
+}
+function renderPairCols() {
+  const cols = $("pair-cols"); if (!cols) return;
+  const e = pairEntries().find((x) => x.cap.id === pairSel);
+  if (!e) { cols.innerHTML = `<div class="pcol none">选择左侧能力查看配对</div>`; return; }
+  const c = e.cap, f = e.fn, r = e.reg;
+  const stTag = (st) => pairTag(st, "st-" + st);
+  const html = [
+    `<div class="pcol" style="animation-delay:0ms">
+       <h4><span class="dot"></span>① analysis · 唯一真相源</h4>
+       <div class="pid">${esc(c.id)}</div>
+       <div>${stTag(c.status || "probe")}${pairTag(c.safetyLevel || "-")}${pairTag(c.mechanism || "execmd")}</div>
+       <div class="pkv"><b>${esc(c.sourceRef || "")}</b></div>
+       <div class="pkv">${(c.params || []).length} 参数 · ${esc(c.domain || "")}/${esc(c.object || "")}/${esc(c.action || "")}</div>
+       <div class="pdesc">${esc(c.description || "")}</div>
+     </div>`,
+    `<div class="pcol${f ? " hl" : ""}" style="animation-delay:90ms">
+       <h4><span class="dot"></span>② function-schema · 注入上游 Agent</h4>
+       ${f ? `<div class="pid">${esc(f.name)}</div>
+       <div>${pairTag((f.arguments && Object.keys(f.arguments).filter((k) => f.arguments[k].required).length || 0) + " 必填参数")}${pairTag("交付物 ✓")}</div>
+       ${pairArgsHtml(f)}
+       <div class="pdesc">${esc(f.description || "")}</div>`
+         : `<div class="pid">未导出</div><div class="pdesc">运行 mcp-pipeline schema --format bridge 生成后, 此处与①逐条配对呈现</div>`}
+     </div>`,
+    `<div class="pcol" style="animation-delay:180ms">
+       <h4><span class="dot"></span>③ registry · 车端执行</h4>
+       ${r ? `<div class="pid">${esc(r.id)}</div>
+       <div>${stTag(r.status || "probe")}${pairTag(r.mechanism || "execmd")}${pairTag(r.form || "")}</div>
+       <div class="pkv">methodName <b>${esc(r.methodName || "")}</b> · pattern <b>${esc(r.pattern || "")}</b>${r.dataClass ? ` · <b>${esc(r.dataClass)}</b>` : ""}</div>
+       <div class="pkv"><b>${esc(r.sourceRef || "")}</b></div>
+       <div class="pdesc">机制字段投影 — 交付给车端执行器/设备端同事</div>`
+         : `<div class="pid">未生成</div><div class="pdesc">运行 analysis-to-registry 生成后, 此处与①逐条配对呈现</div>`}
+     </div>`,
+    `<div class="pcol" style="animation-delay:270ms">
+       <h4><span class="dot"></span>④ MCP tools/list · serve 投影</h4>
+       <div class="pid">${esc(c.id)}</div>
+       <div>${pairTag("tool name = id")}${c.safetyLevel === "readonly" ? pairTag("readOnlyHint: true") : ""}</div>
+       <div class="pkv">inputSchema: <b>${(c.params || []).map((p) => p.name).join(" / ") || "(空)"}</b></div>
+       <div class="pdesc">运行时由 serve 从 ① 投影; e2e 网关 tools_discovered 与 ② 完全一致(四层校验)。</div>
+     </div>`,
+  ];
+  cols.innerHTML = html.join("");
+}
+function selectPair(id) {
+  pairSel = id;
+  renderPairList();
+  renderPairCols();
+  requestAnimationFrame(() => requestAnimationFrame(drawPairLinks));
+  const on = document.querySelector(".pair-item.on");
+  if (on) on.scrollIntoView({ block: "nearest" });
+}
+function drawPairLinks() {
+  const stage = $("pair-stage"), svg = $("pair-links");
+  if (!stage || !svg) return;
+  const sr = stage.getBoundingClientRect();
+  if (!sr.width) return;
+  svg.setAttribute("viewBox", `0 0 ${sr.width} ${sr.height}`);
+  svg.innerHTML = "";
+  const cols = [...$("pair-cols").children].filter((n) => n.classList.contains("pcol"));
+  if (cols.length < 4) return;
+  const anchor = (el, side) => {
+    const r = el.getBoundingClientRect();
+    return { x: (side === "r" ? r.right : r.left) - sr.left, y: r.top + Math.min(r.height * 0.38, 96) - sr.top };
+  };
+  const defs = [
+    { from: cols[0], to: cols[1], label: "schema 导出(确定性)" },
+    { from: cols[1], to: cols[3], label: "MCP tools/list 同源" },
+    { from: cols[0], to: cols[2], label: "to registry(机制投影)" },
+  ];
+  const NS = "http://www.w3.org/2000/svg";
+  defs.forEach((d, i) => {
+    const a = anchor(d.from, "r"), b = anchor(d.to, "l");
+    const mx = (a.x + b.x) / 2;
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`);
+    p.setAttribute("fill", "none"); p.setAttribute("stroke", "#4088eb");
+    p.setAttribute("stroke-width", "1.6"); p.setAttribute("opacity", "0.55");
+    p.style.strokeDasharray = "1200"; p.style.strokeDashoffset = "1200";
+    p.style.transition = `stroke-dashoffset .6s ${i * 0.12}s cubic-bezier(.22,.8,.32,1)`;
+    svg.appendChild(p);
+    requestAnimationFrame(() => { p.style.strokeDashoffset = "0"; });
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", (a.x + b.x) / 2); t.setAttribute("y", (a.y + b.y) / 2 - 7);
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", "10");
+    t.setAttribute("fill", "#2f5f99"); t.setAttribute("paint-order", "stroke");
+    t.setAttribute("stroke", "#f6faff"); t.setAttribute("stroke-width", "4");
+    t.textContent = d.label;
+    t.style.opacity = "0"; t.style.transition = `opacity .5s ${0.25 + i * 0.12}s`;
+    svg.appendChild(t);
+    requestAnimationFrame(() => { t.style.opacity = "0.92"; });
+  });
+}
+function bindPairInteractions() {
+  const wrap = $("pair-wrap"), si = $("pair-search");
+  if (si) si.oninput = () => { pairQ = si.value.trim(); renderPairList(); };
+  if (wrap) wrap.addEventListener("keydown", (ev) => {
+    if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+    ev.preventDefault();
+    const rows = pairEntries().filter((x) => !pairQ || x.cap.id.toLowerCase().includes(pairQ.toLowerCase()));
+    if (!rows.length) return;
+    const idx = rows.findIndex((x) => x.cap.id === pairSel);
+    const next = rows[Math.max(0, Math.min(rows.length - 1, idx + (ev.key === "ArrowDown" ? 1 : -1)))];
+    if (next) selectPair(next.cap.id);
+  });
+}
+
 /* ---------- 渲染入口（置于所有 let/const 声明之后，避免暂时性死区） ---------- */
 function renderData() {
   const S = D.stats;
@@ -868,6 +1161,8 @@ function renderData() {
   renderSteps(S);
   renderPanels();
   renderTools();
+  renderDeliverables();
+  bindPairInteractions();
 }
 
 function render() {
