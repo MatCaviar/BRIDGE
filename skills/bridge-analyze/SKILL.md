@@ -1,13 +1,13 @@
 ---
 name: bridge-analyze
-description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力调用 schema(analysis.json)。用于 host codeagent: 自主分析一个应用, 产出可被 MCP serve 直接投影给 LLM agent 的工具 schema, 并完成验证。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。'
+description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 可调能力全链路交付: analysis.json(唯一真相源) + function-schema.json(上游注入) + 可选 registry/app wire + 全程可视化 + 收尾自动端到端测试。host codeagent 自主分析一个应用并自证有效。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。'
 ---
 
 > 🌐 默认用中文与用户交互和输出；代码/命令/标识符/文件名保持英文。
 
 # bridge-analyze — 应用 → 上游 Agent 能力调用 Schema
 
-本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出 `analysis.json`（唯一真相源）和 `function-schema.json`（直接交给上游 Agent 的函数定义），并自主完成验证。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
+本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出一套可评审的交付 bundle —— `analysis.json`（唯一真相源）、`function-schema.json`（上游 Agent 函数定义）、可选 `registry.json`（车端执行器）/ app 侧 wire 配置，全程可视化跟随，并以自动端到端测试收尾（发现的问题自行优化）。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
 
 ## 输入 → 输出契约
 
@@ -17,7 +17,12 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 - APK / 安装包（可逆向：dex、manifest、resources）
 - 运行环境（adb 设备、日志、行为观察）
 
-**输出**：`analysis.json` + `function-schema.json`（均必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
+**输出**（产物目录建议 `<输入目录>/.mcp-pipeline/<app>/`，与套件管线状态目录一致）：
+- `analysis.json` — 唯一真相源（**必须**）
+- `function-schema.json` — 上游 Agent 函数定义，由 CLI 从 analysis 确定性导出（**必须**）
+- `registry.json` — 车端执行器 registry，mechanism 字段投影（可选）
+- **app 侧 wire 配置**（如 `rpc/config.json`）— 目标 app 自带配置驱动执行端（如通用 RpcEngine 单入口页）时，按其配置格式把全部能力落成可执行 wire，随 analysis 同步演进（可选，适用即做）
+- 全程可视化跟随 + 收尾自动端到端测试 — 流程的组成部分，不是可选装饰（见对应章节）
 - Agent schema 投影：`capabilities[].id/description/params/status` → `function-schema.json` 的 `name/arguments/options/description`；同一语义也由 MCP `tools/list` 以标准 JSON Schema 注入上游 Agent
 - 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
 - 先把本 `SKILL.md` 所在目录解析为绝对路径 `<skill目录>`，再把其 `../..` 解析为 `<套件根>`（仓库根：`cli/e2e/...`）。所有套件命令都使用这两个绝对路径，不依赖用户当前工作目录。CLI：`node "<套件根>/cli/bin/mcp-pipeline.js" <subcmd>`（`schema`/`serve`/`invoke`）；analysis 校验只使用 `<skill目录>/validate-analysis.mjs`。
@@ -115,13 +120,16 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 - **离线/云端依赖**: 车/设备无外网时云搜索/云服务不可用 — 依赖坐标/云查询的能力需兜底方案(内置字典/联网 geocode), description 注明。
 - **标识符对不上**: 服务的真实 functionId/命令名可能与 SDK 常量/文档不同 — 以服务端注册表(handler/路由)为准。
 
-## 流程（自主编排, 不必照抄顺序）
+## 流程（端到端总览 — 步骤可并行/重排，验证协议与收尾测试不可省）
 
 1. 摸清输入形态 → 定位对外能力面(manifest/AIDL/服务/页面/媒体/functionId 清单)
 2. 枚举能力 → 逐项定 id/params/status/mechanism
 3. 写 description(触发场景模板)
-4. 产出 analysis.json，并由 CLI 确定性导出 function-schema.json（及可选 registry）
-5. 执行验证协议 → 修正 → 报告
+4. 产出 analysis.json → CLI 确定性导出 function-schema.json（+ 可选 registry / app 侧 wire 配置）
+5. 执行验证协议(七步) → 修正
+6. 可视化跟随(--open 自动开浏览器, 会话上报实时点亮；见「可视化同步」)
+7. 收尾自动端到端测试(全量套件, 失败自行优化；见「收尾」)
+8. 报告(验证证据 + 测试通过率与覆盖统计 + 下一步)
 
 ## 可视化同步（适配层，默认开启；不影响执行流程）
 
@@ -158,4 +166,4 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 ## 产物去向
 
-`function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope；机制字段经 `analysis-to-registry` 生成车端 registry。
+`function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope（收尾自动测试验证的正是这条注入链）；机制字段经 `analysis-to-registry` 生成车端 registry；app 侧 wire 配置（如适用）部署到目标 app 执行端即可驱动真机。全部产物的配对关系在可视化页「配对矩阵」中呈现与核对。
