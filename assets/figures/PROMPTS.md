@@ -24,9 +24,13 @@ Create a full-width 16:9 internal implementation cutaway for BRIDGE. Match the b
 
 Three tall panels cover health-aware device routing, schema-grounded execution, and evidence review. A bottom recovery loop turns broken outcomes into repair, re-test, and release.
 
+The Simplified Chinese edition is localized directly from the selected English master. All vehicles, benches, cockpit screenshots, mascots, cards, connectors, shadows, spacing, and proportions are retained; only the English label areas are replaced with Chinese KaiTi typography. Technical identifiers such as `BRIDGE`, `Schema`, `MCP`, `CAN`, `UI`, and JSON code remain unchanged where appropriate.
+
 ## Figure 5 — BRIDGE Capability Flywheel
 
 Source knowledge bootstraps `analysis.json`, `function-schema.json`, and `registry.json`; a six-stage loop then extracts capabilities, projects schemas, tests Agent injection, records real-device trajectories, judges evidence, and refines the contract.
+
+The Simplified Chinese edition uses the English master as the immutable visual base and changes only label text. The source panel, contract scroll, capability pool, six flywheel sectors, central robot-and-runtime composition, cockpit rig, and unbranded test vehicles therefore remain visually identical between languages.
 
 ## Deliverables
 
