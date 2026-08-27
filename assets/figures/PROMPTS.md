@@ -10,9 +10,15 @@ Cockpit screens retain the dimensional illustration style of the surrounding har
 
 Universal inputs enter BRIDGE Analyze. The resulting `function-schema.json` is visibly injected into the upstream Agent, whose MCP call passes through the server and executor to a real device. GUI fallback and safety approval remain explicit secondary paths.
 
-## Figure 3 — BRIDGE Infrastructure
+## Figure 3 — BRIDGE Implementation Architecture
 
-A four-quadrant systems view connects scalable app inputs, a portable runtime, the hybrid function/GUI action space, and the three projections of one analysis contract: Agent function schema, runtime registry, and MCP configuration.
+Figure 3 is deliberately an internal implementation cutaway rather than another execution overview. The `bridge-analyze` plugin feeds a dominant canonical `analysis.json` capability IR. Its Agent-facing fields (`id`, `description`, `params`, safety) and execution-facing fields (`status`, `sourceRef`, mechanism, route) drive five deterministic projections: `function-schema.json`, MCP `tools/list`, OpenAI tools, Anthropic tools, and `registry.json`.
+
+Below the contract, `mcp-pipeline schema / serve / invoke` form the host runtime. The ADB `cmd.json ↔ result.json` mailbox joins it to the generic `Bridge Executor`, whose external registry selects AIDL, execmd, Intent, media, mapnav, or carcontrol adapters. A cross-cutting rail represents live visualization, schema injection checks, contract tests, invoke tests, and E2E smoke tests. Upstream-Agent dialogue, app inputs, real vehicles, cockpit UI, GUI fallback, and safety approval are intentionally absent because Figure 2 already owns that end-to-end narrative.
+
+### Figure 3 final ImageGen prompt
+
+Create a full-width 16:9 internal implementation cutaway for BRIDGE. Match the bright Qwen UI-Agent-inspired academic material language of the other BRIDGE figures: off-white canvas, heavy clean charcoal outlines, softly raised white and lavender cards, violet/blue connectors, shallow pseudo-3D technical props, soft studio contact shadows, generous whitespace, and no dark background. Use a central contract motherboard composition: a language-neutral canonical layered dossier in the center; a compact plugin-analysis workstation and three analyzer modules on the left; five schema/registry projection cards plugged into the right; two lower runtime chassis for the host CLI and vehicle executor; a raised two-document ADB mailbox between them; six clean mechanism sockets in the vehicle chassis; and a thin observability/test bus across the bottom. This must look like an implementation architecture, not a sequential task flow. Do not show universal input files, an upstream chatbot, a real car, cockpit UI, GUI fallback, safety approval, phone, logo, watermark, or pseudo-text. Leave a large blank header and clean blank label plates for deterministic localization.
 
 ## Figure 4 — BRIDGE Real-Device Runtime
 
@@ -24,8 +30,10 @@ Source knowledge bootstraps `analysis.json`, `function-schema.json`, and `regist
 
 ## Deliverables
 
-- `imagegen-masters/*.en-imagegen.png`: original English ImageGen raster masters, preserved unchanged.
-- `imagegen-masters/*.zh-CN-imagegen.png`: original Simplified Chinese ImageGen raster masters with KaiTi-style Chinese typography, preserved unchanged.
+- `imagegen-masters/*.en-imagegen.png`: English raster masters based on the selected ImageGen compositions.
+- `imagegen-masters/*.zh-CN-imagegen.png`: Simplified Chinese raster masters with KaiTi-style Chinese typography, based on the selected ImageGen compositions.
+- `imagegen-masters/bridge-figure-3-infrastructure-implementation-base-imagegen.png`: selected language-neutral Figure 3 ImageGen mother image before deterministic labels.
+- `imagegen-masters/bridge-figure-3-infrastructure-concept-a-imagegen.png`: retained alternate Figure 3 implementation-architecture concept.
 - `*.en.png` and `*.zh-CN.png`: explicit English and Simplified Chinese raster editions.
 - Unsuffixed `.png`: the English edition used as the default report/slide asset.
 - `*.en.svg` and `*.zh-CN.svg`: self-contained, full-color vector-path reproductions generated at 8-bit color precision, zero speckle filtering, one-level color separation, and no spline simplification. The SVGs contain paths rather than embedded raster images, so the Chinese edition does not depend on local font installation.
