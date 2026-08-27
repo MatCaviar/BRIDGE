@@ -62,6 +62,7 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 .round-h .rm{font-style:italic;font-size:.66rem;letter-spacing:.05em;text-transform:none;color:#7d92b5}
 .round-h.pending .rn{animation:tpulse 1.2s ease-in-out infinite}
 .round-t{font-size:.82rem;color:#c9d8ea;white-space:pre-wrap;word-break:break-word;line-height:1.52;margin:.05rem 0 .05rem .15rem}
+.round-body{display:flex;flex-direction:column;gap:.3rem;margin:.1rem 0 .1rem 1.05rem}
 .round-m{font-size:.62rem;color:var(--text-dim);font-family:var(--mono,monospace);margin-left:.15rem;opacity:.85}
 .toolrow{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-size:.76rem;padding:.05rem 0 .05rem .15rem}
 .toolrow .tname{font-family:var(--mono,monospace);font-weight:600;color:#a9c0e0;letter-spacing:.03em}
@@ -467,10 +468,12 @@ function mkRound(turn,model){
   h.appendChild(ic);h.appendChild(rn);h.appendChild(rm);
   const t=document.createElement('div');t.className='round-t';t.style.display='none';
   const m=document.createElement('div');m.className='round-m';m.style.display='none';
+  const body=document.createElement('div');body.className='round-body';
   const wrap=document.createElement('div');
-  wrap.appendChild(h);wrap.appendChild(t);wrap.appendChild(m);
+  wrap.appendChild(h);wrap.appendChild(t);wrap.appendChild(m);wrap.appendChild(body);
   ensureThread().appendChild(wrap);chat.scrollTop=chat.scrollHeight;
-  return {wrap,h,t,m};
+  state.currentRoundBody=body;
+  return {wrap,h,t,m,body};
 }
 function fillRound(d){
   const r=state.roundR;if(!r)return;r.h.classList.remove('pending');
@@ -501,7 +504,7 @@ function mkToolBlk(turn,name,args){
   raw.appendChild(rsum);
   const pre=document.createElement('pre');pre.textContent='args: '+JSON.stringify(args??{},null,1);raw.appendChild(pre);
   row.appendChild(raw);
-  ensureThread().appendChild(row);chat.scrollTop=chat.scrollHeight;return row;
+  (state.currentRoundBody||ensureThread()).appendChild(row);chat.scrollTop=chat.scrollHeight;return row;
 }
 function parseResult(txt){
   const t=String(txt??'').trim();
@@ -611,7 +614,7 @@ function connectSSE(sessionId){
   es.addEventListener('turn_started',e=>{const d=JSON.parse(e.data);kv('st-turns',String(d.turn));});
   es.addEventListener('session_completed',e=>{const d=JSON.parse(e.data);if(state.roundR){state.roundR.wrap.remove();state.roundR=null;}
     if(state.lastRoundWrap&&state.lastRoundText&&(state.lastRoundText.trim()===(d.finalText||'').trim()))state.lastRoundWrap.remove();
-    state.threadEl=null;addMsg('agent','\u{1F54A} '+(d.finalText||'完成'));chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
+    state.threadEl=null;state.currentRoundBody=null;addMsg('agent','\u{1F54A} '+(d.finalText||'完成'));chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
   es.addEventListener('session_error',e=>{const d=JSON.parse(e.data);addMsg('agent','会话错误: '+d.error);bg('error',2500);es.close();reset();});
   es.onerror=()=>{es.close();reset();};
 }
