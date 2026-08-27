@@ -55,38 +55,31 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 .msg.agent{align-self:flex-start;background:rgba(255,255,255,.05);border:1px solid var(--line)}
 .msg .mtime{display:block;font-size:10px;color:var(--text-faint);margin-top:4px}
 .msg.thinking{color:var(--text-dim);font-style:italic}
-/* ── LLM 多轮全量展示 ── */
-.msg.round{border-left:2px solid rgba(130,182,230,.55);background:rgba(130,182,230,.05);padding:.4rem .7rem;border-radius:0 8px 8px 0;max-width:92%;opacity:.92}
-.msg.round.empty{padding:.12rem .7rem;background:transparent;border-left-color:rgba(130,182,230,.25)}
-.msg.round.empty .rtext,.msg.round.empty .rmeta{display:none}
-.msg.round.empty .rbadge{margin-bottom:0;border-color:rgba(143,165,200,.18);color:rgba(143,165,200,.6)}
-.msg.round .rbadge{display:inline-flex;align-items:baseline;gap:7px;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#8fa5c8;border:1px solid rgba(143,165,200,.32);border-radius:3px;padding:2px 9px 2px 8px;margin-bottom:.35rem;background:transparent;font-variant-numeric:tabular-nums}
-.msg.round .rbadge .rn{font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:0;color:#b7c9e4;line-height:1}
-.msg.round .rbadge .rm{letter-spacing:.06em;font-style:italic;text-transform:none;color:#7d92b5;font-size:10px}
-.msg.round .rtext{white-space:pre-wrap;word-break:break-word;font-size:.84rem;color:#c9d8ea;line-height:1.5}
-.msg.round .rmeta{font-size:.66rem;color:var(--text-dim);margin-top:.22rem;font-family:var(--mono,monospace);opacity:.85}
-.msg.round.pending .rtext{color:var(--text-dim);font-style:italic}
-.tblk{margin:.3rem 0 .3rem .9rem;border:1px solid rgba(130,182,230,.25);border-left-width:3px;border-radius:8px;overflow:hidden;font-size:.76rem;max-width:100%;background:rgba(130,182,230,.05)}
-.tblk.run{border-left-color:#e0c38a}.tblk.ok{border-left-color:#5ad07e}.tblk.err{border-left-color:#e08a8a}
-.tblk .thead{padding:.35rem .6rem;display:flex;gap:.45rem;align-items:center;flex-wrap:wrap}
-.tblk .tname{font-weight:600;color:#a9c0e0;font-family:var(--mono,monospace);letter-spacing:.04em}
-.tblk .argchip{display:inline-flex;align-items:baseline;gap:4px;background:transparent;border:none;border-bottom:1px solid rgba(143,165,200,.28);border-radius:0;padding:0 2px 1px;line-height:normal}
-.tblk .argchip+.tblk .argchip,.tblk .argchip~.tblk .argchip{margin-left:2px}
-.tblk .thead .argchip{margin-right:8px}
-.tblk .argchip i{font-style:italic;color:#7d92b5;font-size:10px;letter-spacing:.02em}
-.tblk .argchip b{color:#dde9f7;font-weight:600;font-size:11.5px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
-.tblk .tstat{margin-left:auto;font-size:9.5px;white-space:nowrap;letter-spacing:.12em;text-transform:uppercase;font-family:var(--mono,monospace)}
-.tblk.run .tstat{color:#e0c38a;animation:tpulse 1.1s ease-in-out infinite}
-.tblk.ok .tstat{color:#5ad07e}.tblk.err .tstat{color:#e08a8a}
-@keyframes tpulse{50%{opacity:.45}}
-.tblk .tresult{padding:.3rem .6rem;border-top:1px dashed rgba(130,182,230,.18);white-space:pre-wrap;word-break:break-word;font-family:var(--mono,monospace);font-size:.72rem;max-height:180px;overflow-y:auto}
-.tblk.ok .tresult{color:#a9dfb8}.tblk.err .tresult{color:#efb3b3}
-.tblk .traw{border-top:1px dashed rgba(130,182,230,.18)}
-.tblk .traw summary{cursor:pointer;padding:.2rem .6rem;color:#7d9dbf;font-size:.66rem;user-select:none;list-style:none}
-.tblk .traw summary::-webkit-details-marker{display:none}
-.tblk .traw summary::before{content:'▸ ';}
-.tblk .traw[open] summary::before{content:'▾ ';}
-.tblk .traw pre{margin:.2rem .6rem .4rem;white-space:pre-wrap;word-break:break-all;color:var(--text-dim);font-size:.68rem;max-height:200px;overflow-y:auto;font-family:var(--mono,monospace)}
+/* ── LLM 多轮全量展示 · v3 左侧竖轨时间线(无气泡) ── */
+.thread{border-left:1px solid rgba(143,165,200,.28);margin:.45rem 0 .55rem .5rem;padding-left:.9rem;display:flex;flex-direction:column;gap:.42rem}
+.round-h{display:flex;align-items:baseline;gap:.5rem;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:#8fa5c8}
+.round-h .rn{font-size:.95rem;font-weight:600;letter-spacing:.02em;color:#c4d4ec;font-variant-numeric:tabular-nums}
+.round-h .rm{font-style:italic;font-size:.66rem;letter-spacing:.05em;text-transform:none;color:#7d92b5}
+.round-h.pending .rn{animation:tpulse 1.2s ease-in-out infinite}
+.round-t{font-size:.82rem;color:#c9d8ea;white-space:pre-wrap;word-break:break-word;line-height:1.52;margin:.05rem 0 .05rem .15rem}
+.round-m{font-size:.62rem;color:var(--text-dim);font-family:var(--mono,monospace);margin-left:.15rem;opacity:.85}
+.toolrow{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-size:.76rem;padding:.05rem 0 .05rem .15rem}
+.toolrow .tname{font-family:var(--mono,monospace);font-weight:600;color:#a9c0e0;letter-spacing:.03em}
+.toolrow .argchip{display:inline-flex;align-items:baseline;gap:4px;border-bottom:1px solid rgba(143,165,200,.28);padding:0 2px 1px;line-height:normal}
+.toolrow .argchip i{font-style:italic;color:#7d92b5;font-size:10px}
+.toolrow .argchip b{color:#dde9f7;font-weight:600;font-size:11.5px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.toolrow .tstat{margin-left:auto;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;font-family:var(--mono,monospace);color:#7d92b5;white-space:nowrap}
+.toolrow.run .tstat{animation:tpulse 1.1s ease-in-out infinite}
+.toolrow.ok .tstat{color:#8fbf9f}.toolrow.err .tstat{color:#d9a3a3}
+.toolrow .tresult{flex-basis:100%;font-family:var(--mono,monospace);font-size:.68rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;max-height:170px;overflow-y:auto;margin:.15rem 0 0 .15rem;border-left:1px dotted rgba(143,165,200,.3);padding-left:.55rem}
+.toolrow.err .tresult{color:#d9a3a3}
+.toolrow .traw{flex-basis:100%}
+.toolrow .traw summary{cursor:pointer;color:#5f7396;font-size:.64rem;user-select:none;list-style:none;letter-spacing:.06em}
+.toolrow .traw summary::-webkit-details-marker{display:none}
+.toolrow .traw summary::before{content:'▸ '}
+.toolrow .traw[open] summary::before{content:'▾ '}
+.toolrow .traw pre{margin:.15rem 0;white-space:pre-wrap;word-break:break-all;color:var(--text-dim);font-size:.66rem;max-height:200px;overflow-y:auto;font-family:var(--mono,monospace)}
+@keyframes tpulse{50%{opacity:.4}}
 /* command bar */
 .cmd{display:flex;gap:8px;padding:12px}
 .cmd input{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--text);font-size:13.5px;outline:none;transition:border .3s}
@@ -459,71 +452,77 @@ function addMsg(role,text){
   d.appendChild(t);d.appendChild(mt);chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
   return d;
 }
+function ensureThread(){
+  if(!state.threadEl){
+    const t=document.createElement('div');t.className='thread';
+    chat.appendChild(t);state.threadEl=t;
+  }
+  return state.threadEl;
+}
 function mkRound(turn,model){
-  const d=document.createElement('div');d.className='msg round pending';
-  const b=document.createElement('span');b.className='rbadge';
-  const ROMAN=['\u2160','\u2161','\u2162','\u2163','\u2164','\u2165','\u2166','\u2167','\u2168','\u2169'];
-  const rl=document.createElement('span');rl.textContent='Round';
-  const rn=document.createElement('span');rn.className='rn';rn.textContent=ROMAN[(turn-1)%10]||(turn??'?');
+  const h=document.createElement('div');h.className='round-h pending';
+  const ic=document.createElement('span');ic.textContent='\u{1F9F5}';
+  const rn=document.createElement('span');rn.className='rn';rn.textContent=String(turn??'?');
   const rm=document.createElement('span');rm.className='rm';rm.textContent=model;
-  b.appendChild(rl);b.appendChild(rn);b.appendChild(rm);
-  const t=document.createElement('div');t.className='rtext';t.textContent='思考中…';
-  const m=document.createElement('div');m.className='rmeta';
-  d.appendChild(b);d.appendChild(t);d.appendChild(m);chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
-  return d;
+  h.appendChild(ic);h.appendChild(rn);h.appendChild(rm);
+  const t=document.createElement('div');t.className='round-t';t.style.display='none';
+  const m=document.createElement('div');m.className='round-m';m.style.display='none';
+  const wrap=document.createElement('div');
+  wrap.appendChild(h);wrap.appendChild(t);wrap.appendChild(m);
+  ensureThread().appendChild(wrap);chat.scrollTop=chat.scrollHeight;
+  return {wrap,h,t,m};
 }
 function fillRound(d){
-  const el=state.roundEl;if(!el)return;el.classList.remove('pending');
+  const r=state.roundR;if(!r)return;r.h.classList.remove('pending');
   const txt=(d.text&&String(d.text).trim())?String(d.text):'';
-  if(txt){el.querySelector('.rtext').textContent=txt;}
-  else{el.classList.add('empty');}
+  if(txt){r.t.style.display='';r.t.textContent=txt;}
   const u=d.usage||{};
-  if(!el.classList.contains('empty'))el.querySelector('.rmeta').textContent='stop='+(d.stopReason||'?')+' · in '+(u.inputTokens??'?')+' / out '+(u.outputTokens??'?')+' tok'+(d.durationMs!=null?' · '+(d.durationMs/1000).toFixed(1)+'s':'');
-  state.lastRoundEl=el;state.lastRoundText=txt;
-  chat.scrollTop=chat.scrollHeight;state.roundEl=null;
+  r.m.style.display='';r.m.textContent='stop='+(d.stopReason||'?')+' · in '+(u.inputTokens??'?')+' / out '+(u.outputTokens??'?')+' tok'+(d.durationMs!=null?' · '+(d.durationMs/1000).toFixed(1)+'s':'');
+  state.lastRoundWrap=r.wrap;state.lastRoundText=txt;
+  chat.scrollTop=chat.scrollHeight;state.roundR=null;
 }
 function mkToolBlk(turn,name,args){
-  const d=document.createElement('div');d.className='tblk run';
-  const h=document.createElement('div');h.className='thead';
-  const nm=document.createElement('span');nm.className='tname';nm.textContent='\u25C6 '+name;
-  h.appendChild(nm);
+  const row=document.createElement('div');row.className='toolrow run';
+  const ic=document.createElement('span');ic.textContent='\u{1F9E9}';
+  const nm=document.createElement('span');nm.className='tname';nm.textContent=name;
+  row.appendChild(ic);row.appendChild(nm);
   for(const [k,v] of Object.entries(args??{})){
     const c=document.createElement('span');c.className='argchip';
     const ki=document.createElement('i');ki.textContent=k;
     const vb=document.createElement('b');vb.textContent=(typeof v==='object')?JSON.stringify(v):String(v);
     vb.title=ki.textContent+'='+vb.textContent;
-    c.appendChild(ki);c.appendChild(vb);h.appendChild(c);
+    c.appendChild(ki);c.appendChild(vb);row.appendChild(c);
   }
-  const st=document.createElement('span');st.className='tstat';st.textContent='running';
-  h.appendChild(st);d.appendChild(h);
-  const rs=document.createElement('div');rs.className='tresult';rs.textContent='…';d.appendChild(rs);
+  const st=document.createElement('span');st.className='tstat';st.textContent='\u{1FAE7} running';
+  row.appendChild(st);
+  const rs=document.createElement('div');rs.className='tresult';rs.style.display='none';row.appendChild(rs);
   const raw=document.createElement('details');raw.className='traw';
-  const rsum=document.createElement('summary');rsum.textContent='原始数据';
+  const rsum=document.createElement('summary');rsum.textContent='raw';
   raw.appendChild(rsum);
   const pre=document.createElement('pre');pre.textContent='args: '+JSON.stringify(args??{},null,1);raw.appendChild(pre);
-  d.appendChild(raw);
-  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;
+  row.appendChild(raw);
+  ensureThread().appendChild(row);chat.scrollTop=chat.scrollHeight;return row;
 }
 function parseResult(txt){
   const t=String(txt??'').trim();
   try{const j=JSON.parse(t);
     if(j&&typeof j==='object'){
-      if(j.ok===false)return {ok:false,msg:j.error||'执行失败',data:j};
-      if(j.ok===true)return {ok:true,msg:j.data!=null?(typeof j.data==='object'?JSON.stringify(j.data,null,1):String(j.data)):'成功',data:j};
-      return {ok:true,msg:JSON.stringify(j,null,1),data:j};
+      if(j.ok===false)return {ok:false,msg:j.error||'执行失败'};
+      if(j.ok===true)return {ok:true,msg:j.data!=null?(typeof j.data==='object'?JSON.stringify(j.data,null,1):String(j.data)):'成功'};
+      return {ok:true,msg:JSON.stringify(j,null,1)};
     }
   }catch(e){}
   return {ok:!/^error|失败|device not found/i.test(t),msg:t||'(空结果)'};
 }
 function fillToolBlk(callId,isErr,result,durationMs){
-  const d=(state.toolEls||{})[callId];if(!d)return;
+  const row=(state.toolEls||{})[callId];if(!row)return;
   const pr=parseResult(result);
   const bad=isErr||pr.ok===false;
-  d.classList.remove('run');d.classList.add(bad?'err':'ok');
-  d.querySelector('.tstat').textContent=(bad?'\u2715 fail':'\u2713 done')+(durationMs!=null?' '+(durationMs/1000).toFixed(1)+'s':'');
-  d.querySelector('.tresult').textContent=pr.msg;
-  d.querySelector('.traw pre').textContent='args: '+d.querySelector('.traw pre').textContent.replace(/^args:\s*/,'')+'\nresult: '+String(result??'');
-  if(bad)d.querySelector('.traw').open=true;
+  row.classList.remove('run');row.classList.add(bad?'err':'ok');
+  row.querySelector('.tstat').textContent=(bad?'\u{1F940} fail':'\u{1F33F} done')+(durationMs!=null?' '+(durationMs/1000).toFixed(1)+'s':'');
+  const rs=row.querySelector('.tresult');rs.style.display='';rs.textContent=pr.msg;
+  row.querySelector('.traw pre').textContent+='\nresult: '+String(result??'');
+  if(bad)row.querySelector('.traw').open=true;
   chat.scrollTop=chat.scrollHeight;delete state.toolEls[callId];
 }
 function addToolItem(tool,args,res,isErr){
@@ -597,7 +596,7 @@ function connectSSE(sessionId){
   const es=new EventSource('/api/events/'+encodeURIComponent(sessionId));state.es=es;
   es.addEventListener('tools_discovered',e=>{const d=JSON.parse(e.data);renderRegistry(d.tools||[]);kv('st-tools',String((d.tools||[]).length),'ok');});
   es.addEventListener('llm_request',e=>{const d=JSON.parse(e.data);kv('st-model',(d.provider||'?')+'/'+(d.model||'?'));chip('chip-llm','busy','思考中');bg('thinking',0);
-    state.roundEl=mkRound(d.turn,(d.provider||'?')+'/'+(d.model||'?'));});
+    state.roundR=mkRound(d.turn,(d.provider||'?')+'/'+(d.model||'?'));});
   es.addEventListener('llm_response',e=>{const d=JSON.parse(e.data);kv('st-tin',String(d.totalInputTokens??0));kv('st-tout',String(d.totalOutputTokens??0));
     fillRound(d);});
   es.addEventListener('tool_call_started',e=>{const d=JSON.parse(e.data);chip('chip-car','busy','调用中');kv('st-car','调用 '+d.toolName,'warn');bg('executing',0);
@@ -610,8 +609,9 @@ function connectSSE(sessionId){
     fillToolBlk(d.callId,true,String(d.error||'error'),d.durationMs);
     chip('chip-car','err','调用失败');kv('st-car','上次调用失败','err');bg('error',2200);});
   es.addEventListener('turn_started',e=>{const d=JSON.parse(e.data);kv('st-turns',String(d.turn));});
-  es.addEventListener('session_completed',e=>{const d=JSON.parse(e.data);if(state.roundEl&&state.roundEl.classList.contains('pending'))state.roundEl.remove();
-    if(state.lastRoundEl&&state.lastRoundText&&(state.lastRoundText.trim()===(d.finalText||'').trim()))state.lastRoundEl.remove();addMsg('agent','\u2726 '+(d.finalText||'完成'));chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
+  es.addEventListener('session_completed',e=>{const d=JSON.parse(e.data);if(state.roundR){state.roundR.wrap.remove();state.roundR=null;}
+    if(state.lastRoundWrap&&state.lastRoundText&&(state.lastRoundText.trim()===(d.finalText||'').trim()))state.lastRoundWrap.remove();
+    state.threadEl=null;addMsg('agent','\u{1F54A} '+(d.finalText||'完成'));chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
   es.addEventListener('session_error',e=>{const d=JSON.parse(e.data);addMsg('agent','会话错误: '+d.error);bg('error',2500);es.close();reset();});
   es.onerror=()=>{es.close();reset();};
 }
