@@ -125,6 +125,14 @@ mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-s
 
 ## 📥 安装与运行
 
+**30 秒首次体验（无需安装任何东西）**：`git clone` 本仓库后直接运行
+
+```bash
+node viz/run.mjs --open
+```
+
+可视化页在默认浏览器自动打开（内置仓库样例数据）；点击「▶ 端到端测试」即自动安装依赖 → 构建 → 生成配置 → 拉起网关（缺 LLM key 时页面会询问），全程零手动步骤。对任意 app 做正式分析请走下方插件流程（bridge-analyze skill 会自动把可视化切到该项目）。
+
 **Claude Code**
 
 ```bash

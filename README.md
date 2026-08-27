@@ -125,6 +125,14 @@ Full contract: [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md).
 
 ## 📥 Install & run
 
+**30-second first run (nothing to install)** — after `git clone`, just:
+
+```bash
+node viz/run.mjs --open
+```
+
+The viz page opens in your default browser (bundled sample data); click "▶ 端到端测试" and deps → build → config → gateway are all auto-bootstrapped (the page asks for the LLM key if missing). Zero manual steps. To analyze your own app, use the plugin flow below — bridge-analyze switches the visualization to your project automatically.
+
 **Claude Code**
 
 ```bash
