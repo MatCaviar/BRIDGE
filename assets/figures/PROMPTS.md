@@ -24,13 +24,21 @@ Create a full-width 16:9 internal implementation cutaway for BRIDGE. Match the b
 
 Three tall panels cover health-aware device routing, schema-grounded execution, and evidence review. A bottom recovery loop turns broken outcomes into repair, re-test, and release.
 
-The Simplified Chinese edition is localized directly from the selected English master. All vehicles, benches, cockpit screenshots, mascots, cards, connectors, shadows, spacing, and proportions are retained; only the English label areas are replaced with Chinese KaiTi typography. Technical identifiers such as `BRIDGE`, `Schema`, `MCP`, `CAN`, `UI`, and JSON code remain unchanged where appropriate.
+The Simplified Chinese edition is a full-frame built-in ImageGen regeneration. The English master is supplied only as the composition, hierarchy, and style reference; the complete Chinese figure is generated as one coherent image rather than assembled with text plates or deterministic overlays. Chinese labels use a KaiTi-style treatment, while `BRIDGE`, `Schema`, `MCP`, `CAN`, `UI`, and JSON syntax remain technical terms where appropriate.
+
+### Figure 4 final Chinese ImageGen prompt
+
+Recreate the complete reference figure from scratch as a 16:9 Simplified Chinese academic material illustration. Preserve the three-column real-device-runtime composition and bottom recovery loop, including the robot agents, local workstation, health-aware vehicle pool, HIL bench, cockpit rig, modern cockpit screenshots, unbranded premium EV test vehicles, evidence cards, arrows, raised white/lavender panels, violet-blue accents, and soft studio shadows. Use a bright Qwen UI-Agent-inspired visual language with no phone, logo, watermark, dark background, cropped object, rectangular text patch, or extra label. Typeset all Chinese in clear printed KaiTi and keep English letters/numerals in Times New Roman. Use the exact Chinese title and labels supplied for portable runtime, Schema-grounded execution, evidence review, and the recovery loop; retain the JSON function schema as technical code.
 
 ## Figure 5 — BRIDGE Capability Flywheel
 
 Source knowledge bootstraps `analysis.json`, `function-schema.json`, and `registry.json`; a six-stage loop then extracts capabilities, projects schemas, tests Agent injection, records real-device trajectories, judges evidence, and refines the contract.
 
-The Simplified Chinese edition uses the English master as the immutable visual base and changes only label text. The source panel, contract scroll, capability pool, six flywheel sectors, central robot-and-runtime composition, cockpit rig, and unbranded test vehicles therefore remain visually identical between languages.
+The Simplified Chinese edition is also regenerated end to end with built-in ImageGen, using the English master as a composition and style reference rather than as a raster base. The source panel, contract scroll, evolving capability pool, six flywheel sectors, central robot-and-runtime composition, cockpit rig, and unbranded test vehicles are generated together in one pass.
+
+### Figure 5 final Chinese ImageGen prompt
+
+Recreate the complete reference figure from scratch as a 16:9 Simplified Chinese BRIDGE capability-flywheel illustration. Match the left capability-bootstrapping panel, initial-contract scroll, evolving capability pool, six lavender flywheel sectors, central robot with vehicle-runtime shield/server, cockpit rig, and two modern unbranded premium EVs. Keep the bright academic material style, crisp charcoal outlines, violet connectors, raised white cards, subtle 3D props, generous whitespace, and soft contact shadows. Use printed KaiTi for Chinese and Times New Roman for English/numerals. Render exactly: `图 5：BRIDGE 能力飞轮`, `阶段 I：能力冷启动`, `源知识`, `源代码仓库`, `PRD / 规格文档`, `座舱 / HIL 观测`, `车辆日志`, `analysis.json`, `function-schema.json`, `registry.json`, `初始契约`, `演进能力池`, the six numbered capability stages, and `闭环、证据驱动的持续改进`. No phone, logo, watermark, black background, crop, extra words, or garbled text.
 
 ## Deliverables
 
