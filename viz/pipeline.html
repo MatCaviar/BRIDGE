@@ -1023,22 +1023,21 @@ if (!D) {
   <iframe id="e2e-frame" title="cockpit"></iframe>
 </div>
 <script>
-/* ── 端到端视图: 同页切换 + URL 同步(/cockpit) — 网关可达性自适应（通用）──
-   cockpit 地址经 /api/e2e 动态解析(后端 BRIDGE_E2E_URL 可配); 网关未启动时
-   显示启动指引而非死 iframe, 可重试。 */
+/* ── 端到端视图: 同页切换 + URL 同步(/cockpit) — 单端口体验（通用）──
+   cockpit 经后端同源代理 /e2e/* 提供(后端按需自动拉起网关: 首次自动安装/构建/配置,
+   无 LLM key 降级 mock); 网关就绪前显示启动阶段而非死 iframe。?cockpit= 仍可直指外部地址。 */
 (function(){
   const cockpitParam = new URLSearchParams(location.search).get("cockpit");
-  const DEFAULT_COCKPIT = cockpitParam || "http://localhost:3000/cockpit";
   const ov = document.getElementById("e2e-overlay");
   const frame = document.getElementById("e2e-frame");
   const entry = document.getElementById("e2e-entry");
   let pushed = false;
-  let cockpitUrl = DEFAULT_COCKPIT;
-  let probeAt = 0, probeOk = false;
+  let cockpitUrl = cockpitParam || "/e2e/cockpit";
+  let probeAt = 0, probeOk = false, probeInfo = null;
   const isE2E = () => location.pathname === "/cockpit";
   async function resolveCockpit() {
     if (cockpitParam) return { ok: true, url: cockpitParam };
-    if (Date.now() - probeAt < 5000) return { ok: probeOk, url: cockpitUrl };
+    if (Date.now() - probeAt < 5000) return { ok: probeOk, url: cockpitUrl, info: probeInfo };
     probeAt = Date.now();
     try {
       const r = await fetch("/api/e2e", { cache: "no-store" });
@@ -1046,10 +1045,11 @@ if (!D) {
       const g = (j && j.gateway) || {};
       if (g.url) cockpitUrl = g.url;
       probeOk = g.ok === true;
-    } catch (e) { probeOk = false; }
-    return { ok: probeOk, url: cockpitUrl };
+      probeInfo = g;
+    } catch (e) { probeOk = false; probeInfo = null; }
+    return { ok: probeOk, url: cockpitUrl, info: probeInfo };
   }
-  function showDown(url) {
+  function showDown(info) {
     try { if (frame.contentWindow) frame.src = "about:blank"; } catch (e) {}
     let panel = document.getElementById("e2e-down");
     if (!panel) {
@@ -1058,25 +1058,30 @@ if (!D) {
       panel.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#0e1726;color:#cfe0f5;font:14px/1.8 system-ui;padding:24px;text-align:center";
       ov.appendChild(panel);
     }
+    const starting = info && info.starting;
+    const phaseZh = { install: "安装依赖(首次约 1 分钟)", build: "构建 e2e", start: "启动网关", bootstrap: "准备环境" };
+    const phase = info && info.phase ? (phaseZh[info.phase] || info.phase) : "";
+    const log = ((info && info.log) || []).slice(-4);
     panel.innerHTML =
-      `<div style="font-size:17px;font-weight:600">端到端测试网关未启动</div>` +
-      `<div>目标 <code style="background:#1a2b44;padding:2px 6px;border-radius:4px">${url}</code> 当前不可达</div>` +
-      `<div style="opacity:.75">启动方式：<code>cd e2e && node dist/web/server.js --config config-cockpit.yaml</code>（需 LLM API key 环境变量）<br>` +
-      `启动后点击「重试」，或等本页 5s 自动重探</div>` +
-      `<button id="e2e-retry" style="margin-top:8px;padding:6px 22px;border:1px solid #4b6f9e;border-radius:6px;background:#1c334f;color:#cfe0f5;cursor:pointer">重试</button>`;
+      `<div style="font-size:17px;font-weight:600">${starting ? "端到端环境启动中…" : "端到端网关未启动"}</div>` +
+      (phase ? `<div style="color:#7fb2ff">阶段：${phase}</div>` : "") +
+      (starting ? `<div style="opacity:.7">后端正在自动准备网关（首次使用含依赖安装与构建），本页每 5 秒自动重试</div>`
+                : `<div style="opacity:.7">后端将自动拉起网关；若长时间未就绪，请检查 viz 后端日志</div>`) +
+      (log.length ? `<div style="font:12px/1.7 Consolas,monospace;opacity:.6;max-width:720px;white-space:pre-wrap">${log.map((l) => esc0(l)).join("<br>")}</div>` : "") +
+      `<button id="e2e-retry" style="margin-top:8px;padding:6px 22px;border:1px solid #4b6f9e;border-radius:6px;background:#1c334f;color:#cfe0f5;cursor:pointer">立即重试</button>`;
     const retry = document.getElementById("e2e-retry");
     if (retry) retry.onclick = () => { probeAt = 0; show(true); };
   }
+  function esc0(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
   async function show(push){
     ov.hidden = false;
-    const { ok, url } = await resolveCockpit();
+    const { ok, url, info } = await resolveCockpit();
     const down = document.getElementById("e2e-down");
     if (down) down.remove();
-    if (!ok) { showDown(url); }
+    if (!ok) { showDown(info); }
     else { if (frame.getAttribute("src") !== url) frame.src = url; }
     if (push && !isE2E()){
-      const query = cockpitParam ? `?cockpit=${encodeURIComponent(url)}` : "";
-      history.pushState({ e2e: true }, "", `/cockpit${query}`);
+      history.pushState({ e2e: true }, "", `/cockpit`);
       pushed = true;
     }
   }
@@ -1088,7 +1093,7 @@ if (!D) {
   }
   window.addEventListener("message", (e) => {
     let origin = "";
-    try { origin = new URL(cockpitUrl).origin; } catch (err) { origin = ""; }
+    try { origin = new URL(cockpitUrl, location.origin).origin; } catch (err) { origin = ""; }
     if (e.data === "bridge:e2e-back" && origin && e.origin === origin) leave();
   });
   window.addEventListener("keydown", (e) => {
@@ -1096,7 +1101,7 @@ if (!D) {
   });
   window.addEventListener("popstate", () => { isE2E() ? show(false) : hide(); });
   if (isE2E()) show(false);
-  // 网关未启动期间每 5s 静默重探, 起来后自动装载 cockpit
+  // 启动中/未就绪期间每 5s 静默重探, 就绪后自动装载 cockpit
   setInterval(() => {
     if (!ov.hidden && document.getElementById("e2e-down")) show(false);
   }, 5000);

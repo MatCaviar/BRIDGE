@@ -17,7 +17,7 @@
  *
  * 安全：仅绑定 127.0.0.1 本地回环；车端操作（deploy/invoke）会真动车，页面侧有护栏。
  */
-import { createServer } from "http";
+import { createServer, request as httpRequest } from "http";
 import { spawn, execFile } from "child_process";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
@@ -82,6 +82,133 @@ const PORT = Number(argValue("--port") || process.env.PORT || 8650);
 const HOST = "127.0.0.1";
 
 const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, serveLog: [] };
+
+/* ---------- 端到端网关: 同源代理(/e2e/*) + 按需自动拉起(通用, 单端口体验) ----------
+   页面只在 :8650 内活动; gateway(默认 :3000, BRIDGE_E2E_URL 可配)作为内部实现细节
+   由本后端代理并自动启动: 首次使用自动 npm install + tsc + 生成配置; 无 LLM key 时
+   降级 mock provider(工具面/注入可用); 项目模式(--analysis)自动指向本次分析产物。 */
+const E2E_DIR = join(ROOT, "e2e");
+const E2E_BASE = (process.env.BRIDGE_E2E_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+const E2E_TARGET = new URL(E2E_BASE);
+const gw = { proc: null, phase: "", starting: false, log: [] };
+function gwLog(line) {
+  gw.log.push(line);
+  if (gw.log.length > 60) gw.log.splice(0, gw.log.length - 60);
+  console.error(`[e2e] ${line}`);
+}
+async function gwProbe() {
+  try { await fetchJson(`${E2E_BASE}/api/health`, 1500); return true; } catch (e) { return false; }
+}
+function gatewayConfigPath() {
+  if (process.env.BRIDGE_E2E_CONFIG) return resolve(PROJECT_ROOT, process.env.BRIDGE_E2E_CONFIG);
+  const template = read(join(E2E_DIR, "config-cockpit.yaml"));
+  if (!template) return join(E2E_DIR, "config-cockpit.yaml");
+  let text = template;
+  // 配置写到 viz/ 目录 — 模板内的相对路径(按配置所在目录解析)全部换成绝对路径
+  text = text
+    .replace(/"bridge-serve-wrapper\.mjs"/g, JSON.stringify(join(E2E_DIR, "bridge-serve-wrapper.mjs").replace(/\\/g, "/")))
+    .replace(/"\.\.\/cli\/bin\/mcp-pipeline\.js"/g, JSON.stringify(CLI.replace(/\\/g, "/")));
+  // 项目模式: serve 指向本次分析产物
+  if (resolvedAnalysis && existsSync(resolvedAnalysis)) {
+    text = text.replace(/"--analysis",\s*"bridge-analysis\.json"/,
+      `"--analysis", ${JSON.stringify(resolvedAnalysis.replace(/\\/g, "/"))}`);
+  }
+  // 无 LLM key: 降级 mock provider(schema 冒烟), 有 key 则原样
+  if (!process.env.QWEN_API_KEY && !process.env.OPENAI_API_KEY) {
+    text = text
+      .replace(/provider: openai/, "provider: mock")
+      .replace(/model: qwen3\.5-flash/, "model: bridge-schema-smoke")
+      .replace(/api_key: \$\{QWEN_API_KEY\}/, "api_key: local-smoke");
+    gwLog("未检出 QWEN_API_KEY — 网关以 mock LLM 启动(工具面/schema 注入可用, 对话为占位)");
+  }
+  const out = join(VIZ, ".e2e-config.yaml");
+  writeFileSync(out, text);
+  return out;
+}
+async function bootstrapGateway() {
+  try {
+    if (!existsSync(join(E2E_DIR, "node_modules"))) {
+      gw.phase = "install";
+      gwLog("首次运行: 安装 e2e 依赖 (npm install, 约 1 分钟)…");
+      const r = await run("npm", ["install", "--no-audit", "--no-fund"], { cwd: E2E_DIR, timeout: 420000, shell: true });
+      if (!r.ok) { gwLog("npm install 失败: " + r.output.slice(-300)); return; }
+    }
+    const distServer = join(E2E_DIR, "dist", "web", "server.js");
+    if (!existsSync(distServer)) {
+      gw.phase = "build";
+      gwLog("构建 e2e (tsc)…");
+      const tsc = join(E2E_DIR, "node_modules", "typescript", "bin", "tsc");
+      const b = existsSync(tsc)
+        ? await run(process.execPath, [tsc], { cwd: E2E_DIR, timeout: 240000 })
+        : await run("npx", ["tsc"], { cwd: E2E_DIR, timeout: 240000, shell: true });
+      if (!b.ok || !existsSync(distServer)) { gwLog("构建失败: " + b.output.slice(-300)); return; }
+    }
+    gw.phase = "start";
+    const cfg = gatewayConfigPath();
+    gwLog(`启动网关: node dist/web/server.js --config ${cfg}`);
+    const p = spawn(process.execPath, [join(E2E_DIR, "dist", "web", "server.js"), "--config", cfg],
+      { cwd: E2E_DIR, windowsHide: true });
+    gw.proc = p;
+    const onOut = (d) => d.toString().split(/\r?\n/).filter(Boolean).slice(-2).forEach((l) => gwLog(l));
+    p.stdout.on("data", onOut);
+    p.stderr.on("data", onOut);
+    p.on("exit", (code) => { gwLog(`网关进程退出 (code=${code})`); if (gw.proc === p) gw.proc = null; });
+    for (let i = 0; i < 40; i++) {
+      await sleep(500);
+      if (await gwProbe()) { gwLog("网关就绪"); return; }
+      if (p.exitCode !== null && p.exitCode !== undefined && !gw.proc) break;
+    }
+    gwLog("网关未在 20s 内就绪 — 检查上方日志");
+  } catch (e) {
+    gwLog("启动异常: " + String(e.message));
+  } finally {
+    gw.starting = false;
+    gw.phase = "";
+  }
+}
+async function ensureGateway() {
+  if (await gwProbe()) return { ok: true };
+  if (gw.starting) return { ok: false, starting: true, phase: gw.phase };
+  gw.starting = true;
+  bootstrapGateway(); // 后台执行, 阶段经 /api/e2e 与 /e2e 503 响应可见
+  return { ok: false, starting: true, phase: gw.phase };
+}
+/** 同源代理: /e2e/* → gateway(*)。HTML 响应注入 fetch/EventSource 前缀补丁, 让页面内
+ *  的 /api/* 调用与 SSE 落回 /e2e/api/*; 其余(含 SSE 流)原样透传。 */
+function proxyToGateway(req, res, path) {
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers.connection;
+  delete headers["accept-encoding"];
+  const preq = httpRequest(
+    { hostname: E2E_TARGET.hostname, port: E2E_TARGET.port, path, method: req.method, headers },
+    (pres) => {
+      const isHtml = /text\/html/.test(String(pres.headers["content-type"] || ""));
+      if (!isHtml) {
+        res.writeHead(pres.statusCode || 502, pres.headers);
+        pres.pipe(res);
+        return;
+      }
+      const chunks = [];
+      pres.on("data", (c) => chunks.push(c));
+      pres.on("end", () => {
+        let body = Buffer.concat(chunks).toString("utf8");
+        const h = { ...pres.headers };
+        delete h["content-length"];
+        const patch = `<script>/* BRIDGE same-origin proxy patch */(function(){var P="/e2e";var f=window.fetch;window.fetch=function(i,init){try{var u=typeof i==="string"?i:(i&&i.url);if(u&&u.charAt(0)==="/"&&u.indexOf(P+"/")!==0){u=P+u;return typeof i==="string"?f(u,init):f(new Request(u,i),init);}}catch(e){}return f(i,init);};if(window.EventSource){var E=window.EventSource;window.EventSource=function(u,c){if(typeof u==="string"&&u.charAt(0)==="/"&&u.indexOf(P+"/")!==0)u=P+u;return new E(u,c);};}})();</script>`;
+        body = body.replace(/<head([^>]*)>/i, (m) => m + patch);
+        res.writeHead(pres.statusCode || 502, h);
+        res.end(body);
+      });
+    });
+  preq.on("error", (e) => {
+    try {
+      res.writeHead(502, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: String(e.message) }));
+    } catch (_) { /* client gone */ }
+  });
+  req.pipe(preq);
+}
 
 /* ---------- 工具 ---------- */
 const MIME = {
@@ -526,14 +653,15 @@ const handler = async (req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   try {
     if (url.pathname === "/api/e2e") {
-      // 聚合 gateway(默认 :3000, BRIDGE_E2E_URL 可配) 端到端状态: 健康度 + cockpit 地址 + 最近会话事件摘要
-      const E2E_BASE = (process.env.BRIDGE_E2E_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+      // 端到端网关状态(同源代理视图): ok 时前端直接 iframe /e2e/cockpit; down 时触发自动拉起并回报阶段
       const out = { gateway: null, sessions: [] };
-      try {
-        const h = await fetchJson(`${E2E_BASE}/api/health`, 2500);
-        out.gateway = { ok: true, url: `${E2E_BASE}/cockpit`, ...h };
-      } catch {
-        out.gateway = { ok: false, url: `${E2E_BASE}/cockpit` };
+      if (await gwProbe()) {
+        let h = {};
+        try { h = await fetchJson(`${E2E_BASE}/api/health`, 2500); } catch (e) { /* probe已过, 忽略 */ }
+        out.gateway = { ok: true, url: "/e2e/cockpit", proxied: true, ...h };
+      } else {
+        const st = await ensureGateway();
+        out.gateway = { ok: false, url: "/e2e/cockpit", proxied: true, starting: st.starting === true, phase: st.phase || "", log: gw.log.slice(-5) };
       }
       try {
         const sess = state.session;
@@ -627,6 +755,19 @@ const handler = async (req, res) => {
       const r = await fn(args || {});
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: r.ok, stage, output: r.output || "", error: r.error || "", durationMs: r.durationMs || 0 }));
+    }
+    if (url.pathname === "/e2e" || url.pathname.startsWith("/e2e/")) {
+      // 同源端到端入口: /e2e 与 /e2e/ → cockpit; /e2e/api/* → gateway API(含 SSE 透传)
+      ensureGateway();
+      let sub = url.pathname.replace(/^\/e2e/, "");
+      if (!sub || sub === "/") sub = "/cockpit";
+      if (!(await gwProbe())) {
+        res.writeHead(503, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ ok: false, starting: gw.starting, phase: gw.phase, log: gw.log.slice(-6) }));
+        return;
+      }
+      proxyToGateway(req, res, sub);
+      return;
     }
     const path = (url.pathname === "/" || url.pathname === "/cockpit") ? "pipeline.html" : decodeURIComponent(url.pathname.slice(1));
     return serveFile(res, path);
