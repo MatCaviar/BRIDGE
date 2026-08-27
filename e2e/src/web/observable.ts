@@ -140,6 +140,7 @@ export async function runObservable(
       timestamp: ts(),
       turn: turn + 1,
       text: response.text,
+      thinking: response.thinking ?? "",
       stopReason: response.stopReason,
       usage: response.usage,
       durationMs: llmDuration,

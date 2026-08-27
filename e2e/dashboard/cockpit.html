@@ -63,6 +63,8 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 .round-h.pending .rn{animation:tpulse 1.2s ease-in-out infinite}
 .round-t{font-size:.82rem;color:#c9d8ea;white-space:pre-wrap;word-break:break-word;line-height:1.52;margin:.05rem 0 .05rem .15rem}
 .round-body{display:flex;flex-direction:column;gap:.3rem;margin:.1rem 0 .1rem 1.05rem}
+.round-thk{margin:.05rem 0 .05rem .15rem;border-left:1px dotted rgba(143,165,200,.35);padding-left:.55rem;color:#9db0cc;font-size:.76rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto}
+.round-thk .thk-h{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:#7d92b5;margin-bottom:.12rem;display:flex;align-items:baseline;gap:.35rem}
 .round-m{font-size:.62rem;color:var(--text-dim);font-family:var(--mono,monospace);margin-left:.15rem;opacity:.85}
 .toolrow{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-size:.76rem;padding:.05rem 0 .05rem .15rem}
 .toolrow .tname{font-family:var(--mono,monospace);font-weight:600;color:#a9c0e0;letter-spacing:.03em}
@@ -477,6 +479,14 @@ function mkRound(turn,model){
 }
 function fillRound(d){
   const r=state.roundR;if(!r)return;r.h.classList.remove('pending');
+  const thk=(d.thinking&&String(d.thinking).trim())?String(d.thinking):'';
+  if(thk){
+    const w=document.createElement('div');w.className='round-thk';
+    const hd=document.createElement('div');hd.className='thk-h';hd.textContent='\u{1FAB6} thinking';
+    w.appendChild(hd);
+    const body=document.createElement('div');body.textContent=thk;w.appendChild(body);
+    r.h.after(w);
+  }
   const txt=(d.text&&String(d.text).trim())?String(d.text):'';
   if(txt){r.t.style.display='';r.t.textContent=txt;}
   const u=d.usage||{};

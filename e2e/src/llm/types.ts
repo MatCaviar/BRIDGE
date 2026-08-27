@@ -5,6 +5,8 @@ export interface LLMConfig {
   readonly baseUrl?: string;
   readonly temperature?: number;
   readonly maxTokens?: number;
+  /** 思考模式(DashScope qwen: enable_thinking; 不设则随 provider 默认) */
+  readonly thinking?: boolean;
 }
 
 export interface Message {
@@ -23,6 +25,8 @@ export interface ToolCall {
 
 export interface LLMResponse {
   text: string;
+  /** 思考/推理内容(如 DashScope reasoning_content), 无则为空串 */
+  thinking?: string;
   toolCalls: ToolCall[];
   stopReason: "end_turn" | "tool_use" | "max_tokens";
   usage: { inputTokens: number; outputTokens: number };

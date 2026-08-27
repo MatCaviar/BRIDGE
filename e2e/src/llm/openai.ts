@@ -68,6 +68,7 @@ export class OpenAIClient implements LLMClient {
   private readonly model: string;
   private readonly maxTokens?: number;
   private readonly temperature?: number;
+  private readonly thinking?: boolean;
 
   constructor(config: LLMConfig) {
     const clientOptions: OpenAIClientOptions = { apiKey: config.apiKey };
@@ -78,6 +79,7 @@ export class OpenAIClient implements LLMClient {
     this.model = config.model;
     this.maxTokens = config.maxTokens;
     this.temperature = config.temperature;
+    this.thinking = config.thinking;
   }
 
   async createMessage(params: {
@@ -104,9 +106,10 @@ export class OpenAIClient implements LLMClient {
       requestParams.tools = params.tools as ChatCompletionTool[];
     }
 
-    // Provider-specific: disable thinking mode for DashScope/Qwen
-    // OpenAI ignores unknown params, so this is safe for all providers
-    (requestParams as unknown as Record<string, unknown>)["enable_thinking"] = false;
+    // DashScope/Qwen 思考模式跟随配置(未配置则随 provider 默认); OpenAI 忽略未知参数, 安全
+    if (this.thinking !== undefined) {
+      (requestParams as unknown as Record<string, unknown>)["enable_thinking"] = this.thinking;
+    }
 
     const response = await this.client.chat.completions.create(requestParams);
 
@@ -114,6 +117,8 @@ export class OpenAIClient implements LLMClient {
     const message = choice?.message;
 
     const text = message?.content ?? "";
+    // DashScope qwen 思考内容在 reasoning_content(非标字段), 完整透传
+    const thinking = String((message as { reasoning_content?: unknown } | undefined)?.reasoning_content ?? "");
     const stopReason = mapStopReason(choice?.finish_reason);
 
     const toolCalls: ToolCall[] = (message?.tool_calls ?? []).map((tc) => {
@@ -136,6 +141,7 @@ export class OpenAIClient implements LLMClient {
 
     return {
       text,
+      thinking,
       toolCalls,
       stopReason,
       usage: {

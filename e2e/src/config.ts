@@ -106,6 +106,7 @@ export function loadConfig(configPath: string): GatewayConfig {
       baseUrl: llm.base_url ? String(llm.base_url) : undefined,
       temperature: llm.temperature ? Number(llm.temperature) : undefined,
       maxTokens: llm.max_tokens ? Number(llm.max_tokens) : undefined,
+      thinking: llm.thinking === undefined ? undefined : Boolean(llm.thinking),
     },
     mcpServers,
     uiSync: (parsed.ui_sync as Array<Record<string, unknown>> | undefined)?.map((r) => ({

@@ -55,6 +55,8 @@ export interface LlmResponseEvent {
   readonly timestamp: string;
   readonly turn: number;
   readonly text: string;
+  /** 当轮思考/推理全文(reasoning_content), 无则为空串 */
+  readonly thinking?: string;
   readonly stopReason: string;
   readonly usage: { readonly inputTokens: number; readonly outputTokens: number };
   /** Wall-clock ms from llm_request to this response. */
