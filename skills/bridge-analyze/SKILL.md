@@ -102,7 +102,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 4. **端到端 schema 测试**: `node "<套件根>/e2e/schema-injection-smoke.mjs" --analysis <analysis.json> --report <schema-injection-report.json>` — BRIDGE 文件产物、MCP `tools/list`、OpenAI 与 Anthropic envelope 四层数量和字段一致
 5. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
 6. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
-7. **报告**: 向用户说明 — 工具数、function schema 注入结果、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
+7. **报告**: 向用户说明 — 工具数、function schema 注入结果、机制分布、哪些 verified/probe/broken、验证证据、端到端自动演示结果（sessionId/LLM 回复摘要）、下一步(部署/实测)
 
 无设备时: 1-4 必做, 6 留待有环境, status 保持 probe 并明确告知。
 
@@ -142,6 +142,12 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 - 步事件：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
 - 节点：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry / `n5` 车端部署·自检 / `n6` 实测
 - `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不写台本；`skipped`（如车离线）注明原因。
+
+**收尾 · 端到端自动演示（验证协议通过后必做 — 全自动，不让用户做任何操作）**：
+
+1. `POST $BRIDGE_VIZ_URL/api/e2e` — 触发网关自动拉起（依赖安装/构建/配置生成/启动全自动，首次约 1 分钟）；轮询同一接口至 `gateway.ok`。若返回 `needsKey`：页面会向用户弹窗询问 LLM key，在最终报告中说明即可，不阻断其余步骤；
+2. `POST $BRIDGE_VIZ_URL/e2e/api/run`，body `{"message":"用一句话介绍你现在能控制哪些功能"}` — 真实走一轮 LLM↔工具链路（schema 注入 → 工具选择 → 无车机时如实报设备不可达）；把 sessionId 与最终回复摘要写进报告；
+3. `POST $BRIDGE_VIZ_URL/api/e2e/show` — 用户已打开的可视化页经后端信号**自动切换**到端到端视图（页面 1s 轮询，无需用户点击）。
 
 ## 产物去向
 

@@ -81,7 +81,7 @@ let TARGET = {
 const PORT = Number(argValue("--port") || process.env.PORT || 8650);
 const HOST = "127.0.0.1";
 
-const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, serveLog: [] };
+const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, serveLog: [], showE2E: false };
 
 /* ---------- 端到端网关: 同源代理(/e2e/*) + 按需自动拉起(通用, 单端口体验) ----------
    页面只在 :8650 内活动; gateway(默认 :3000, BRIDGE_E2E_URL 可配)作为内部实现细节
@@ -787,7 +787,15 @@ const handler = async (req, res) => {
         name: session.name, startedAt: session.startedAt,
         stages: session.stages, log: session.log, progress: sessProgress(),
         running: session.log.length > 0 && session.stages.n6 !== "done" && session.stages.n6 !== "skipped",
+        // host codeagent 收尾端到端演示时置位(POST /api/e2e/show), 已打开的页面轮询到后自动切换到端到端视图
+        showE2E: state.showE2E === true,
       }));
+    }
+    if (url.pathname === "/api/e2e/show" && req.method === "POST") {
+      state.showE2E = true;
+      ensureGateway();
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true }));
     }
     if (url.pathname === "/api/session/start" && req.method === "POST") {
       let body = "";

@@ -727,6 +727,18 @@ function applySession(s) {
   if (!s) return;
   const lvl = statsLevelFor(s);
   if (lvl > statsUnlocked) { statsUnlocked = lvl; renderStats(); }
+  // 产物落盘后动态回拉: n3(校验+schema)完成时, 从后端取最新产物数据刷新总览与配对矩阵(无需刷新页面)
+  if (lvl >= 2 && !window.__dataPulled) {
+    window.__dataPulled = true;
+    fetch("/api/target", { cache: "no-store" }).then((r) => r.json()).then((t) => {
+      if (t && t.data) { Object.assign(D, t.data); renderStats(); renderDeliverables(); }
+    }).catch(() => {});
+  }
+  // 收尾端到端演示信号: host codeagent POST /api/e2e/show 后, 已打开的页面自动切换到端到端视图(仅一次)
+  if (s.showE2E === true && !window.__e2eAutoShown) {
+    window.__e2eAutoShown = true;
+    if (typeof window.__showE2E === "function") window.__showE2E(true);
+  }
   for (const id of SESSION_IDS) {
     const st = s.stages[id] || "pending";
     const mapped = st === "running" ? "active" : st;
@@ -1260,6 +1272,7 @@ if (!D) {
     }
   }
   function hide(){ ov.hidden = true; }
+  window.__showE2E = show; // 供会话轮询的收尾自动切换调用(POST /api/e2e/show 信号)
   entry.addEventListener("click", e => { e.preventDefault(); show(true); });
   function leave(){
     if (pushed || document.referrer) history.back();
