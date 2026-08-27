@@ -781,8 +781,15 @@ const handler = async (req, res) => {
       return;
     }
     if (url.pathname === "/api/health") {
+      // project 身份供上报方核对: 防止把会话事件发给其他项目/残留实例
+      let ident = null;
+      try {
+        const dj = JSON.parse(readFileSync(join(VIZ, "data.js"), "utf-8").replace(/^[^{]*\{/, "{").replace(/;\s*$/, ""));
+        ident = { title: dj.title?.input ?? "", caps: dj.stats?.totalCaps ?? 0 };
+      } catch { /* data.js 缺失时 ident 为 null */ }
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: true, name: "bridge-viz-run", port: PORT,
+        analysis: TARGET.analysis || "", project: ident,
         car: !!state.carIp, serveRunning: !!state.serveProc }));
     }
     if (url.pathname === "/api/state") {

@@ -13,6 +13,7 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 可调�
 
 **输入**（用户给什么用什么，可组合）：
 - 应用源码目录（Android/Kotlin+AIDL、TypeScript、其他语言）
+- APK / 安装包：先 zip 解包 → manifest/资源/classes*.dex；dex 无现成工具时自写轻量解析（字符串表/方法名/signature 扫描即可覆盖大部分能力面）。此形态耗时显著长于源码（30-60 分钟量级），**期间更要持续上报阶段事件**让用户看到进展，不要憋到最后一次性补报
 - PRD / 接口文档 / manifest / AIDL 文件
 - APK / 安装包（可逆向：dex、manifest、resources）
 - 运行环境（adb 设备、日志、行为观察）
@@ -142,6 +143,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 1. 复制 `<套件根>/viz/` 整体到 `<输入目录>/viz/`（输入目录不可写时放产物目录）；
 2. 导出 `<产物目录>/function-schema.json` 后生成项目数据：`node <输入目录>/viz/gen.mjs <analysis.json> [<registry.json>]`（页面身份与数字由它驱动）；
 3. 后台启动查看器（**启动即默认在用户默认浏览器(Chrome/Edge/Safari 随系统)自动打开页面**——不要让用户手动打开，也不要自行拼 shell 打开命令；`--open` 现为默认行为，`--no-open` 才是关闭。**启动后必须确认**输出日志出现 `已请求在默认浏览器打开` 或 `页面: http://…` 且进程存活，失败则修正参数重试，不得静默跳过——可视化对用户是硬要求）：
+   **身份核对（必做）**：启动后 `GET <地址>/api/health`，确认返回的 `project.title/caps` 属于**本次输入**（data.js 已由第 2 步重生成为前提）。若对不上——你连到的是别的项目或残留实例（常见：旧测试环境的后端还占着端口）——立即换空闲端口自起，绝不能把会话事件发给错误后端。
    `node "<输入目录>/viz/run.mjs" --open --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<analysis.json>" --src "<输入目录>"`
    （端口默认 8650，被占用加 `--port 87xx` 并把 `BRIDGE_VIZ_URL` 指向实际地址；查看器经 `--suite-root` 复用套件的 CLI/校验器，不要求用户项目自带 cli/skills/e2e。无图形环境打开会静默失败——此时把页面地址以**醒目文字**告知用户，并说明端到端视图在页面状态小球一键可达。）
 
