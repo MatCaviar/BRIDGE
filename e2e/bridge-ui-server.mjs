@@ -2,7 +2,7 @@
 /**
  * bridge-ui — host-side MCP server for APP-UI driving capabilities (app-type abilities).
  *
- * The BRIDGE executor covers binder-contract tools (imaudio execmd, mapnav, carcontrol, media).
+ * The BRIDGE executor covers binder-contract tools (execmd, mapnav, carcontrol, media).
  * Apps whose behavior is only reachable through their UI (taps/swipes) need a different path:
  * this server drives the car's UI over adb — `uiautomator dump` to discover widgets, `input tap`
  * to click. It is app-agnostic: any app, any screen, driven by text labels. The LLM uses it like
@@ -147,11 +147,11 @@ server.registerTool(
 server.registerTool(
   "ui_launch",
   {
-    description: "启动车机 app 或直达其页面(deep link)。用户说'打开XX'时用。三种方式: pkg+uri(deep link, 如 imaudio://soundeffects/boeffects) / pkg+activity(组件) / 仅 pkg(主入口)。可选 extras 传附加字符串参数。",
+    description: "启动车机 app 或直达其页面(deep link)。用户说'打开XX'时用。三种方式: pkg+uri(deep link, 如 myapp://section/page) / pkg+activity(组件) / 仅 pkg(主入口)。可选 extras 传附加字符串参数。",
     inputSchema: {
-      pkg: z.string().describe("app 包名, 如 com.immotors.imaudio / com.ebanma.map.main / cn.alios.audioapp.qq"),
+      pkg: z.string().describe("app 包名, 如 com.example.app / com.example.map"),
       activity: z.string().optional().describe("Activity 全名, 省略则解析主入口"),
-      uri: z.string().optional().describe("deep link URI(优先于 activity), 如 imaudio://soundeffects/boeffects"),
+      uri: z.string().optional().describe("deep link URI(优先于 activity), 如 myapp://section/page"),
       action: z.string().optional().describe("intent action(目标服务要求匹配 action 时传, 优先于 uri)"),
       extras: z.record(z.string()).optional().describe("附加字符串 extras, 如 {\"ToCarControl\": \"{\\\"type\\\":\\\"air\\\"}\"}"),
       display: z.string().optional().describe("目标屏 DRIVER/PASSENGER/REAR(按 DisplayManager 名匹配, 失败回退当前屏)"),

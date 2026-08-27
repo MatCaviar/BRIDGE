@@ -99,6 +99,36 @@ function gwLog(line) {
 async function gwProbe() {
   try { await fetchJson(`${E2E_BASE}/api/health`, 1500); return true; } catch (e) { return false; }
 }
+/** 由 analysis 产物生成 system_prompt 的工具清单段(泛化: 不绑定任何 app, 描述取自 capability) */
+function toolLinesFor(analysis) {
+  const caps = (analysis.capabilities ?? []).filter((c) => c.status !== "broken");
+  const byDomain = new Map();
+  for (const c of caps) {
+    const d = c.domain || (analysis.app && analysis.app.name) || "app";
+    if (!byDomain.has(d)) byDomain.set(d, []);
+    byDomain.get(d).push(c);
+  }
+  const lines = [];
+  for (const [domain, list] of byDomain) {
+    lines.push(`    ◆ ${domain}:`);
+    for (const c of list) {
+      const brief = String(c.description || "").replace(/\s+/g, " ").split(/(?<=[。;；.])\s*/)[0].slice(0, 110);
+      const req = (c.params ?? []).filter((p) => !p.optional).map((p) => p.name).join("/");
+      lines.push(`      - ${c.id}${req ? `(${req})` : "(无参数)"}: ${brief}`);
+    }
+  }
+  lines.push(`    ◆ 媒体播控(内置): media_next / media_prev / media_play / media_pause`);
+  return lines.join("\n");
+}
+/** 由 capability 可选字段 uiSync={argKey,map} 生成 ui_sync 段(无数据返回空串) */
+function uiSyncYamlFor(analysis) {
+  const entries = (analysis.capabilities ?? []).filter((c) => c.uiSync && c.uiSync.map && Object.keys(c.uiSync.map).length);
+  if (!entries.length) return "";
+  const blocks = entries.map((c) =>
+    `  - tool: ${c.id}\n    arg_key: ${c.uiSync.argKey || ""}\n    map:\n` +
+    Object.entries(c.uiSync.map).map(([k, v]) => `      "${k}": ${JSON.stringify(String(v))}`).join("\n"));
+  return `ui_sync:\n${blocks.join("\n")}`;
+}
 function gatewayConfigPath() {
   if (process.env.BRIDGE_E2E_CONFIG) return resolve(PROJECT_ROOT, process.env.BRIDGE_E2E_CONFIG);
   const template = read(join(E2E_DIR, "config-cockpit.yaml"));
@@ -114,6 +144,14 @@ function gatewayConfigPath() {
   if (resolvedAnalysis && existsSync(resolvedAnalysis)) {
     text = text.replace(/"--analysis",\s*"bridge-analysis\.json"/,
       `"--analysis", ${JSON.stringify(resolvedAnalysis.replace(/\\/g, "/"))}`);
+  }
+  // system_prompt 工具清单与 ui_sync 按本次 analysis 动态生成(泛化, 不绑定任何 app)
+  let analysis = null;
+  try { analysis = JSON.parse(read(resolvedAnalysis)); } catch (e) { /* 占位行保留 */ }
+  if (analysis) {
+    text = text.replace(/^ {4}\(本行由 viz\/run\.mjs 按本次分析产物自动替换为工具清单\)$/m, toolLinesFor(analysis));
+    const uiSync = uiSyncYamlFor(analysis);
+    if (uiSync) text = text.replace(/\ntask:/, "\n" + uiSync + "\ntask:");
   }
   // LLM key 是刚需: 取不到就询问用户(页面输入, POST /api/e2e/key), 不做 mock 降级
   if (!gw.apiKey && !process.env.QWEN_API_KEY) {

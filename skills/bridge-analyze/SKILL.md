@@ -52,7 +52,8 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
       "dataClass": "ModeParam",    // dataclass: 反序列化类型
       "devicePaths": ["body.vin"], // envelope: 设备值注入点(须在 app.deviceSources)
       "servicePackage": "com.x.app", "serviceClass": "com.x.app.Service", "bindAction": "com.x.app.ACTION_BIND",
-      "ccDomain": "002", "ccFunction": "func_id"  // carcontrol 专用
+      "ccDomain": "002", "ccFunction": "func_id",  // carcontrol 专用
+      "uiSync": { "argKey": "mode", "map": { "7": "主驾优先" } }  // 可选: e2e cockpit 在该工具成功后自动点击对应 UI 文案做状态同步(map=参数值→界面文本, 按目标 app 实际文案填写; 无此需求省略)
     }
   ]
 }
