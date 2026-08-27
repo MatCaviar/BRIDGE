@@ -599,7 +599,7 @@ function connectSSE(sessionId){
   const es=new EventSource('/api/events/'+encodeURIComponent(sessionId));state.es=es;
   es.addEventListener('tools_discovered',e=>{const d=JSON.parse(e.data);renderRegistry(d.tools||[]);kv('st-tools',String((d.tools||[]).length),'ok');});
   es.addEventListener('llm_request',e=>{const d=JSON.parse(e.data);kv('st-model',(d.provider||'?')+'/'+(d.model||'?'));chip('chip-llm','busy','思考中');bg('thinking',0);
-    state.roundR=mkRound(d.turn,(d.provider||'?')+'/'+(d.model||'?'));});
+    state.roundR=mkRound(d.turn,(d.model||d.provider||'?'));});
   es.addEventListener('llm_response',e=>{const d=JSON.parse(e.data);kv('st-tin',String(d.totalInputTokens??0));kv('st-tout',String(d.totalOutputTokens??0));
     fillRound(d);});
   es.addEventListener('tool_call_started',e=>{const d=JSON.parse(e.data);chip('chip-car','busy','调用中');kv('st-car','调用 '+d.toolName,'warn');bg('executing',0);
