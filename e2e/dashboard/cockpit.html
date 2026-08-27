@@ -56,12 +56,15 @@ main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;min-
 .msg .mtime{display:block;font-size:10px;color:var(--text-faint);margin-top:4px}
 .msg.thinking{color:var(--text-dim);font-style:italic}
 /* ── LLM 多轮全量展示 ── */
-.msg.round{border-left:3px solid #82b6e6;background:rgba(130,182,230,.07);padding:.55rem .8rem;border-radius:0 10px 10px 0;max-width:100%}
+.msg.round{border-left:2px solid rgba(130,182,230,.55);background:rgba(130,182,230,.05);padding:.4rem .7rem;border-radius:0 8px 8px 0;max-width:92%;opacity:.92}
+.msg.round.empty{padding:.12rem .7rem;background:transparent;border-left-color:rgba(130,182,230,.25)}
+.msg.round.empty .rtext,.msg.round.empty .rmeta{display:none}
+.msg.round.empty .rbadge{margin-bottom:0;border-color:rgba(143,165,200,.18);color:rgba(143,165,200,.6)}
 .msg.round .rbadge{display:inline-flex;align-items:baseline;gap:7px;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#8fa5c8;border:1px solid rgba(143,165,200,.32);border-radius:3px;padding:2px 9px 2px 8px;margin-bottom:.35rem;background:transparent;font-variant-numeric:tabular-nums}
 .msg.round .rbadge .rn{font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:0;color:#b7c9e4;line-height:1}
 .msg.round .rbadge .rm{letter-spacing:.06em;font-style:italic;text-transform:none;color:#7d92b5;font-size:10px}
-.msg.round .rtext{white-space:pre-wrap;word-break:break-word;font-size:.92rem;color:#e8f1fa;line-height:1.55}
-.msg.round .rmeta{font-size:.7rem;color:var(--text-dim);margin-top:.3rem;font-family:var(--mono,monospace)}
+.msg.round .rtext{white-space:pre-wrap;word-break:break-word;font-size:.84rem;color:#c9d8ea;line-height:1.5}
+.msg.round .rmeta{font-size:.66rem;color:var(--text-dim);margin-top:.22rem;font-family:var(--mono,monospace);opacity:.85}
 .msg.round.pending .rtext{color:var(--text-dim);font-style:italic}
 .tblk{margin:.3rem 0 .3rem .9rem;border:1px solid rgba(130,182,230,.25);border-left-width:3px;border-radius:8px;overflow:hidden;font-size:.76rem;max-width:100%;background:rgba(130,182,230,.05)}
 .tblk.run{border-left-color:#e0c38a}.tblk.ok{border-left-color:#5ad07e}.tblk.err{border-left-color:#e08a8a}
@@ -471,8 +474,12 @@ function mkRound(turn,model){
 }
 function fillRound(d){
   const el=state.roundEl;if(!el)return;el.classList.remove('pending');
-  el.querySelector('.rtext').textContent=(d.text&&String(d.text).trim())?String(d.text):'（本轮仅发起工具调用，无文本输出）';
-  const u=d.usage||{};el.querySelector('.rmeta').textContent='stop='+(d.stopReason||'?')+' · in '+(u.inputTokens??'?')+' / out '+(u.outputTokens??'?')+' tok'+(d.durationMs!=null?' · '+(d.durationMs/1000).toFixed(1)+'s':'');
+  const txt=(d.text&&String(d.text).trim())?String(d.text):'';
+  if(txt){el.querySelector('.rtext').textContent=txt;}
+  else{el.classList.add('empty');}
+  const u=d.usage||{};
+  if(!el.classList.contains('empty'))el.querySelector('.rmeta').textContent='stop='+(d.stopReason||'?')+' · in '+(u.inputTokens??'?')+' / out '+(u.outputTokens??'?')+' tok'+(d.durationMs!=null?' · '+(d.durationMs/1000).toFixed(1)+'s':'');
+  state.lastRoundEl=el;state.lastRoundText=txt;
   chat.scrollTop=chat.scrollHeight;state.roundEl=null;
 }
 function mkToolBlk(turn,name,args){
@@ -603,7 +610,8 @@ function connectSSE(sessionId){
     fillToolBlk(d.callId,true,String(d.error||'error'),d.durationMs);
     chip('chip-car','err','调用失败');kv('st-car','上次调用失败','err');bg('error',2200);});
   es.addEventListener('turn_started',e=>{const d=JSON.parse(e.data);kv('st-turns',String(d.turn));});
-  es.addEventListener('session_completed',e=>{const d=JSON.parse(e.data);if(state.roundEl&&state.roundEl.classList.contains('pending'))state.roundEl.remove();addMsg('agent','\u2726 '+(d.finalText||'完成'));chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
+  es.addEventListener('session_completed',e=>{const d=JSON.parse(e.data);if(state.roundEl&&state.roundEl.classList.contains('pending'))state.roundEl.remove();
+    if(state.lastRoundEl&&state.lastRoundText&&(state.lastRoundText.trim()===(d.finalText||'').trim()))state.lastRoundEl.remove();addMsg('agent','\u2726 '+(d.finalText||'完成'));chip('chip-llm','ok','完成');kv('st-voice','完成','ok');bg('success',0);speak(d.finalText,()=>bg('idle'));es.close();reset();});
   es.addEventListener('session_error',e=>{const d=JSON.parse(e.data);addMsg('agent','会话错误: '+d.error);bg('error',2500);es.close();reset();});
   es.onerror=()=>{es.close();reset();};
 }
