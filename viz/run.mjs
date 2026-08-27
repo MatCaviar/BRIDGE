@@ -213,8 +213,18 @@ async function bootstrapGateway() {
 }
 async function ensureGateway() {
   if (await gwProbe()) return { ok: true };
-  if (gw.starting) return { ok: false, starting: true, phase: gw.phase };
+  if (gw.starting) {
+    // 看门狗: bootstrap 卡死(如宿主被 killing 致子进程握管道挂死)3 分钟无进展则复位重试
+    if (Date.now() - (gw.startedAt || 0) > 180000) {
+      gwLog("bootstrap 疑似卡死超过 3 分钟 — 复位重试");
+      gw.starting = false;
+      gw.phase = "";
+    } else {
+      return { ok: false, starting: true, phase: gw.phase };
+    }
+  }
   gw.starting = true;
+  gw.startedAt = Date.now();
   bootstrapGateway(); // 后台执行, 阶段经 /api/e2e 与 /e2e 503 响应可见
   return { ok: false, starting: true, phase: gw.phase };
 }
@@ -353,16 +363,18 @@ function run(cmd, args, opts = {}) {
     const t0 = Date.now();
     const p = spawn(cmd, args, { cwd: ROOT, windowsHide: true, ...opts });
     let out = "";
+    let settled = false;
     p.stdout.on("data", (d) => (out += d.toString()));
     p.stderr.on("data", (d) => (out += d.toString()));
+    const done = (r) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(hardCap); resolve(r); } };
     const timer = setTimeout(() => { try { p.kill(); } catch (e) {} }, opts.timeout || 60000);
+    // 硬兜底: shell:true 的子进程被外力杀死时, 孙进程可能握着管道使 close 永不触发 — 到点强制结算
+    const hardCap = setTimeout(() => done({ ok: false, code: -1, output: "timeout(hard): " + out.trim().slice(-200), durationMs: Date.now() - t0 }), (opts.timeout || 60000) + 8000);
     p.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({ ok: code === 0, code, output: out.trim(), durationMs: Date.now() - t0 });
+      done({ ok: code === 0, code, output: out.trim(), durationMs: Date.now() - t0 });
     });
     p.on("error", (e) => {
-      clearTimeout(timer);
-      resolve({ ok: false, code: -1, output: String(e.message), durationMs: Date.now() - t0 });
+      done({ ok: false, code: -1, output: String(e.message), durationMs: Date.now() - t0 });
     });
   });
 }
