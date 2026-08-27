@@ -19,7 +19,7 @@
  */
 import { createServer, request as httpRequest } from "http";
 import { spawn, execFile } from "child_process";
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join, basename, resolve } from "path";
 
@@ -74,7 +74,7 @@ let TARGET = {
   registry: argValue("--registry")
     ? resolve(PROJECT_ROOT, argValue("--registry"))
     : (analysisArg ? registryForAnalysis(resolvedAnalysis) : join(ROOT, "bridge-executor", "registries", "registry.json")),
-  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "bridge-executor", "src")),
+  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio")),
   adapter: argValue("--adapter") ? resolve(PROJECT_ROOT, argValue("--adapter")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt")),
 };
 
@@ -487,13 +487,6 @@ function targetViewData() {
     probe: { present: false },
   };
 }
-const extractMethods = (src) =>
-  [...src.matchAll(/(?:oneway\s+)?[\w<>\[\].,\s]+\s(\w+)\s*\([^)]*\)\s*(?:throws[\s\w.]*)?;/g)]
-    .map((m) => m[1]).filter((v, i, arr) => arr.indexOf(v) === i);
-const interfaceMethods = (src) => {
-  const m = src.match(/interface\s+\w+[^{]*\{([\s\S]*?)(?:abstract class|$)/);
-  return extractMethods(m ? m[1] : src);
-};
 
 /** inputs: 盘点 bridge-analyze 的真实输入素材（源码/逆向产物/分析产物） */
 async function stageInputs() {
@@ -537,94 +530,21 @@ async function stageAnalyze() {
   const active = caps.filter((c) => c.status !== "broken").length;
 
   const SRC = TARGET.srcDir;
-  // 项目模式(--analysis): 通用 sourceRef 可定位性核对 — 不绑定任何样例契约;
+  // 通用 sourceRef 可定位性核对 — 项目/套件演示同一实现, 不绑定任何样例契约;
   // 逐字 wire 契约核对由 bridge-analyze 验证协议第 5 步在宿主侧执行。
-  if (argValue("--analysis")) {
-    const activeCaps = caps.filter((c) => c.status !== "broken");
-    const miss = activeCaps.filter((c) => {
-      const ref = String(c.sourceRef || "").split(":")[0];
-      return !(ref && existsSync(join(SRC, ref)));
-    });
-    const out = [
-      `【载入真相源】${TARGET.analysis.replace(/\\/g, "/")}`,
-      `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
-      `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
-      ``,
-      `【sourceRef 可定位性核对（通用）】${SRC.replace(/\\/g, "/")}`,
-      `  非 broken ${activeCaps.length}: sourceRef 文件可定位 ${activeCaps.length - miss.length}/${activeCaps.length}${miss.length ? `（待核: ${miss.map((c) => c.id).join("、")}）` : " ✓"}`,
-      `  逐字 wire 核对(methodName/枚举/注入路径)由 host codeagent 按验证协议第 5 步完成`,
-    ].join("\n");
-    return { ok: true, output: out };
-  }
-  // 套件模式(无 --analysis): 仓库自带样例的契约交叉核对演示
-  // 契约文件在目标源码树内定向查找（跳过 build/.gradle 等，兼容 executor 布局与真实 app 布局）
-  const findIn = (name) => {
-    const hits = [];
-    const walk = (d) => {
-      let entries;
-      try { entries = readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
-      for (const en of entries) {
-        if (["build", ".gradle", ".git", "node_modules", ".cxx"].includes(en.name)) continue;
-        const p = join(d, en.name);
-        if (en.isDirectory()) walk(p);
-        else if (en.name === name) hits.push(p);
-      }
-    };
-    try { walk(SRC); } catch (e) {}
-    return hits[0] ? read(hits[0]) : "";
-  };
-  const aidlSrc = findIn("IIMAudioService.aidl");
-  const customSrc = findIn("ICustomService.java");
-  const mapSrc = findIn("IMapCommonService.java");
-  const aidlMethods = extractMethods(aidlSrc);
-  const customMethods = interfaceMethods(customSrc);
-  const mapMethods = interfaceMethods(mapSrc);
-  // 被分析目标源码（bridge-analyze 的 sourceRef 指向处）: 适配器
-  const adapterKt = read(TARGET.adapter);
-  const adapterMethods = [...adapterKt.matchAll(/fun\s+(\w+)\s*\(/g)].map((m) => m[1]);
-  let handlers = [];
-  try { handlers = JSON.parse(read(join(ROOT, "tools", "carcontrol_handlers.json"))); } catch (e) {}
-  const handlerIds = new Set(handlers.map((h) => h.functionId).filter(Boolean));
-
-  const execmdCaps = caps.filter((c) => c.status !== "broken" && (c.mechanism || "execmd") === "execmd");
-  const ccCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "carcontrol");
-  const mapCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "mapnav");
-  const brokenCaps = caps.filter((c) => c.status === "broken");
-  const execmdUnmatched = execmdCaps.filter((c) => !adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
-  const ccUnmatched = ccCaps.filter((c) => !handlerIds.has(c.ccFunction)).map((c) => `${c.id}(${c.ccFunction})`);
-  const mapUnmatched = mapCaps.filter(() => !mapMethods.includes("navigateToForAI")).map((c) => c.id);
-  const uncoveredMap = mapMethods.filter((m) => m !== "navigateToForAI");
-  const helperFuns = new Set(["registerCallback", "unregisterCallback", "parseRequest", "parseJsonObject", "intArg", "optionalIntArg", "buildResponse"]);
-  const analyzedNames = new Set(caps.map((c) => c.methodName).filter(Boolean));
-  const uncoveredAdapter = adapterMethods.filter((m) => !analyzedNames.has(m) && !helperFuns.has(m));
-  const brokenInAdapter = brokenCaps.filter((c) => adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
-
+  const activeCaps = caps.filter((c) => c.status !== "broken");
+  const miss = activeCaps.filter((c) => {
+    const ref = String(c.sourceRef || "").split(":")[0];
+    return !(ref && existsSync(join(SRC, ref)));
+  });
   const out = [
     `【载入真相源】${TARGET.analysis.replace(/\\/g, "/")}`,
     `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
     `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
     ``,
-    `【被分析目标源码（sourceRef 指向）】${TARGET.adapter.replace(/\\/g, "/")}`,
-    `  → ${adapterMethods.length} 个 fun（含 ${execmdCaps.length} 个 capability 对应的方法）`,
-    ``,
-    `【源码契约扫描】${SRC.replace(/\\/g, "/")}`,
-    `  IIMAudioService.aidl   → ${aidlMethods.length ? `${aidlMethods.length} 方法: ${aidlMethods.join(" / ")}` : "未找到（目标源码中无此契约）"}`,
-    `  ICustomService.java    → ${customMethods.length ? `${customMethods.length} 方法: ${customMethods.join(" / ")}（JSON functionId 路由）` : "未找到（执行器侧契约，目标源码无）"}`,
-    `  IMapCommonService.java → ${mapMethods.length ? `${mapMethods.length} 方法: ${mapMethods.join(" / ")}` : "未找到（执行器侧契约，目标源码无）"}`,
-    `  carcontrol_handlers.json → ${handlerIds.size} functionId 映射（逆向产物）`,
-    ``,
-    `【交叉核对】${caps.length} capabilities`,
-    `  execmd ${execmdCaps.length}: methodName ∈ 适配器源码 — ${execmdCaps.length - execmdUnmatched.length}/${execmdCaps.length} ✓${execmdUnmatched.length ? ` ✗ ${execmdUnmatched.join("、")}` : ""}（逐名核对源码）`,
-    `  carcontrol ${ccCaps.length}: ccFunction ∈ ${handlerIds.size} handlers — ${ccCaps.length - ccUnmatched.length}/${ccCaps.length} ✓${ccUnmatched.length ? ` ✗ ${ccUnmatched.join("、")}` : ""}`,
-    `  mapnav ${mapCaps.length}: navigateToForAI ∈ IMapCommonService — ${mapCaps.length - mapUnmatched.length}/${mapCaps.length} ✓`,
-    `  broken ${brokenCaps.length}: 方法存在于源码但标记 broken（stub）${brokenInAdapter.length ? `— ${brokenInAdapter.join("、")}` : ""}`,
-    ``,
-    `【潜在能力面（源码方法未被 analysis 覆盖）】`,
-    `  IMapCommonService: ${uncoveredMap.join(" / ") || "（无）"} → 可经 bridge-analyze onboarding`,
-    `  IMAudioServiceAdapter: ${uncoveredAdapter.join(" / ") || "（无）"}`,
-    `  IIMAudioService: registerCallback / unregisterCallback（内部回调机制）`,
-    `  ICustomService: sendMessage / isServiceReady（执行器基础设施）`,
-    `（描述撰写为 agent 判断；本阶段执行的是源码扫描 + 契约交叉核对的确定性部分）`,
+    `【sourceRef 可定位性核对（通用）】${SRC.replace(/\\/g, "/")}`,
+    `  非 broken ${activeCaps.length}: sourceRef 文件可定位 ${activeCaps.length - miss.length}/${activeCaps.length}${miss.length ? `（待核: ${miss.map((c) => c.id).join("、")}）` : " ✓"}`,
+    `  逐字 wire 核对(methodName/枚举/注入路径)由 host codeagent 按验证协议第 5 步完成`,
   ].join("\n");
   return { ok: true, output: out };
 }
