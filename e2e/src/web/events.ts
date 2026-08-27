@@ -79,6 +79,8 @@ export interface ToolCallCompletedEvent {
   readonly serverName: string;
   readonly toolName: string;
   readonly resultPreview: string;
+  /** 完整结果(不截断) — cockpit 全量展示用 */
+  readonly resultFull: string;
   /** Wall-clock ms from tool_call_started to this event. */
   readonly durationMs: number;
 }

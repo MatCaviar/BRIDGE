@@ -229,6 +229,7 @@ export async function runObservable(
           serverName: call.serverName,
           toolName: call.toolName,
           resultPreview: preview,
+          resultFull: resultStr,
           durationMs: toolDuration,
         } satisfies ToolCallCompletedEvent);
       } catch (error) {
@@ -312,6 +313,7 @@ async function syncUiAfterTool(
       serverName: "bridge-ui",
       toolName: "ui_tap_text",
       resultPreview: `ui_sync: tapped "${text}"`,
+      resultFull: `ui_sync: tapped "${text}"`,
       durationMs: 0,
     });
   } catch {

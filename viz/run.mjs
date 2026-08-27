@@ -17,26 +17,13 @@
  *
  * 安全：仅绑定 127.0.0.1 本地回环；车端操作（deploy/invoke）会真动车，页面侧有护栏。
  */
-import { createServer } from "http";
+import { createServer, request as httpRequest } from "http";
 import { spawn, execFile } from "child_process";
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join, basename, resolve } from "path";
 
 const VIZ = dirname(fileURLToPath(import.meta.url));
-
-// POST body 健壮解码: 严格 UTF-8, 失败按 GBK 兜底(Windows 客户端常见), 再失败退 utf-8 宽松
-const __utf8Strict = new TextDecoder("utf-8", { fatal: true });
-const __gbkDecoder = new TextDecoder("gbk");
-async function readBody(req) {
-  const chunks = [];
-  for await (const c of req) chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
-  const buf = Buffer.concat(chunks);
-  if (!buf.length) return "";
-  try { return __utf8Strict.decode(buf); }
-  catch { try { return __gbkDecoder.decode(buf); } catch { return buf.toString("utf-8"); } }
-}
-
 const argValue = (name) => {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
@@ -87,14 +74,294 @@ let TARGET = {
   registry: argValue("--registry")
     ? resolve(PROJECT_ROOT, argValue("--registry"))
     : (analysisArg ? registryForAnalysis(resolvedAnalysis) : join(ROOT, "bridge-executor", "registries", "registry.json")),
-  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "bridge-executor", "src")),
+  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio")),
   adapter: argValue("--adapter") ? resolve(PROJECT_ROOT, argValue("--adapter")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt")),
 };
 
 const PORT = Number(argValue("--port") || process.env.PORT || 8650);
+
+// POST body 健壮解码: 严格 UTF-8, 失败按 GBK 兜底(Windows GBK 客户端常见), 再失败退 utf-8 宽松
+const __utf8Strict = new TextDecoder("utf-8", { fatal: true });
+const __gbkDecoder = new TextDecoder("gbk");
+async function readBody(req) {
+  const chunks = [];
+  for await (const c of req) chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c));
+  const buf = Buffer.concat(chunks);
+  if (!buf.length) return "";
+  try { return __utf8Strict.decode(buf); }
+  catch { try { return __gbkDecoder.decode(buf); } catch { return buf.toString("utf-8"); } }
+}
+
 const HOST = "127.0.0.1";
 
-const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, serveLog: [] };
+const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, serveLog: [], showE2E: false };
+
+/* ---------- 端到端网关: 同源代理(/e2e/*) + 按需自动拉起(通用, 单端口体验) ----------
+   页面只在 :8650 内活动; gateway(默认 :3000, BRIDGE_E2E_URL 可配)作为内部实现细节
+   由本后端代理并自动启动: 首次使用自动 npm install + tsc + 生成配置; 无 LLM key 时
+   降级 mock provider(工具面/注入可用); 项目模式(--analysis)自动指向本次分析产物。 */
+const E2E_DIR = join(ROOT, "e2e");
+const E2E_BASE = (process.env.BRIDGE_E2E_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+const E2E_TARGET = new URL(E2E_BASE);
+const gw = { proc: null, phase: "", starting: false, log: [], apiKey: "", needsKey: false,
+  // 自动端到端测试实时状态(cockpit 轮询渲染; 不写入管线会话日志, 管线页保持纯净)
+  tests: { running: false, total: 0, index: 0, current: "", results: [], updatedAt: 0 } };
+function gwLog(line) {
+  gw.log.push(line);
+  if (gw.log.length > 60) gw.log.splice(0, gw.log.length - 60);
+  console.error(`[e2e] ${line}`);
+}
+async function gwProbe() {
+  try { await fetchJson(`${E2E_BASE}/api/health`, 1500); return true; } catch (e) { return false; }
+}
+/** 由 analysis 产物生成 system_prompt 的工具清单段(泛化: 不绑定任何 app, 描述取自 capability) */
+function toolLinesFor(analysis) {
+  const caps = (analysis.capabilities ?? []).filter((c) => c.status !== "broken");
+  const byDomain = new Map();
+  for (const c of caps) {
+    const d = c.domain || (analysis.app && analysis.app.name) || "app";
+    if (!byDomain.has(d)) byDomain.set(d, []);
+    byDomain.get(d).push(c);
+  }
+  const lines = [];
+  for (const [domain, list] of byDomain) {
+    lines.push(`    ◆ ${domain}:`);
+    for (const c of list) {
+      const brief = String(c.description || "").replace(/\s+/g, " ").split(/(?<=[。;；.])\s*/)[0].slice(0, 110);
+      const req = (c.params ?? []).filter((p) => !p.optional).map((p) => p.name).join("/");
+      lines.push(`      - ${c.id}${req ? `(${req})` : "(无参数)"}: ${brief}`);
+    }
+  }
+  lines.push(`    ◆ 媒体播控(内置): media_next / media_prev / media_play / media_pause`);
+  return lines.join("\n");
+}
+/** 由 capability 可选字段 uiSync={argKey,map} 生成 ui_sync 段(无数据返回空串) */
+function uiSyncYamlFor(analysis) {
+  const entries = (analysis.capabilities ?? []).filter((c) => c.uiSync && c.uiSync.map && Object.keys(c.uiSync.map).length);
+  if (!entries.length) return "";
+  const blocks = entries.map((c) =>
+    `  - tool: ${c.id}\n    arg_key: ${c.uiSync.argKey || ""}\n    map:\n` +
+    Object.entries(c.uiSync.map).map(([k, v]) => `      "${k}": ${JSON.stringify(String(v))}`).join("\n"));
+  return `ui_sync:\n${blocks.join("\n")}`;
+}
+function gatewayConfigPath() {
+  if (process.env.BRIDGE_E2E_CONFIG) return resolve(PROJECT_ROOT, process.env.BRIDGE_E2E_CONFIG);
+  const template = read(join(E2E_DIR, "config-cockpit.yaml"));
+  if (!template) return join(E2E_DIR, "config-cockpit.yaml");
+  let text = template;
+  // 配置写到 viz/ 目录 — 配置加载器把相对路径按配置所在目录解析, 模板内全部相对路径须换成绝对路径
+  // (漏掉任何一个都会让对应 stdio 子进程 spawn 到不存在的脚本而瞬崩 → "Connection closed")
+  text = text
+    .replace(/"bridge-serve-wrapper\.mjs"/g, JSON.stringify(join(E2E_DIR, "bridge-serve-wrapper.mjs").replace(/\\/g, "/")))
+    .replace(/"bridge-ui-server\.mjs"/g, JSON.stringify(join(E2E_DIR, "bridge-ui-server.mjs").replace(/\\/g, "/")))
+    .replace(/"\.\.\/cli\/bin\/mcp-pipeline\.js"/g, JSON.stringify(CLI.replace(/\\/g, "/")));
+  // 项目模式: serve 指向本次分析产物
+  if (resolvedAnalysis && existsSync(resolvedAnalysis)) {
+    text = text.replace(/"--analysis",\s*"bridge-analysis\.json"/,
+      `"--analysis", ${JSON.stringify(resolvedAnalysis.replace(/\\/g, "/"))}`);
+  }
+  // system_prompt 工具清单与 ui_sync 按本次 analysis 动态生成(泛化, 不绑定任何 app)
+  let analysis = null;
+  try { analysis = JSON.parse(read(resolvedAnalysis)); } catch (e) { /* 占位行保留 */ }
+  if (analysis) {
+    text = text.replace(/^ {4}\(本行由 viz\/run\.mjs 按本次分析产物自动替换为工具清单\)$/m, toolLinesFor(analysis));
+    const uiSync = uiSyncYamlFor(analysis);
+    if (uiSync) text = text.replace(/\ntask:/, "\n" + uiSync + "\ntask:");
+  }
+  // LLM key 是刚需: 取不到就询问用户(页面输入, POST /api/e2e/key), 不做 mock 降级
+  if (!gw.apiKey && !process.env.QWEN_API_KEY) {
+    gw.needsKey = true;
+    return null;
+  }
+  gw.needsKey = false;
+  const out = join(VIZ, ".e2e-config.yaml");
+  writeFileSync(out, text);
+  return out;
+}
+async function bootstrapGateway() {
+  try {
+    if (!existsSync(join(E2E_DIR, "node_modules"))) {
+      gw.phase = "install";
+      gwLog("首次运行: 安装 e2e 依赖 (npm install, 约 1 分钟)…");
+      const r = await run("npm", ["install", "--no-audit", "--no-fund"], { cwd: E2E_DIR, timeout: 420000, shell: true });
+      if (!r.ok) { gwLog("npm install 失败: " + r.output.slice(-300)); return; }
+    }
+    const distServer = join(E2E_DIR, "dist", "web", "server.js");
+    if (!existsSync(distServer)) {
+      gw.phase = "build";
+      gwLog("构建 e2e (tsc)…");
+      const tsc = join(E2E_DIR, "node_modules", "typescript", "bin", "tsc");
+      const b = existsSync(tsc)
+        ? await run(process.execPath, [tsc], { cwd: E2E_DIR, timeout: 240000 })
+        : await run("npx", ["tsc"], { cwd: E2E_DIR, timeout: 240000, shell: true });
+      if (!b.ok || !existsSync(distServer)) { gwLog("构建失败: " + b.output.slice(-300)); return; }
+    }
+    gw.phase = "start";
+    const cfg = gatewayConfigPath();
+    if (!cfg) {
+      gwLog("缺少 LLM API key (QWEN_API_KEY) — 请在页面输入(仅存内存)或设置环境变量后重试");
+      return;
+    }
+    gwLog(`启动网关: node dist/web/server.js --config ${cfg}`);
+    const gwPort = Number(E2E_TARGET.port) || 3000; // 端口跟随 BRIDGE_E2E_URL, 与代理/探活一致
+    const p = spawn(process.execPath, [join(E2E_DIR, "dist", "web", "server.js"), "--config", cfg, "--port", String(gwPort)],
+      { cwd: E2E_DIR, windowsHide: true, env: { ...process.env, ...(gw.apiKey ? { QWEN_API_KEY: gw.apiKey } : {}) } });
+    gw.proc = p;
+    const onOut = (d) => d.toString().split(/\r?\n/).filter(Boolean).slice(-2).forEach((l) => gwLog(l));
+    p.stdout.on("data", onOut);
+    p.stderr.on("data", onOut);
+    p.on("exit", (code) => { gwLog(`网关进程退出 (code=${code})`); if (gw.proc === p) gw.proc = null; });
+    for (let i = 0; i < 40; i++) {
+      await sleep(500);
+      if (await gwProbe()) { gwLog("网关就绪"); return; }
+      if (p.exitCode !== null && p.exitCode !== undefined && !gw.proc) break;
+    }
+    gwLog("网关未在 20s 内就绪 — 检查上方日志");
+  } catch (e) {
+    gwLog("启动异常: " + String(e.message));
+  } finally {
+    gw.starting = false;
+    gw.phase = "";
+  }
+}
+async function ensureGateway() {
+  if (await gwProbe()) return { ok: true };
+  if (gw.starting) {
+    // 看门狗: bootstrap 卡死(如宿主被 killing 致子进程握管道挂死)3 分钟无进展则复位重试
+    if (Date.now() - (gw.startedAt || 0) > 180000) {
+      gwLog("bootstrap 疑似卡死超过 3 分钟 — 复位重试");
+      gw.starting = false;
+      gw.phase = "";
+    } else {
+      return { ok: false, starting: true, phase: gw.phase };
+    }
+  }
+  gw.starting = true;
+  gw.startedAt = Date.now();
+  bootstrapGateway(); // 后台执行, 阶段经 /api/e2e 与 /e2e 503 响应可见
+  return { ok: false, starting: true, phase: gw.phase };
+}
+/** 单条端到端测试: 真实 LLM 回合。判定: expect="none" → 期望不调用任何工具(防幻觉);
+ *  expect 为空 → 只记录; 否则 = 期望工具是否被选中 */
+async function runOneE2eTest(message, expect) {
+  const out = { message, expect: expect || "", called: [], final: "", pass: !expect };
+  try {
+    const r = await fetch(`${E2E_BASE}/api/run`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    const { sessionId } = await r.json();
+    if (!sessionId) throw new Error(String((await r.json().catch(() => ({}))).error || "no sessionId"));
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 90000);
+    const s = await fetch(`${E2E_BASE}/api/events/${sessionId}`, { signal: ac.signal });
+    const reader = s.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        const dataLine = frame.split("\n").find((l) => l.startsWith("data: "));
+        if (!dataLine) continue;
+        let ev;
+        try { ev = JSON.parse(dataLine.slice(6)); } catch { continue; }
+        if (ev.type === "tool_call_started" && ev.toolName) out.called.push(ev.toolName);
+        if (ev.type === "session_completed") out.final = String(ev.finalText || "");
+        if (ev.type === "session_error") out.final = "会话错误: " + String(ev.error || "");
+        if (ev.type === "session_completed" || ev.type === "session_error") {
+          clearTimeout(timer);
+          try { ac.abort(); } catch { /* already closed */ }
+          out.pass = expect === "none" ? out.called.length === 0
+            : !expect || out.called.includes(expect);
+          return out;
+        }
+      }
+    }
+    clearTimeout(timer);
+  } catch (e) {
+    out.final = "测试执行异常: " + String(e.message || e);
+  }
+  out.pass = expect === "none" ? out.called.length === 0 && !/异常|会话错误/.test(out.final)
+    : !expect || (expect && out.called.includes(expect));
+  return out;
+}
+/** host codeagent 驱动的自动端到端测试: 顺序执行, 实时状态供 cockpit 展示(自动跟随逐轮),
+ * 判定 = LLM 是否选中期望工具(以发现问题为导向); 不写管线会话日志。 */
+async function runE2eTests(tests) {
+  gw.tests = { running: true, total: tests.length, index: 0, current: "", results: [], updatedAt: Date.now() };
+  state.showE2E = true; // 测试开始即把用户页面自动切到 cockpit, 逐轮实时观看
+  const finish = (result) => {
+    gw.tests.running = false;
+    gw.tests.updatedAt = Date.now();
+    return result;
+  };
+  if (!(await gwProbe())) {
+    ensureGateway();
+    for (let i = 0; i < 90 && !(await gwProbe()); i++) await sleep(1000);
+  }
+  if (!(await gwProbe())) {
+    const why = gw.needsKey ? "缺少 LLM API key — 页面会向用户询问, 补 key 后重试" : "网关未能启动(见后端日志)";
+    return finish({ ok: false, needsKey: gw.needsKey, error: why });
+  }
+  const results = [];
+  for (const [i, t] of tests.entries()) {
+    const expect = t.expectTool || "";
+    gw.tests.index = i + 1;
+    gw.tests.current = t.message;
+    gw.tests.updatedAt = Date.now();
+    const r = await runOneE2eTest(t.message, expect);
+    results.push(r);
+    gw.tests.results = results;
+    gw.tests.updatedAt = Date.now();
+  }
+  const passed = results.filter((r) => r.pass).length;
+  const failed = results.filter((r) => !r.pass);
+  return finish({
+    ok: true, pass: passed, total: results.length, results,
+    note: failed.length ? `未通过 ${failed.length} 条(期望工具未被选中 → 优化对应 description 后 POST /api/e2e/restart 重测)` : "全部通过",
+  });
+}
+/** 同源代理: /e2e/* → gateway(*)。HTML 响应注入 fetch/EventSource 前缀补丁, 让页面内
+ *  的 /api/* 调用与 SSE 落回 /e2e/api/*; 其余(含 SSE 流)原样透传。 */
+function proxyToGateway(req, res, path) {
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers.connection;
+  delete headers["accept-encoding"];
+  const preq = httpRequest(
+    { hostname: E2E_TARGET.hostname, port: E2E_TARGET.port, path, method: req.method, headers },
+    (pres) => {
+      const isHtml = /text\/html/.test(String(pres.headers["content-type"] || ""));
+      if (!isHtml) {
+        res.writeHead(pres.statusCode || 502, pres.headers);
+        pres.pipe(res);
+        return;
+      }
+      const chunks = [];
+      pres.on("data", (c) => chunks.push(c));
+      pres.on("end", () => {
+        let body = Buffer.concat(chunks).toString("utf8");
+        const h = { ...pres.headers };
+        delete h["content-length"];
+        const patch = `<script>/* BRIDGE same-origin proxy patch */(function(){var P="/e2e";var f=window.fetch;window.fetch=function(i,init){try{var u=typeof i==="string"?i:(i&&i.url);if(u&&u.charAt(0)==="/"&&u.indexOf(P+"/")!==0){u=P+u;return typeof i==="string"?f(u,init):f(new Request(u,i),init);}}catch(e){}return f(i,init);};if(window.EventSource){var E=window.EventSource;window.EventSource=function(u,c){if(typeof u==="string"&&u.charAt(0)==="/"&&u.indexOf(P+"/")!==0)u=P+u;return new E(u,c);};}})();</script>`;
+        body = body.replace(/<head([^>]*)>/i, (m) => m + patch);
+        res.writeHead(pres.statusCode || 502, h);
+        res.end(body);
+      });
+    });
+  preq.on("error", (e) => {
+    try {
+      res.writeHead(502, { "content-type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: String(e.message) }));
+    } catch (_) { /* client gone */ }
+  });
+  req.pipe(preq);
+}
 
 /* ---------- 工具 ---------- */
 const MIME = {
@@ -109,16 +376,18 @@ function run(cmd, args, opts = {}) {
     const t0 = Date.now();
     const p = spawn(cmd, args, { cwd: ROOT, windowsHide: true, ...opts });
     let out = "";
+    let settled = false;
     p.stdout.on("data", (d) => (out += d.toString()));
     p.stderr.on("data", (d) => (out += d.toString()));
+    const done = (r) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(hardCap); resolve(r); } };
     const timer = setTimeout(() => { try { p.kill(); } catch (e) {} }, opts.timeout || 60000);
+    // 硬兜底: shell:true 的子进程被外力杀死时, 孙进程可能握着管道使 close 永不触发 — 到点强制结算
+    const hardCap = setTimeout(() => done({ ok: false, code: -1, output: "timeout(hard): " + out.trim().slice(-200), durationMs: Date.now() - t0 }), (opts.timeout || 60000) + 8000);
     p.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({ ok: code === 0, code, output: out.trim(), durationMs: Date.now() - t0 });
+      done({ ok: code === 0, code, output: out.trim(), durationMs: Date.now() - t0 });
     });
     p.on("error", (e) => {
-      clearTimeout(timer);
-      resolve({ ok: false, code: -1, output: String(e.message), durationMs: Date.now() - t0 });
+      done({ ok: false, code: -1, output: String(e.message), durationMs: Date.now() - t0 });
     });
   });
 }
@@ -228,30 +497,34 @@ function targetViewData() {
       present: registryTools.length > 0,
       tools: registryTools.length,
       byMechanism: registryByMechanism,
+      entries: registryTools.map((t) => ({
+        id: t.id, mechanism: t.mechanism ?? "execmd", methodName: t.methodName ?? "",
+        pattern: t.pattern ?? "", dataClass: t.dataClass ?? null, form: t.form ?? "",
+        status: t.status ?? "probe", sourceRef: t.sourceRef ?? "",
+      })),
       missingFromRegistry: [...activeIds].filter((id) => !registryIds.has(id)),
       extraInRegistry: [...registryIds].filter((id) => !activeIds.has(id)),
     },
+    functionSchemaDeliverable: functionSchemas.length
+      ? { path: TARGET.functionSchema.replace(/\\/g, "/"), count: functionSchemas.length, functions: functionSchemas }
+      : null,
     mediaBuiltins: MEDIA_BUILTINS,
     probe: { present: false },
   };
 }
-const extractMethods = (src) =>
-  [...src.matchAll(/(?:oneway\s+)?[\w<>\[\].,\s]+\s(\w+)\s*\([^)]*\)\s*(?:throws[\s\w.]*)?;/g)]
-    .map((m) => m[1]).filter((v, i, arr) => arr.indexOf(v) === i);
-const interfaceMethods = (src) => {
-  const m = src.match(/interface\s+\w+[^{]*\{([\s\S]*?)(?:abstract class|$)/);
-  return extractMethods(m ? m[1] : src);
-};
 
 /** inputs: 盘点 bridge-analyze 的真实输入素材（源码/逆向产物/分析产物） */
 async function stageInputs() {
+  const suiteSampleMode = !argValue("--analysis");
   const items = [
     ["被分析源码（适配器）", TARGET.adapter],
     ["唯一真相源（分析产物）", TARGET.analysis],
     ["执行器契约面", TARGET.srcDir],
-    ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
-    ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
-    ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
+    ...(suiteSampleMode ? [
+      ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
+      ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
+      ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
+    ] : []),
   ];
   const out = [
     `【输入素材盘点】bridge-analyze 输入形态：源码 / PRD / APK / adb 观察`,
@@ -263,7 +536,7 @@ async function stageInputs() {
     }),
     ``,
     `【说明】`,
-    `  完整逆向 dex dump（imaudio-dex / map-dex / ccs-dex 等，~1.7GB）不入库；来源与交接位置见 reverse/README.md`,
+    ...(suiteSampleMode ? [`  完整逆向 dex dump（仓库样例项目相关，不入库）；来源与交接位置见 reverse/README.md`] : []),
     `  本阶段为输入盘点（bridge-analyze 输入契约：任意形态）；真正"吃"这些原料的是 ② analyze（源码扫描 + 契约核对）`,
   ].join("\n");
   return { ok: true, output: out };
@@ -282,74 +555,21 @@ async function stageAnalyze() {
   const active = caps.filter((c) => c.status !== "broken").length;
 
   const SRC = TARGET.srcDir;
-  // 契约文件在目标源码树内定向查找（跳过 build/.gradle 等，兼容 executor 布局与真实 app 布局）
-  const findIn = (name) => {
-    const hits = [];
-    const walk = (d) => {
-      let entries;
-      try { entries = readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
-      for (const en of entries) {
-        if (["build", ".gradle", ".git", "node_modules", ".cxx"].includes(en.name)) continue;
-        const p = join(d, en.name);
-        if (en.isDirectory()) walk(p);
-        else if (en.name === name) hits.push(p);
-      }
-    };
-    try { walk(SRC); } catch (e) {}
-    return hits[0] ? read(hits[0]) : "";
-  };
-  const aidlSrc = findIn("IIMAudioService.aidl");
-  const customSrc = findIn("ICustomService.java");
-  const mapSrc = findIn("IMapCommonService.java");
-  const aidlMethods = extractMethods(aidlSrc);
-  const customMethods = interfaceMethods(customSrc);
-  const mapMethods = interfaceMethods(mapSrc);
-  // 被分析目标源码（bridge-analyze 的 sourceRef 指向处）: 适配器
-  const adapterKt = read(TARGET.adapter);
-  const adapterMethods = [...adapterKt.matchAll(/fun\s+(\w+)\s*\(/g)].map((m) => m[1]);
-  let handlers = [];
-  try { handlers = JSON.parse(read(join(ROOT, "tools", "carcontrol_handlers.json"))); } catch (e) {}
-  const handlerIds = new Set(handlers.map((h) => h.functionId).filter(Boolean));
-
-  const execmdCaps = caps.filter((c) => c.status !== "broken" && (c.mechanism || "execmd") === "execmd");
-  const ccCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "carcontrol");
-  const mapCaps = caps.filter((c) => c.status !== "broken" && c.mechanism === "mapnav");
-  const brokenCaps = caps.filter((c) => c.status === "broken");
-  const execmdUnmatched = execmdCaps.filter((c) => !adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
-  const ccUnmatched = ccCaps.filter((c) => !handlerIds.has(c.ccFunction)).map((c) => `${c.id}(${c.ccFunction})`);
-  const mapUnmatched = mapCaps.filter(() => !mapMethods.includes("navigateToForAI")).map((c) => c.id);
-  const uncoveredMap = mapMethods.filter((m) => m !== "navigateToForAI");
-  const helperFuns = new Set(["registerCallback", "unregisterCallback", "parseRequest", "parseJsonObject", "intArg", "optionalIntArg", "buildResponse"]);
-  const analyzedNames = new Set(caps.map((c) => c.methodName).filter(Boolean));
-  const uncoveredAdapter = adapterMethods.filter((m) => !analyzedNames.has(m) && !helperFuns.has(m));
-  const brokenInAdapter = brokenCaps.filter((c) => adapterMethods.includes(c.methodName)).map((c) => `${c.id}(${c.methodName})`);
-
+  // 通用 sourceRef 可定位性核对 — 项目/套件演示同一实现, 不绑定任何样例契约;
+  // 逐字 wire 契约核对由 bridge-analyze 验证协议第 5 步在宿主侧执行。
+  const activeCaps = caps.filter((c) => c.status !== "broken");
+  const miss = activeCaps.filter((c) => {
+    const ref = String(c.sourceRef || "").split(":")[0];
+    return !(ref && existsSync(join(SRC, ref)));
+  });
   const out = [
     `【载入真相源】${TARGET.analysis.replace(/\\/g, "/")}`,
     `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
     `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
     ``,
-    `【被分析目标源码（sourceRef 指向）】${TARGET.adapter.replace(/\\/g, "/")}`,
-    `  → ${adapterMethods.length} 个 fun（含 ${execmdCaps.length} 个 capability 对应的方法）`,
-    ``,
-    `【源码契约扫描】${SRC.replace(/\\/g, "/")}`,
-    `  IIMAudioService.aidl   → ${aidlMethods.length ? `${aidlMethods.length} 方法: ${aidlMethods.join(" / ")}` : "未找到（目标源码中无此契约）"}`,
-    `  ICustomService.java    → ${customMethods.length ? `${customMethods.length} 方法: ${customMethods.join(" / ")}（JSON functionId 路由）` : "未找到（执行器侧契约，目标源码无）"}`,
-    `  IMapCommonService.java → ${mapMethods.length ? `${mapMethods.length} 方法: ${mapMethods.join(" / ")}` : "未找到（执行器侧契约，目标源码无）"}`,
-    `  carcontrol_handlers.json → ${handlerIds.size} functionId 映射（逆向产物）`,
-    ``,
-    `【交叉核对】${caps.length} capabilities`,
-    `  execmd ${execmdCaps.length}: methodName ∈ 适配器源码 — ${execmdCaps.length - execmdUnmatched.length}/${execmdCaps.length} ✓${execmdUnmatched.length ? ` ✗ ${execmdUnmatched.join("、")}` : ""}（逐名核对源码）`,
-    `  carcontrol ${ccCaps.length}: ccFunction ∈ ${handlerIds.size} handlers — ${ccCaps.length - ccUnmatched.length}/${ccCaps.length} ✓${ccUnmatched.length ? ` ✗ ${ccUnmatched.join("、")}` : ""}`,
-    `  mapnav ${mapCaps.length}: navigateToForAI ∈ IMapCommonService — ${mapCaps.length - mapUnmatched.length}/${mapCaps.length} ✓`,
-    `  broken ${brokenCaps.length}: 方法存在于源码但标记 broken（stub）${brokenInAdapter.length ? `— ${brokenInAdapter.join("、")}` : ""}`,
-    ``,
-    `【潜在能力面（源码方法未被 analysis 覆盖）】`,
-    `  IMapCommonService: ${uncoveredMap.join(" / ") || "（无）"} → 可经 bridge-analyze onboarding`,
-    `  IMAudioServiceAdapter: ${uncoveredAdapter.join(" / ") || "（无）"}`,
-    `  IIMAudioService: registerCallback / unregisterCallback（内部回调机制）`,
-    `  ICustomService: sendMessage / isServiceReady（执行器基础设施）`,
-    `（描述撰写为 agent 判断；本阶段执行的是源码扫描 + 契约交叉核对的确定性部分）`,
+    `【sourceRef 可定位性核对（通用）】${SRC.replace(/\\/g, "/")}`,
+    `  非 broken ${activeCaps.length}: sourceRef 文件可定位 ${activeCaps.length - miss.length}/${activeCaps.length}${miss.length ? `（待核: ${miss.map((c) => c.id).join("、")}）` : " ✓"}`,
+    `  逐字 wire 核对(methodName/枚举/注入路径)由 host codeagent 按验证协议第 5 步完成`,
   ].join("\n");
   return { ok: true, output: out };
 }
@@ -535,17 +755,19 @@ async function fetchJson(url, ms) {
   } finally { clearTimeout(t); }
 }
 
-createServer(async (req, res) => {
+const handler = async (req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   try {
     if (url.pathname === "/api/e2e") {
-      // 聚合 gateway(:3000) 端到端状态: 健康度 + 最近会话事件摘要(工具调用/最终回复)
+      // 端到端网关状态(同源代理视图): ok 时前端直接 iframe /e2e/cockpit; down 时触发自动拉起并回报阶段
       const out = { gateway: null, sessions: [] };
-      try {
-        const h = await fetchJson("http://localhost:3000/api/health", 2500);
-        out.gateway = { ok: true, ...h };
-      } catch {
-        out.gateway = { ok: false };
+      if (await gwProbe()) {
+        let h = {};
+        try { h = await fetchJson(`${E2E_BASE}/api/health`, 2500); } catch (e) { /* probe已过, 忽略 */ }
+        out.gateway = { ok: true, url: "/e2e/cockpit", proxied: true, ...h };
+      } else {
+        const st = await ensureGateway();
+        out.gateway = { ok: false, url: "/e2e/cockpit", proxied: true, starting: st.starting === true, phase: st.phase || "", needsKey: gw.needsKey, log: gw.log.slice(-5) };
       }
       try {
         const sess = state.session;
@@ -596,7 +818,36 @@ createServer(async (req, res) => {
         name: session.name, startedAt: session.startedAt,
         stages: session.stages, log: session.log, progress: sessProgress(),
         running: session.log.length > 0 && session.stages.n6 !== "done" && session.stages.n6 !== "skipped",
+        // host codeagent 收尾端到端演示时置位(POST /api/e2e/show), 已打开的页面轮询到后自动切换到端到端视图
+        showE2E: state.showE2E === true,
       }));
+    }
+    if (url.pathname === "/api/e2e/restart" && req.method === "POST") {
+      // host codeagent 优化 description 后重启网关, 使新生成的配置(含 system_prompt 工具清单)生效
+      if (gw.proc) { try { gw.proc.kill(); } catch (e) { /* already dead */ } gw.proc = null; }
+      gwLog("按请求重启网关(应用更新后的 analysis)");
+      ensureGateway();
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    if (url.pathname === "/api/e2e/test" && req.method === "POST") {
+      // 自动端到端测试(同步响应, 通常 1-2 分钟): 逐条实时写入 /api/session(n6), cockpit 自动跟随展示
+      let body = await readBody(req);
+      let tests = [];
+      try { tests = (JSON.parse(body || "{}").tests || []).filter((t) => t && t.message); } catch (e) { tests = []; }
+      if (!tests.length) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        return res.end(JSON.stringify({ ok: false, error: "tests 为空(需 [{message, expectTool}])" }));
+      }
+      const result = await runE2eTests(tests);
+      res.writeHead(result.ok ? 200 : 503, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify(result));
+    }
+    if (url.pathname === "/api/e2e/show" && req.method === "POST") {
+      state.showE2E = true;
+      ensureGateway();
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true }));
     }
     if (url.pathname === "/api/session/start" && req.method === "POST") {
       let body = await readBody(req);
@@ -635,15 +886,70 @@ createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: r.ok, stage, output: r.output || "", error: r.error || "", durationMs: r.durationMs || 0 }));
     }
+    if (url.pathname === "/api/e2e/key" && req.method === "POST") {
+      // 用户经页面提交 LLM key — 仅存本机后端内存(不落盘/不入仓), 提交后自动拉起网关
+      let body = await readBody(req);
+      let key = "";
+      try { key = String((JSON.parse(body || "{}").key || "")).trim(); } catch (e) { key = ""; }
+      if (!key) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        return res.end(JSON.stringify({ ok: false, error: "key 不能为空" }));
+      }
+      gw.apiKey = key;
+      gw.needsKey = false;
+      gwLog("已收到 LLM API key(仅内存) — 拉起网关");
+      ensureGateway();
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    if (url.pathname === "/e2e" || url.pathname.startsWith("/e2e/")) {
+      // 同源端到端入口: /e2e 与 /e2e/ → cockpit; /e2e/api/* → gateway API(含 SSE 透传)
+      ensureGateway();
+      let sub = url.pathname.replace(/^\/e2e/, "");
+      if (!sub || sub === "/") sub = "/cockpit";
+      // 测试实时状态由本后端直接供给(cockpit 进度条轮询), 不转发网关
+      if (sub === "/api/tests") {
+        res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        return res.end(JSON.stringify(gw.tests));
+      }
+      if (!(await gwProbe())) {
+        res.writeHead(503, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+        res.end(JSON.stringify({ ok: false, starting: gw.starting, phase: gw.phase, log: gw.log.slice(-6) }));
+        return;
+      }
+      proxyToGateway(req, res, sub);
+      return;
+    }
     const path = (url.pathname === "/" || url.pathname === "/cockpit") ? "pipeline.html" : decodeURIComponent(url.pathname.slice(1));
     return serveFile(res, path);
   } catch (e) {
     res.writeHead(500, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: String(e.message) }));
   }
-}).listen(PORT, HOST, () => {
+};
+
+createServer(handler).listen(PORT, "127.0.0.1", () => {
   console.log(`BRIDGE 管线可视化 · 实时后端就绪`);
-  console.log(`  页面: http://${HOST}:${PORT}/pipeline.html   （切「实时」模式逐阶段执行）`);
+  console.log(`  页面: http://127.0.0.1:${PORT}/pipeline.html 与 http://localhost:${PORT}/cockpit （双栈回环）`);
   console.log(`  adb: ${ADB}`);
   console.log(`  退出: Ctrl+C`);
+  // --open / BRIDGE_VIZ_OPEN=1: 由后端直接在用户默认浏览器打开页面(host codeagent 不必自行拼命令,
+  // 规避 Git Bash 下 cmd start 的路径转义问题); 无图形环境静默忽略, 由调用方以文字告知地址。
+  if (argValue("--open") || process.env.BRIDGE_VIZ_OPEN === "1") {
+    const url = `http://127.0.0.1:${PORT}/pipeline.html`;
+    try {
+      if (process.platform === "win32") {
+        spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process '${url}'`], { windowsHide: true, stdio: "ignore" });
+      } else if (process.platform === "darwin") {
+        spawn("open", [url], { stdio: "ignore" });
+      } else {
+        spawn("xdg-open", [url], { stdio: "ignore" });
+      }
+      console.log(`  已请求在默认浏览器打开: ${url}`);
+    } catch (e) { console.log(`  打开浏览器失败(无图形环境?): ${url}`); }
+  }
 });
+// Windows 的 localhost 优先解析 ::1 — 补 IPv6 回环监听, 保证 http://localhost:<port> 浏览器可达
+try {
+  createServer(handler).on("error", () => { /* IPv6 回环不可用时静默忽略 */ }).listen(PORT, "::1");
+} catch (e) { /* 同上 */ }

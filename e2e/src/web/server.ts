@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { EventEmitter } from "node:events";
 import express from "express";
+import type { Response } from "express";
 import { loadConfig } from "../config.js";
 import { McpConnector } from "../mcp/connector.js";
 import { createLLMClient } from "../llm/factory.js";
@@ -58,6 +59,9 @@ interface Session {
   readonly buffer: DashboardEvent[];
   status: "running" | "completed" | "error";
   sseClientCount: number;
+  /** 登记字段(供 /api/sessions 与 cockpit 自动跟随) */
+  startedAt?: string;
+  message?: string;
 }
 
 const SESSION_TTL_MS = 120_000;
@@ -109,7 +113,20 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Start a new orchestration session
-app.post("/api/run", (req, res) => {
+app.post("/api/run", async (req, res) => {
+  // HTTP 先于 MCP 发现就绪(listen 不等 connectAll) — run 必须等工具注册表填充完成,
+  // 否则早到的请求会以 "No MCP tools discovered" 失败(自动端到端测试实测发现的竞态)
+  if (configState.connectPromise) {
+    try {
+      await Promise.race([
+        configState.connectPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("MCP servers not ready (120s)")), 120000)),
+      ]);
+    } catch (err: unknown) {
+      res.status(503).json({ error: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+  }
   if (hasActiveSession()) {
     res.status(409).json({ error: "A session is already running. Please wait." });
     return;
@@ -123,11 +140,16 @@ app.post("/api/run", (req, res) => {
 
   const { sessionId, emitter } = createSession();
 
+  // 会话登记(供 cockpit 自动跟随 agent 驱动的测试回合): 记录首条用户消息与时间
+  const session = sessions.get(sessionId)!;
+  session.startedAt = new Date().toISOString();
+  session.message = message.trim().slice(0, 120);
+
   // Buffer events so late-connecting SSE clients can still get them
   emitter.on("event", (event: DashboardEvent) => {
-    const session = sessions.get(sessionId);
-    if (session) {
-      session.buffer.push(event);
+    const s = sessions.get(sessionId);
+    if (s) {
+      s.buffer.push(event);
     }
   });
 
@@ -169,6 +191,16 @@ app.post("/api/run", (req, res) => {
   });
 
   res.json({ sessionId });
+});
+
+// 最近会话列表 — 供 cockpit 自动跟随 agent 驱动的端到端测试(逐轮展示)
+app.get("/api/sessions", (_req, res) => {
+  const list = [...sessions.entries()]
+    .map(([id, s]) => ({ id, status: s.status, startedAt: (s as { startedAt?: string }).startedAt ?? "", message: (s as { message?: string }).message ?? "" }))
+    .filter((s) => s.startedAt)
+    .sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1))
+    .slice(0, 20);
+  res.json({ sessions: list, active: hasActiveSession() });
 });
 
 // 语音识别: 接收 WAV → 转发到本地 faster-whisper ASR (127.0.0.1:8765) → 返回 { text, error }
@@ -254,13 +286,15 @@ app.get("/api/events/:sessionId", (req, res) => {
 });
 
 // Serve dashboard HTML
+// send 默认 dotfiles:"ignore" — 路径含点目录(如 D:\x\.zcode\workspace)时 sendFile 会被拒绝为 404, 故显式 allow
+const sendHtml = (res: Response, p: string) => res.sendFile(p, { dotfiles: "allow" });
 app.get("/", (_req, res) => {
   const htmlPath = path.join(E2E_ROOT, "dashboard/index.html");
   if (!fs.existsSync(htmlPath)) {
     res.status(404).send("dashboard/index.html not found.");
     return;
   }
-  res.sendFile(htmlPath);
+  sendHtml(res, htmlPath);
 });
 
 // 座舱智能体 App (点阵动画 + 全量状态)
@@ -270,14 +304,14 @@ app.get("/cockpit", (_req, res) => {
     res.status(404).send("dashboard/cockpit.html not found.");
     return;
   }
-  res.sendFile(cockpitPath);
+  sendHtml(res, cockpitPath);
 });
 
 // ---------------------------------------------------------------------------
 // Startup
 // ---------------------------------------------------------------------------
 
-const configState = { configPath: "", connector: null as McpConnector | null };
+const configState = { configPath: "", connector: null as McpConnector | null, connectPromise: null as Promise<void> | null };
 
 async function main(): Promise<void> {
   const { configPath, port } = parseArgs();
@@ -291,8 +325,10 @@ async function main(): Promise<void> {
 
   const connector = new McpConnector(config.mcpServers);
   configState.connector = connector;
-  // 车机离线时 connectAll 可能长时间重试 — 不阻塞 HTTP 服务, 后台连接
-  connector.connectAll().then(() => {
+  // 车机离线时 connectAll 可能长时间重试 — 不阻塞 HTTP 服务, 后台连接; run 侧等待该 promise
+  const connectPromise = connector.connectAll();
+  configState.connectPromise = connectPromise;
+  connectPromise.then(() => {
     const toolCount = connector.getToolDefinitions().length;
     console.log(`[dashboard] MCP ready — ${toolCount} tools available`);
   }).catch((err: unknown) => {

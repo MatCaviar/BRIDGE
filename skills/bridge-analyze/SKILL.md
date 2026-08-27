@@ -1,13 +1,13 @@
 ---
 name: bridge-analyze
-description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力调用 schema(analysis.json)。用于 host codeagent: 自主分析一个应用, 产出可被 MCP serve 直接投影给 LLM agent 的工具 schema, 并完成验证。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。'
+description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 可调能力全链路交付: analysis.json(唯一真相源) + function-schema.json(上游注入) + 可选 registry/app wire + 全程可视化 + 收尾自动端到端测试。host codeagent 自主分析一个应用并自证有效。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。'
 ---
 
 > 🌐 默认用中文与用户交互和输出；代码/命令/标识符/文件名保持英文。
 
 # bridge-analyze — 应用 → 上游 Agent 能力调用 Schema
 
-本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出 `analysis.json`（唯一真相源）和 `function-schema.json`（直接交给上游 Agent 的函数定义），并自主完成验证。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
+本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出一套可评审的交付 bundle —— `analysis.json`（唯一真相源）、`function-schema.json`（上游 Agent 函数定义）、可选 `registry.json`（车端执行器）/ app 侧 wire 配置，全程可视化跟随，并以自动端到端测试收尾（发现的问题自行优化）。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
 
 ## 输入 → 输出契约
 
@@ -17,7 +17,12 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
 - APK / 安装包（可逆向：dex、manifest、resources）
 - 运行环境（adb 设备、日志、行为观察）
 
-**输出**：`analysis.json` + `function-schema.json`（均必须）+ 可选 `registry.json`（执行器配置，由 analysis 推导）。
+**输出**（产物目录建议 `<输入目录>/.mcp-pipeline/<app>/`，与套件管线状态目录一致）：
+- `analysis.json` — 唯一真相源（**必须**）
+- `function-schema.json` — 上游 Agent 函数定义，由 CLI 从 analysis 确定性导出（**必须**）
+- `registry.json` — 车端执行器 registry，mechanism 字段投影（可选）
+- **app 侧 wire 配置**（如 `rpc/config.json`）— 目标 app 自带配置驱动执行端（如通用 RpcEngine 单入口页）时，按其配置格式把全部能力落成可执行 wire，随 analysis 同步演进（可选，适用即做）
+- 全程可视化跟随 + 收尾自动端到端测试 — 流程的组成部分，不是可选装饰（见对应章节）
 - Agent schema 投影：`capabilities[].id/description/params/status` → `function-schema.json` 的 `name/arguments/options/description`；同一语义也由 MCP `tools/list` 以标准 JSON Schema 注入上游 Agent
 - 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
 - 先把本 `SKILL.md` 所在目录解析为绝对路径 `<skill目录>`，再把其 `../..` 解析为 `<套件根>`（仓库根：`cli/e2e/...`）。所有套件命令都使用这两个绝对路径，不依赖用户当前工作目录。CLI：`node "<套件根>/cli/bin/mcp-pipeline.js" <subcmd>`（`schema`/`serve`/`invoke`）；analysis 校验只使用 `<skill目录>/validate-analysis.mjs`。
@@ -52,7 +57,8 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
       "dataClass": "ModeParam",    // dataclass: 反序列化类型
       "devicePaths": ["body.vin"], // envelope: 设备值注入点(须在 app.deviceSources)
       "servicePackage": "com.x.app", "serviceClass": "com.x.app.Service", "bindAction": "com.x.app.ACTION_BIND",
-      "ccDomain": "002", "ccFunction": "func_id"  // carcontrol 专用
+      "ccDomain": "002", "ccFunction": "func_id",  // carcontrol 专用
+      "uiSync": { "argKey": "mode", "map": { "1": "运动模式" } }  // 可选: e2e cockpit 在该工具成功后自动点击对应 UI 文案做状态同步(map=参数值→界面文本, 按目标 app 实际文案填写; 无此需求省略)
     }
   ]
 }
@@ -101,7 +107,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 4. **端到端 schema 测试**: `node "<套件根>/e2e/schema-injection-smoke.mjs" --analysis <analysis.json> --report <schema-injection-report.json>` — BRIDGE 文件产物、MCP `tools/list`、OpenAI 与 Anthropic envelope 四层数量和字段一致
 5. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
 6. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
-7. **报告**: 向用户说明 — 工具数、function schema 注入结果、机制分布、哪些 verified/probe/broken、验证证据、下一步(部署/实测)
+7. **报告**: 向用户说明 — 工具数、function schema 注入结果、机制分布、哪些 verified/probe/broken、验证证据、端到端自动演示结果（sessionId/LLM 回复摘要）、下一步(部署/实测)
 
 无设备时: 1-4 必做, 6 留待有环境, status 保持 probe 并明确告知。
 
@@ -114,34 +120,52 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 - **离线/云端依赖**: 车/设备无外网时云搜索/云服务不可用 — 依赖坐标/云查询的能力需兜底方案(内置字典/联网 geocode), description 注明。
 - **标识符对不上**: 服务的真实 functionId/命令名可能与 SDK 常量/文档不同 — 以服务端注册表(handler/路由)为准。
 
-## 流程（自主编排, 不必照抄顺序）
+## 流程（端到端总览 — 步骤可并行/重排，验证协议与收尾测试不可省）
 
 1. 摸清输入形态 → 定位对外能力面(manifest/AIDL/服务/页面/媒体/functionId 清单)
 2. 枚举能力 → 逐项定 id/params/status/mechanism
 3. 写 description(触发场景模板)
-4. 产出 analysis.json，并由 CLI 确定性导出 function-schema.json（及可选 registry）
-5. 执行验证协议 → 修正 → 报告
+4. 产出 analysis.json → CLI 确定性导出 function-schema.json（+ 可选 registry / app 侧 wire 配置）
+5. 执行验证协议(七步) → 修正
+6. 可视化跟随(--open 自动开浏览器, 会话上报实时点亮；见「可视化同步」)
+7. 收尾自动端到端测试(全量套件, 失败自行优化；见「收尾」)
+8. 报告(验证证据 + 测试通过率与覆盖统计 + 下一步)
 
 ## 可视化同步（适配层，默认开启；不影响执行流程）
 
-执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。上报失败**静默忽略**（不阻断）。
+执行各步时**顺带上报进度**（纯观察，不改变判断与产物）。地址 `BRIDGE_VIZ_URL` 默认 `http://127.0.0.1:8650`（置空该环境变量即关闭）；上报失败**静默忽略**，不阻断。
 
-**开始执行 skill 时（必做）— 可视化跟本次输入走（通用泛化，不绑定特定 app）**：
+**编码约定**：上报 POST 的 JSON body 必须是 UTF-8 字节——Windows 下不要用 GBK 控制台内联 `curl -d '<中文>'`；把 body 写入 UTF-8 临时文件后 `curl --data-binary @file`，或直接 `node -e "fetch(...)"`。后端虽有 GBK 兜底解码，源头规范才根治乱码。
 
-1. 把 `<套件根>/viz/`（pipeline.html、run.mjs、gen.mjs）**整体复制到输入源同目录** `<输入目录>/viz/`（输入目录不可写时，退化为复制到产物目录）；
-2. 用**本次产出的 analysis** 先导出 `<产物目录>/function-schema.json`，再生成该项目的可视化数据：`node <输入目录>/viz/gen.mjs <产出的 analysis.json> [<registry.json>]`（页面标题、schema 数和数据源等身份信息全部由它驱动，跟着项目走）；
-3. 后台启动 `node "<输入目录>/viz/run.mjs" --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<产出的 analysis.json>" --src "<输入目录>"`（默认端口 8650，被占用则加 `--port 87xx` 自选空闲口，`BRIDGE_VIZ_URL` 同步指向实际地址）；这样复制出的查看器仍从已安装套件调用 CLI/校验器，不会要求用户项目自带 `cli/skills/e2e/tools`；
-4. **直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。
+**开始执行 skill 时（必做）— 可视化跟本次输入走（通用，不绑定特定 app）**：
 
-然后按下列协议上报：
+1. 复制 `<套件根>/viz/` 整体到 `<输入目录>/viz/`（输入目录不可写时放产物目录）；
+2. 导出 `<产物目录>/function-schema.json` 后生成项目数据：`node <输入目录>/viz/gen.mjs <analysis.json> [<registry.json>]`（页面身份与数字由它驱动）；
+3. 后台启动查看器（**必须带 `--open`：后端会在用户默认浏览器自动打开页面，不要让用户手动打开，也不要自行拼 shell 打开命令**）：
+   `node "<输入目录>/viz/run.mjs" --open --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<analysis.json>" --src "<输入目录>"`
+   （端口默认 8650，被占用加 `--port 87xx` 并把 `BRIDGE_VIZ_URL` 指向实际地址；查看器经 `--suite-root` 复用套件的 CLI/校验器，不要求用户项目自带 cli/skills/e2e。`--open` 在无图形环境会静默失败——此时以文字告知页面地址即可。）
 
+页面自带端到端测试入口（同源 `/e2e/cockpit`：网关与依赖由后端自动拉起，缺 LLM key 时页面会向用户询问）——skill 无需、也不应另行启动网关。
+
+**上报协议**（每步开始/结束都发，失败静默）：
 - 会话开始：`POST $BRIDGE_VIZ_URL/api/session/start` `{"name":"bridge-analyze · <app>"}`
-- 每步开始/结束：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
-- 节点映射：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry 生成 / `n5` 车端部署·自检 / `n6` 实测
-- `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不要写台本；`skipped` 用于车离线等留待有环境的步骤并写明原因。
-- 上报失败（后端未启动等）**静默忽略**——不阻断执行，skill 流程与产物不受影响。
-- **编码约定**：POST 的 JSON body 必须是 UTF-8 字节。Windows 下不要用 GBK 控制台内联 `curl -d '<中文>'`——把 body 写进 UTF-8 临时文件再 `curl --data-binary @file`，或直接用 `node -e "fetch(...)"`。后端虽有 GBK 兜底解码，但源头规范才能根治乱码。
+- 步事件：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
+- 节点：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry / `n5` 车端部署·自检 / `n6` 实测
+- `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不写台本；`skipped`（如车离线）注明原因。
+
+**收尾 · 自动端到端测试（验证协议通过后必做 — 全自动）**：
+
+1. **构造全量测试集**（由你按本次 analysis 现构 — 模拟真实座舱用户语音指令、以发现问题为导向；**不要写死成脚本或固定查询清单**）。覆盖维度：
+   - **工具**：全部非 broken capabilities 各 ≥1 条（套件大时按 domain/object 分层，目标仍是全覆盖）；
+   - **状态**：带 enum 的工具覆盖多个取值；readonly 与 normal 都测；
+   - **复合长难句**：多意图一句（如"调小声顺便切个安静的模式"）、口语指代/纠偏、长句噪音，各 domain ≥1 条；
+   - **近义区分**：语义相近的能力对互造易混指令，验证 description 区分度；
+   - **防幻觉**：≥2 条与能力面无关的指令，`expectTool` 填 `"none"` — 期望不调用任何工具，选中即判失败；
+   - query 必须自包含可执行：参数带具体值、不写占位符、不用会诱发"追问参数/先查再改"的歧义表述。query 首选取自各 capability `description` 的触发场景原句，其余按上述维度生成。
+2. **分批执行**：`POST $BRIDGE_VIZ_URL/api/e2e/test` body `{"tests":[{"message":"…","expectTool":"<id>|none|省略"},…]}`，**每批 ≤12 条**同步返回逐条判定；全量套件分多批顺序提交。测试开始即自动把用户页面切到 cockpit：逐轮自动跟随实时展示 + 进度条 ✓/✗（不写管线日志）。接口返回 `needsKey` 时页面向用户询问 key。
+3. **失败即自行优化**：✗（未选中期望工具 / none 却调用了工具）= 对应 description 区分度不足 → 改写 description → 重新导出 function-schema → `POST $BRIDGE_VIZ_URL/api/e2e/restart`（网关按新 analysis 重建配置）→ **仅重测失败项**（≤2 轮）。执行类错误（如设备不可达）属环境问题，如实呈现并说明，不算描述失败。
+4. **报告**：通过率、覆盖统计（工具数/状态数/复合句/近义陷阱/防幻觉）、发现的问题与修正记录。
 
 ## 产物去向
 
-`function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope；机制字段经 `analysis-to-registry` 生成车端 registry。
+`function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope（收尾自动测试验证的正是这条注入链）；机制字段经 `analysis-to-registry` 生成车端 registry；app 侧 wire 配置（如适用）部署到目标 app 执行端即可驱动真机。全部产物的配对关系在可视化页「配对矩阵」中呈现与核对。
