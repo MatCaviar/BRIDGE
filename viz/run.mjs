@@ -933,9 +933,11 @@ createServer(handler).listen(PORT, "127.0.0.1", () => {
   console.log(`  页面: http://127.0.0.1:${PORT}/pipeline.html 与 http://localhost:${PORT}/cockpit （双栈回环）`);
   console.log(`  adb: ${ADB}`);
   console.log(`  退出: Ctrl+C`);
-  // --open / BRIDGE_VIZ_OPEN=1: 由后端直接在用户默认浏览器打开页面(host codeagent 不必自行拼命令,
-  // 规避 Git Bash 下 cmd start 的路径转义问题); 无图形环境静默忽略, 由调用方以文字告知地址。
-  if (argValue("--open") || process.env.BRIDGE_VIZ_OPEN === "1") {
+  // 默认即在用户默认浏览器(Chrome/Edge/Safari 随系统)打开页面 — host codeagent 只要启动本后端,
+  // 浏览器必然被拉起, 不依赖 agent 自行拼命令(Git Bash 下 cmd start 常转义失败, 这是历史坑)。
+  // 关闭: --no-open 或 BRIDGE_VIZ_OPEN=0; 无图形环境静默忽略, 由调用方以文字告知地址。
+  const wantOpen = !argValue("--no-open") && process.env.BRIDGE_VIZ_OPEN !== "0";
+  if (argValue("--open") || wantOpen) {
     const url = `http://127.0.0.1:${PORT}/pipeline.html`;
     try {
       if (process.platform === "win32") {
