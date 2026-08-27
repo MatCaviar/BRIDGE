@@ -218,7 +218,8 @@ async function ensureGateway() {
   bootstrapGateway(); // 后台执行, 阶段经 /api/e2e 与 /e2e 503 响应可见
   return { ok: false, starting: true, phase: gw.phase };
 }
-/** 单条端到端测试: 真实 LLM 回合, 判定 = 期望工具是否被选中(expect 为空则只记录) */
+/** 单条端到端测试: 真实 LLM 回合。判定: expect="none" → 期望不调用任何工具(防幻觉);
+ *  expect 为空 → 只记录; 否则 = 期望工具是否被选中 */
 async function runOneE2eTest(message, expect) {
   const out = { message, expect: expect || "", called: [], final: "", pass: !expect };
   try {
@@ -252,7 +253,8 @@ async function runOneE2eTest(message, expect) {
         if (ev.type === "session_completed" || ev.type === "session_error") {
           clearTimeout(timer);
           try { ac.abort(); } catch { /* already closed */ }
-          out.pass = !expect || out.called.includes(expect);
+          out.pass = expect === "none" ? out.called.length === 0
+            : !expect || out.called.includes(expect);
           return out;
         }
       }
@@ -261,7 +263,8 @@ async function runOneE2eTest(message, expect) {
   } catch (e) {
     out.final = "测试执行异常: " + String(e.message || e);
   }
-  out.pass = !expect || (expect && out.called.includes(expect));
+  out.pass = expect === "none" ? out.called.length === 0 && !/异常|会话错误/.test(out.final)
+    : !expect || (expect && out.called.includes(expect));
   return out;
 }
 /** host codeagent 驱动的自动端到端测试: 顺序执行, 实时状态供 cockpit 展示(自动跟随逐轮),
