@@ -410,13 +410,16 @@ const interfaceMethods = (src) => {
 
 /** inputs: 盘点 bridge-analyze 的真实输入素材（源码/逆向产物/分析产物） */
 async function stageInputs() {
+  const suiteSampleMode = !argValue("--analysis");
   const items = [
     ["被分析源码（适配器）", TARGET.adapter],
     ["唯一真相源（分析产物）", TARGET.analysis],
     ["执行器契约面", TARGET.srcDir],
-    ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
-    ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
-    ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
+    ...(suiteSampleMode ? [
+      ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
+      ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
+      ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
+    ] : []),
   ];
   const out = [
     `【输入素材盘点】bridge-analyze 输入形态：源码 / PRD / APK / adb 观察`,
@@ -428,7 +431,7 @@ async function stageInputs() {
     }),
     ``,
     `【说明】`,
-    `  完整逆向 dex dump（imaudio-dex / map-dex / ccs-dex 等，~1.7GB）不入库；来源与交接位置见 reverse/README.md`,
+    ...(suiteSampleMode ? [`  完整逆向 dex dump（仓库样例项目相关，不入库）；来源与交接位置见 reverse/README.md`] : []),
     `  本阶段为输入盘点（bridge-analyze 输入契约：任意形态）；真正"吃"这些原料的是 ② analyze（源码扫描 + 契约核对）`,
   ].join("\n");
   return { ok: true, output: out };
@@ -447,6 +450,26 @@ async function stageAnalyze() {
   const active = caps.filter((c) => c.status !== "broken").length;
 
   const SRC = TARGET.srcDir;
+  // 项目模式(--analysis): 通用 sourceRef 可定位性核对 — 不绑定任何样例契约;
+  // 逐字 wire 契约核对由 bridge-analyze 验证协议第 5 步在宿主侧执行。
+  if (argValue("--analysis")) {
+    const activeCaps = caps.filter((c) => c.status !== "broken");
+    const miss = activeCaps.filter((c) => {
+      const ref = String(c.sourceRef || "").split(":")[0];
+      return !(ref && existsSync(join(SRC, ref)));
+    });
+    const out = [
+      `【载入真相源】${TARGET.analysis.replace(/\\/g, "/")}`,
+      `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
+      `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
+      ``,
+      `【sourceRef 可定位性核对（通用）】${SRC.replace(/\\/g, "/")}`,
+      `  非 broken ${activeCaps.length}: sourceRef 文件可定位 ${activeCaps.length - miss.length}/${activeCaps.length}${miss.length ? `（待核: ${miss.map((c) => c.id).join("、")}）` : " ✓"}`,
+      `  逐字 wire 核对(methodName/枚举/注入路径)由 host codeagent 按验证协议第 5 步完成`,
+    ].join("\n");
+    return { ok: true, output: out };
+  }
+  // 套件模式(无 --analysis): 仓库自带样例的契约交叉核对演示
   // 契约文件在目标源码树内定向查找（跳过 build/.gradle 等，兼容 executor 布局与真实 app 布局）
   const findIn = (name) => {
     const hits = [];
@@ -850,6 +873,21 @@ createServer(handler).listen(PORT, "127.0.0.1", () => {
   console.log(`  页面: http://127.0.0.1:${PORT}/pipeline.html 与 http://localhost:${PORT}/cockpit （双栈回环）`);
   console.log(`  adb: ${ADB}`);
   console.log(`  退出: Ctrl+C`);
+  // --open / BRIDGE_VIZ_OPEN=1: 由后端直接在用户默认浏览器打开页面(host codeagent 不必自行拼命令,
+  // 规避 Git Bash 下 cmd start 的路径转义问题); 无图形环境静默忽略, 由调用方以文字告知地址。
+  if (argValue("--open") || process.env.BRIDGE_VIZ_OPEN === "1") {
+    const url = `http://127.0.0.1:${PORT}/pipeline.html`;
+    try {
+      if (process.platform === "win32") {
+        spawn("powershell.exe", ["-NoProfile", "-Command", `Start-Process '${url}'`], { windowsHide: true, stdio: "ignore" });
+      } else if (process.platform === "darwin") {
+        spawn("open", [url], { stdio: "ignore" });
+      } else {
+        spawn("xdg-open", [url], { stdio: "ignore" });
+      }
+      console.log(`  已请求在默认浏览器打开: ${url}`);
+    } catch (e) { console.log(`  打开浏览器失败(无图形环境?): ${url}`); }
+  }
 });
 // Windows 的 localhost 优先解析 ::1 — 补 IPv6 回环监听, 保证 http://localhost:<port> 浏览器可达
 try {

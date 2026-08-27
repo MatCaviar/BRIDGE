@@ -53,7 +53,7 @@ description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 能力�
       "devicePaths": ["body.vin"], // envelope: 设备值注入点(须在 app.deviceSources)
       "servicePackage": "com.x.app", "serviceClass": "com.x.app.Service", "bindAction": "com.x.app.ACTION_BIND",
       "ccDomain": "002", "ccFunction": "func_id",  // carcontrol 专用
-      "uiSync": { "argKey": "mode", "map": { "7": "主驾优先" } }  // 可选: e2e cockpit 在该工具成功后自动点击对应 UI 文案做状态同步(map=参数值→界面文本, 按目标 app 实际文案填写; 无此需求省略)
+      "uiSync": { "argKey": "mode", "map": { "1": "运动模式" } }  // 可选: e2e cockpit 在该工具成功后自动点击对应 UI 文案做状态同步(map=参数值→界面文本, 按目标 app 实际文案填写; 无此需求省略)
     }
   ]
 }
@@ -125,22 +125,23 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 ## 可视化同步（适配层，默认开启；不影响执行流程）
 
-执行上述各步时**顺带上报进度**（纯观察，不改变任何判断与产物）。上报地址 `BRIDGE_VIZ_URL` **默认 `http://127.0.0.1:8650`**；需改地址或关闭时用环境变量覆盖（如 `BRIDGE_VIZ_URL=` 置空即关闭）。上报失败**静默忽略**（不阻断）。
+执行各步时**顺带上报进度**（纯观察，不改变判断与产物）。地址 `BRIDGE_VIZ_URL` 默认 `http://127.0.0.1:8650`（置空该环境变量即关闭）；上报失败**静默忽略**，不阻断。
 
-**开始执行 skill 时（必做）— 可视化跟本次输入走（通用泛化，不绑定特定 app）**：
+**开始执行 skill 时（必做）— 可视化跟本次输入走（通用，不绑定特定 app）**：
 
-1. 把 `<套件根>/viz/`（pipeline.html、run.mjs、gen.mjs）**整体复制到输入源同目录** `<输入目录>/viz/`（输入目录不可写时，退化为复制到产物目录）；
-2. 用**本次产出的 analysis** 先导出 `<产物目录>/function-schema.json`，再生成该项目的可视化数据：`node <输入目录>/viz/gen.mjs <产出的 analysis.json> [<registry.json>]`（页面标题、schema 数和数据源等身份信息全部由它驱动，跟着项目走）；
-3. 后台启动 `node "<输入目录>/viz/run.mjs" --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<产出的 analysis.json>" --src "<输入目录>"`（默认端口 8650，被占用则加 `--port 87xx` 自选空闲口，`BRIDGE_VIZ_URL` 同步指向实际地址）；这样复制出的查看器仍从已安装套件调用 CLI/校验器，不会要求用户项目自带 `cli/skills/e2e/tools`；
-4. **直接在用户默认浏览器打开** `$BRIDGE_VIZ_URL/pipeline.html`（Windows: `cmd /c start <url>`；macOS: `open <url>`；Linux: `xdg-open <url>`）；无图形环境/打开失败则退化为文字告知该地址。
+1. 复制 `<套件根>/viz/` 整体到 `<输入目录>/viz/`（输入目录不可写时放产物目录）；
+2. 导出 `<产物目录>/function-schema.json` 后生成项目数据：`node <输入目录>/viz/gen.mjs <analysis.json> [<registry.json>]`（页面身份与数字由它驱动）；
+3. 后台启动查看器（**必须带 `--open`：后端会在用户默认浏览器自动打开页面，不要让用户手动打开，也不要自行拼 shell 打开命令**）：
+   `node "<输入目录>/viz/run.mjs" --open --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<analysis.json>" --src "<输入目录>"`
+   （端口默认 8650，被占用加 `--port 87xx` 并把 `BRIDGE_VIZ_URL` 指向实际地址；查看器经 `--suite-root` 复用套件的 CLI/校验器，不要求用户项目自带 cli/skills/e2e。`--open` 在无图形环境会静默失败——此时以文字告知页面地址即可。）
 
-然后按下列协议上报：
+页面自带端到端测试入口（同源 `/e2e/cockpit`：网关与依赖由后端自动拉起，缺 LLM key 时页面会向用户询问）——skill 无需、也不应另行启动网关。
 
+**上报协议**（每步开始/结束都发，失败静默）：
 - 会话开始：`POST $BRIDGE_VIZ_URL/api/session/start` `{"name":"bridge-analyze · <app>"}`
-- 每步开始/结束：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
-- 节点映射：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry 生成 / `n5` 车端部署·自检 / `n6` 实测
-- `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不要写台本；`skipped` 用于车离线等留待有环境的步骤并写明原因。
-- 上报失败（后端未启动等）**静默忽略**——不阻断执行，skill 流程与产物不受影响。
+- 步事件：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
+- 节点：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry / `n5` 车端部署·自检 / `n6` 实测
+- `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不写台本；`skipped`（如车离线）注明原因。
 
 ## 产物去向
 

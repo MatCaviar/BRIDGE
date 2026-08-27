@@ -246,7 +246,7 @@ node scripts/check-manifests.js             # claude / codex manifest drift guar
 | **移交文档** | `handoff/` | 移交说明 + NEXT STEPS |
 | **本地 ASR** | `asr/` | faster-whisper 中文识别(端口 8765) |
 
-**E2E 快速开始**：`cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`（先起 `asr/asr-whisper-server.py`），浏览器 `http://localhost:3000/cockpit` 点 🎤 说话。
+**E2E quick start** (two ways): **one-click** — open the viz page `http://localhost:8650/pipeline.html` and click "端到端测试"; gateway/deps/config are auto-bootstrapped (the page asks for the LLM key if missing, and points serve at the current analysis in project mode). **manual** — `cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml` (start `asr/asr-whisper-server.py` first), then open `http://localhost:3000/cockpit` and talk to the 🎤.
 
 **单一校验入口**：analysis 规格由 `skills/bridge-analyze/validate-analysis.mjs` 校验；CLI 只负责 `serve` / `invoke`，避免旧 schema 与 E2E 规格漂移。
 

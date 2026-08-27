@@ -264,5 +264,5 @@ MIT——见 [LICENSE](LICENSE)。`tools/adb/` 内嵌 Google 的 adb，遵循其
 | **车端执行器源码** | `bridge-executor/` | 五机制分派 + 手写 binder 契约。 |
 | **工具脚本/移交文档/本地ASR** | `tools/` `handoff/` `asr/` | car_invoke、车控57候选、移交说明、faster-whisper。 |
 
-E2E 快速开始：先起 `asr/asr-whisper-server.py`，再 `cd e2e && npm install && npm run dashboard -- --config config-cockpit.yaml`，浏览器开 `http://localhost:3000/cockpit`。
+E2E 快速开始（两种）：**一键** — 打开可视化页 `http://localhost:8650/pipeline.html` 点「端到端测试」，网关/依赖/配置自动拉起（缺 LLM key 时页面询问，项目模式自动指向本次分析产物）；**手动** — 先起 `asr/asr-whisper-server.py`，再 `cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`，浏览器开 `http://localhost:3000/cockpit`。
 凭据与逆向素材不随仓库分发，见 `handoff/` 与 `reverse/README.md`。
