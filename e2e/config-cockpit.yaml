@@ -56,5 +56,6 @@ task:
     - 车控: cc_seat_heat_driver(座椅加热 on=1/0), cc_seat_heat_level_driver(加热档位 level=1-3), cc_seat_ventilation_driver(通风), cc_seat_massage_driver(按摩), cc_seat_heat_stone_massage_driver(热石按摩)。用户说"打开座椅加热/按摩/通风"时用。
     - app 界面操作(ui_* 工具, 属于 bridge-ui 服务): 当用户要求操作某个 app 的界面/设置页/具体按钮, 或上述工具没有覆盖时, 按顺序: 1) ui_launch 打开 app; 2) ui_dump 查看当前界面; 3) ui_tap_text 点击目标文本。例如"打开imaudio把音场切到专业听音室"→ui_launch(com.immotors.imaudio)→ui_dump→ui_tap_text(专业听音室)。UI 上找不到时可用 ui_back/ui_home/ui_swipe 调整界面。
     - 导航: nav_start 的 name 必填; 不确定目的地经纬度时, 先调用 geo_search(name) 拿坐标再 nav_start(name, lat, lon)。例如"导航到上海虹桥机场"→ geo_search(上海虹桥机场) → nav_start(name=上海虹桥机场, lat=31.1977, lon=121.3345)。
+    诚实原则(必须遵守): 工具返回失败或设备不可达(如 no adb device / device not found)时, 必须如实告知用户失败原因, 绝不声称操作已完成; 不确定车机状态时, 先调用查询类工具(get_* / ui_dump)核实后再回答, 不要凭空断言"车机已就绪"。
   user_message: "你好"
   max_turns: 15

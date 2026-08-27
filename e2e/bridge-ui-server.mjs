@@ -158,6 +158,10 @@ server.registerTool(
     },
   },
   async ({ pkg, activity, uri, action, extras, display }) => {
+    // 诚实原则: 设备不可达是硬失败, 不许吞错谎报成功 — 否则上游 LLM 与 cockpit 状态都会被误导
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
     let am = `am start --user ${ANDROID_USER}`;
     if (action) {
       am += ` -a ${action}`;
@@ -185,9 +189,14 @@ server.registerTool(
       const dispId = await resolveDisplay(display);
       if (dispId >= 0) am += ` --display ${dispId}`;
     }
-    await runAdb(["shell", am]).catch(() => {});
+    let amOut = "";
+    try {
+      amOut = await runAdb(["shell", am]);
+    } catch (e) {
+      return mcpResult({ ok: false, error: `am start 失败: ${String(e.message || e)}`, launched: am });
+    }
     await sleep(2500);
-    return mcpResult({ ok: true, launched: am });
+    return mcpResult({ ok: true, launched: am, output: String(amOut).trim().slice(0, 200) });
   }
 );
 
@@ -198,8 +207,11 @@ server.registerTool(
     inputSchema: {},
   },
   async () => {
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
     const rows = await dumpUi();
-    return mcpResult({ widgets: rows });
+    return mcpResult({ ok: true, widgets: rows });
   }
 );
 
@@ -212,12 +224,19 @@ server.registerTool(
     },
   },
   async ({ text }) => {
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
     const rows = await dumpUi();
     const hit = rows.find((r) => r.label.includes(text));
     if (!hit) {
       return mcpResult({ ok: false, error: `未找到文本 "${text}"`, available: rows.map((r) => r.label).slice(0, 30) });
     }
-    await runAdb(["shell", `input tap ${hit.x} ${hit.y}`]);
+    try {
+      await runAdb(["shell", `input tap ${hit.x} ${hit.y}`]);
+    } catch (e) {
+      return mcpResult({ ok: false, error: `input tap 失败: ${String(e.message || e)}` });
+    }
     await sleep(1500);
     return mcpResult({ ok: true, tapped: hit.label, at: [hit.x, hit.y] });
   }
@@ -230,7 +249,14 @@ server.registerTool(
     inputSchema: { x: z.number(), y: z.number() },
   },
   async ({ x, y }) => {
-    await runAdb(["shell", `input tap ${x} ${y}`]);
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
+    try {
+      await runAdb(["shell", `input tap ${x} ${y}`]);
+    } catch (e) {
+      return mcpResult({ ok: false, error: `input tap 失败: ${String(e.message || e)}` });
+    }
     await sleep(1500);
     return mcpResult({ ok: true, at: [x, y] });
   }
@@ -247,7 +273,14 @@ server.registerTool(
     },
   },
   async ({ x1, y1, x2, y2, duration }) => {
-    await runAdb(["shell", `input swipe ${x1} ${y1} ${x2} ${y2} ${duration ?? 500}`]);
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
+    try {
+      await runAdb(["shell", `input swipe ${x1} ${y1} ${x2} ${y2} ${duration ?? 500}`]);
+    } catch (e) {
+      return mcpResult({ ok: false, error: `input swipe 失败: ${String(e.message || e)}` });
+    }
     await sleep(1000);
     return mcpResult({ ok: true, from: [x1, y1], to: [x2, y2] });
   }
@@ -260,7 +293,14 @@ server.registerTool(
     inputSchema: {},
   },
   async () => {
-    await runAdb(["shell", "input keyevent 4"]);
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
+    try {
+      await runAdb(["shell", "input keyevent 4"]);
+    } catch (e) {
+      return mcpResult({ ok: false, error: `keyevent 失败: ${String(e.message || e)}` });
+    }
     await sleep(1000);
     return mcpResult({ ok: true });
   }
@@ -273,7 +313,14 @@ server.registerTool(
     inputSchema: {},
   },
   async () => {
-    await runAdb(["shell", "input keyevent 3"]);
+    if (!ensureDevice()) {
+      return mcpResult({ ok: false, error: "no adb device (未连接车机); connect one or set BRIDGE_DEVICE" });
+    }
+    try {
+      await runAdb(["shell", "input keyevent 3"]);
+    } catch (e) {
+      return mcpResult({ ok: false, error: `keyevent 失败: ${String(e.message || e)}` });
+    }
     await sleep(1000);
     return mcpResult({ ok: true });
   }

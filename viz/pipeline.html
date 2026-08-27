@@ -1059,16 +1059,33 @@ if (!D) {
       ov.appendChild(panel);
     }
     const starting = info && info.starting;
+    const needsKey = info && info.needsKey;
     const phaseZh = { install: "安装依赖(首次约 1 分钟)", build: "构建 e2e", start: "启动网关", bootstrap: "准备环境" };
     const phase = info && info.phase ? (phaseZh[info.phase] || info.phase) : "";
     const log = ((info && info.log) || []).slice(-4);
     panel.innerHTML =
-      `<div style="font-size:17px;font-weight:600">${starting ? "端到端环境启动中…" : "端到端网关未启动"}</div>` +
-      (phase ? `<div style="color:#7fb2ff">阶段：${phase}</div>` : "") +
-      (starting ? `<div style="opacity:.7">后端正在自动准备网关（首次使用含依赖安装与构建），本页每 5 秒自动重试</div>`
-                : `<div style="opacity:.7">后端将自动拉起网关；若长时间未就绪，请检查 viz 后端日志</div>`) +
-      (log.length ? `<div style="font:12px/1.7 Consolas,monospace;opacity:.6;max-width:720px;white-space:pre-wrap">${log.map((l) => esc0(l)).join("<br>")}</div>` : "") +
-      `<button id="e2e-retry" style="margin-top:8px;padding:6px 22px;border:1px solid #4b6f9e;border-radius:6px;background:#1c334f;color:#cfe0f5;cursor:pointer">立即重试</button>`;
+      `<div style="font-size:17px;font-weight:600">${needsKey ? "需要 LLM API key" : starting ? "端到端环境启动中…" : "端到端网关未启动"}</div>` +
+      (needsKey
+        ? `<div style="opacity:.8;max-width:560px">端到端对话为真实 LLM 调用, 需要阿里云 DashScope 的 <b>QWEN_API_KEY</b>(环境变量未检出)。<br>` +
+          `在下方粘贴 key — 仅保存在本机后端<b>内存</b>中, 不写入磁盘/仓库; 或自行设置环境变量后重启 viz 后端。</div>` +
+          `<div style="display:flex;gap:8px;margin-top:4px">` +
+          `<input id="e2e-key" type="password" placeholder="sk-..." style="width:320px;padding:7px 10px;border:1px solid #4b6f9e;border-radius:6px;background:#132038;color:#cfe0f5;font:13px Consolas,monospace" />` +
+          `<button id="e2e-key-submit" style="padding:6px 18px;border:1px solid #4b6f9e;border-radius:6px;background:#1c334f;color:#cfe0f5;cursor:pointer">提交并启动</button></div>`
+        : (phase ? `<div style="color:#7fb2ff">阶段：${phase}</div>` : "") +
+          (starting ? `<div style="opacity:.7">后端正在自动准备网关（首次使用含依赖安装与构建），本页每 5 秒自动重试</div>`
+                    : `<div style="opacity:.7">后端将自动拉起网关；若长时间未就绪，请检查 viz 后端日志</div>`) +
+          (log.length ? `<div style="font:12px/1.7 Consolas,monospace;opacity:.6;max-width:720px;white-space:pre-wrap">${log.map((l) => esc0(l)).join("<br>")}</div>` : "")) +
+      `<button id="e2e-retry" style="margin-top:8px;padding:6px 22px;border:1px solid #4b6f9e;border-radius:6px;background:#1c334f;color:#cfe0f5;cursor:pointer">${needsKey ? "我已设置环境变量, 重试" : "立即重试"}</button>`;
+    const submit = document.getElementById("e2e-key-submit");
+    if (submit) submit.onclick = async () => {
+      const v = (document.getElementById("e2e-key") || {}).value || "";
+      submit.textContent = "提交中…";
+      try {
+        await fetch("/api/e2e/key", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: v }) });
+      } catch (e) { /* 忽略, 轮询接管 */ }
+      probeAt = 0;
+      show(true);
+    };
     const retry = document.getElementById("e2e-retry");
     if (retry) retry.onclick = () => { probeAt = 0; show(true); };
   }

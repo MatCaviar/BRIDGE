@@ -90,7 +90,7 @@ const state = { carIp: null, carModel: null, carFailedAt: 0, serveProc: null, se
 const E2E_DIR = join(ROOT, "e2e");
 const E2E_BASE = (process.env.BRIDGE_E2E_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
 const E2E_TARGET = new URL(E2E_BASE);
-const gw = { proc: null, phase: "", starting: false, log: [] };
+const gw = { proc: null, phase: "", starting: false, log: [], apiKey: "", needsKey: false };
 function gwLog(line) {
   gw.log.push(line);
   if (gw.log.length > 60) gw.log.splice(0, gw.log.length - 60);
@@ -104,23 +104,23 @@ function gatewayConfigPath() {
   const template = read(join(E2E_DIR, "config-cockpit.yaml"));
   if (!template) return join(E2E_DIR, "config-cockpit.yaml");
   let text = template;
-  // 配置写到 viz/ 目录 — 模板内的相对路径(按配置所在目录解析)全部换成绝对路径
+  // 配置写到 viz/ 目录 — 配置加载器把相对路径按配置所在目录解析, 模板内全部相对路径须换成绝对路径
+  // (漏掉任何一个都会让对应 stdio 子进程 spawn 到不存在的脚本而瞬崩 → "Connection closed")
   text = text
     .replace(/"bridge-serve-wrapper\.mjs"/g, JSON.stringify(join(E2E_DIR, "bridge-serve-wrapper.mjs").replace(/\\/g, "/")))
+    .replace(/"bridge-ui-server\.mjs"/g, JSON.stringify(join(E2E_DIR, "bridge-ui-server.mjs").replace(/\\/g, "/")))
     .replace(/"\.\.\/cli\/bin\/mcp-pipeline\.js"/g, JSON.stringify(CLI.replace(/\\/g, "/")));
   // 项目模式: serve 指向本次分析产物
   if (resolvedAnalysis && existsSync(resolvedAnalysis)) {
     text = text.replace(/"--analysis",\s*"bridge-analysis\.json"/,
       `"--analysis", ${JSON.stringify(resolvedAnalysis.replace(/\\/g, "/"))}`);
   }
-  // 无 LLM key: 降级 mock provider(schema 冒烟), 有 key 则原样
-  if (!process.env.QWEN_API_KEY && !process.env.OPENAI_API_KEY) {
-    text = text
-      .replace(/provider: openai/, "provider: mock")
-      .replace(/model: qwen3\.5-flash/, "model: bridge-schema-smoke")
-      .replace(/api_key: \$\{QWEN_API_KEY\}/, "api_key: local-smoke");
-    gwLog("未检出 QWEN_API_KEY — 网关以 mock LLM 启动(工具面/schema 注入可用, 对话为占位)");
+  // LLM key 是刚需: 取不到就询问用户(页面输入, POST /api/e2e/key), 不做 mock 降级
+  if (!gw.apiKey && !process.env.QWEN_API_KEY) {
+    gw.needsKey = true;
+    return null;
   }
+  gw.needsKey = false;
   const out = join(VIZ, ".e2e-config.yaml");
   writeFileSync(out, text);
   return out;
@@ -145,9 +145,14 @@ async function bootstrapGateway() {
     }
     gw.phase = "start";
     const cfg = gatewayConfigPath();
+    if (!cfg) {
+      gwLog("缺少 LLM API key (QWEN_API_KEY) — 请在页面输入(仅存内存)或设置环境变量后重试");
+      return;
+    }
     gwLog(`启动网关: node dist/web/server.js --config ${cfg}`);
-    const p = spawn(process.execPath, [join(E2E_DIR, "dist", "web", "server.js"), "--config", cfg],
-      { cwd: E2E_DIR, windowsHide: true });
+    const gwPort = Number(E2E_TARGET.port) || 3000; // 端口跟随 BRIDGE_E2E_URL, 与代理/探活一致
+    const p = spawn(process.execPath, [join(E2E_DIR, "dist", "web", "server.js"), "--config", cfg, "--port", String(gwPort)],
+      { cwd: E2E_DIR, windowsHide: true, env: { ...process.env, ...(gw.apiKey ? { QWEN_API_KEY: gw.apiKey } : {}) } });
     gw.proc = p;
     const onOut = (d) => d.toString().split(/\r?\n/).filter(Boolean).slice(-2).forEach((l) => gwLog(l));
     p.stdout.on("data", onOut);
@@ -661,7 +666,7 @@ const handler = async (req, res) => {
         out.gateway = { ok: true, url: "/e2e/cockpit", proxied: true, ...h };
       } else {
         const st = await ensureGateway();
-        out.gateway = { ok: false, url: "/e2e/cockpit", proxied: true, starting: st.starting === true, phase: st.phase || "", log: gw.log.slice(-5) };
+        out.gateway = { ok: false, url: "/e2e/cockpit", proxied: true, starting: st.starting === true, phase: st.phase || "", needsKey: gw.needsKey, log: gw.log.slice(-5) };
       }
       try {
         const sess = state.session;
@@ -755,6 +760,23 @@ const handler = async (req, res) => {
       const r = await fn(args || {});
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ ok: r.ok, stage, output: r.output || "", error: r.error || "", durationMs: r.durationMs || 0 }));
+    }
+    if (url.pathname === "/api/e2e/key" && req.method === "POST") {
+      // 用户经页面提交 LLM key — 仅存本机后端内存(不落盘/不入仓), 提交后自动拉起网关
+      let body = "";
+      for await (const c of req) body += c;
+      let key = "";
+      try { key = String((JSON.parse(body || "{}").key || "")).trim(); } catch (e) { key = ""; }
+      if (!key) {
+        res.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+        return res.end(JSON.stringify({ ok: false, error: "key 不能为空" }));
+      }
+      gw.apiKey = key;
+      gw.needsKey = false;
+      gwLog("已收到 LLM API key(仅内存) — 拉起网关");
+      ensureGateway();
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true }));
     }
     if (url.pathname === "/e2e" || url.pathname.startsWith("/e2e/")) {
       // 同源端到端入口: /e2e 与 /e2e/ → cockpit; /e2e/api/* → gateway API(含 SSE 透传)

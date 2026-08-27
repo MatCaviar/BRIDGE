@@ -120,7 +120,15 @@ export class McpConnector {
         .filter((item) => item.type === "text" && typeof item.text === "string")
         .map((item) => item.text as string);
 
-      return textParts.length > 0 ? textParts.join("\n") : null;
+      const text = textParts.length > 0 ? textParts.join("\n") : null;
+
+      // 工具执行错误(isError)必须向上抛 — 否则上游 LLM 与 cockpit 状态面板会把
+      // 错误文本误判为成功(如 "Error: no adb device" 被当作车机可达)
+      if ((result as { isError?: boolean }).isError) {
+        throw new Error(text ?? `tool "${toolName}" failed`);
+      }
+
+      return text;
     } finally {
       await this.closeClient(client, serverName);
     }
