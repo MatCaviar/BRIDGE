@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { EventEmitter } from "node:events";
 import express from "express";
+import type { Response } from "express";
 import { loadConfig } from "../config.js";
 import { McpConnector } from "../mcp/connector.js";
 import { createLLMClient } from "../llm/factory.js";
@@ -241,13 +242,15 @@ app.get("/api/events/:sessionId", (req, res) => {
 });
 
 // Serve dashboard HTML
+// send 默认 dotfiles:"ignore" — 路径含点目录(如 D:\x\.zcode\workspace)时 sendFile 会被拒绝为 404, 故显式 allow
+const sendHtml = (res: Response, p: string) => res.sendFile(p, { dotfiles: "allow" });
 app.get("/", (_req, res) => {
   const htmlPath = path.join(E2E_ROOT, "dashboard/index.html");
   if (!fs.existsSync(htmlPath)) {
     res.status(404).send("dashboard/index.html not found.");
     return;
   }
-  res.sendFile(htmlPath);
+  sendHtml(res, htmlPath);
 });
 
 // 座舱智能体 App (点阵动画 + 全量状态)
@@ -257,7 +260,7 @@ app.get("/cockpit", (_req, res) => {
     res.status(404).send("dashboard/cockpit.html not found.");
     return;
   }
-  res.sendFile(cockpitPath);
+  sendHtml(res, cockpitPath);
 });
 
 // ---------------------------------------------------------------------------
