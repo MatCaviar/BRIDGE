@@ -522,17 +522,18 @@ async function fetchJson(url, ms) {
   } finally { clearTimeout(t); }
 }
 
-createServer(async (req, res) => {
+const handler = async (req, res) => {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   try {
     if (url.pathname === "/api/e2e") {
-      // 聚合 gateway(:3000) 端到端状态: 健康度 + 最近会话事件摘要(工具调用/最终回复)
+      // 聚合 gateway(默认 :3000, BRIDGE_E2E_URL 可配) 端到端状态: 健康度 + cockpit 地址 + 最近会话事件摘要
+      const E2E_BASE = (process.env.BRIDGE_E2E_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
       const out = { gateway: null, sessions: [] };
       try {
-        const h = await fetchJson("http://localhost:3000/api/health", 2500);
-        out.gateway = { ok: true, ...h };
+        const h = await fetchJson(`${E2E_BASE}/api/health`, 2500);
+        out.gateway = { ok: true, url: `${E2E_BASE}/cockpit`, ...h };
       } catch {
-        out.gateway = { ok: false };
+        out.gateway = { ok: false, url: `${E2E_BASE}/cockpit` };
       }
       try {
         const sess = state.session;
@@ -633,9 +634,15 @@ createServer(async (req, res) => {
     res.writeHead(500, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: false, error: String(e.message) }));
   }
-}).listen(PORT, HOST, () => {
+};
+
+createServer(handler).listen(PORT, "127.0.0.1", () => {
   console.log(`BRIDGE 管线可视化 · 实时后端就绪`);
-  console.log(`  页面: http://${HOST}:${PORT}/pipeline.html   （切「实时」模式逐阶段执行）`);
+  console.log(`  页面: http://127.0.0.1:${PORT}/pipeline.html 与 http://localhost:${PORT}/cockpit （双栈回环）`);
   console.log(`  adb: ${ADB}`);
   console.log(`  退出: Ctrl+C`);
 });
+// Windows 的 localhost 优先解析 ::1 — 补 IPv6 回环监听, 保证 http://localhost:<port> 浏览器可达
+try {
+  createServer(handler).on("error", () => { /* IPv6 回环不可用时静默忽略 */ }).listen(PORT, "::1");
+} catch (e) { /* 同上 */ }

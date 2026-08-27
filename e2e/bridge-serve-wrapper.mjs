@@ -20,11 +20,19 @@ const ADB = resolveAdbBinary();
 
 function startServe(baseArgs) {
   const device = discoverAdbDevice(ADB);
+  let serial;
   if (!device) {
-    console.error("[bridge-serve-wrapper] no unique adb device; connect one or set BRIDGE_DEVICE");
-    process.exit(1);
+    if (process.env.BRIDGE_STRICT_DEVICE === "1") {
+      console.error("[bridge-serve-wrapper] no unique adb device; connect one or set BRIDGE_DEVICE");
+      process.exit(1);
+    }
+    // 无车降级: serve 的工具面/schema 注入不依赖设备(仅 tools/call 连车)。
+    // 车端调用将返回设备不可达错误; 设 BRIDGE_STRICT_DEVICE=1 恢复严格失败模式。
+    serial = "no-device";
+    console.error("[bridge-serve-wrapper] no adb device found; spawning serve with --device no-device (schema/工具面可用, 车端调用将报不可达)");
+  } else {
+    serial = device.serial;
   }
-  const serial = device.serial;
   console.error(`[bridge-serve-wrapper] serve -> ${serial}`);
   const serveProc = spawn(process.execPath, [...baseArgs, "--device", serial], { stdio: ["pipe", "pipe", "inherit"] });
   serveProc.stdin.on("error", () => {});
