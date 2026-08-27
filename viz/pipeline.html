@@ -285,7 +285,7 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
   #e2e-overlay{position:fixed;inset:0;z-index:50;background:var(--bg)}
   #e2e-overlay[hidden]{display:none}
   #e2e-frame{width:100%;height:100%;border:0;background:#fff}
-  /* ===== PART 06 交付物 · 配对矩阵 + 详情抽屉 ===== */
+  /* ===== PART 04 工具明细 · 交付物配对矩阵 + 详情抽屉 ===== */
   @keyframes dl-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
 
   .dl-strip { display:flex; flex-wrap:wrap; border:1px solid var(--primary-100); border-radius:12px;
@@ -313,8 +313,12 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
     padding:.55rem .85rem; border-bottom:1.5px solid var(--primary-100); letter-spacing:.07em; z-index:2; }
   .pmatrix tbody td { padding:.5rem .85rem; border-bottom:1px solid var(--n100); vertical-align:middle; }
   .pm-row { cursor:pointer; transition:background .15s; }
-  .pm-row:hover { background:var(--primary-50); }
+  .pm-row:hover { background:var(--primary-50); box-shadow:inset 3px 0 0 var(--primary-200); }
   .pm-row.on { background:var(--primary-50); box-shadow:inset 3px 0 0 var(--primary-500); }
+  .pm-mech { font-family:var(--mono); font-size:.73rem; color:var(--t2); white-space:nowrap; }
+  .pm-mech i { font-style:normal; color:var(--n300); margin:0 .18rem; }
+  .pm-foot { margin-top:.5rem; font-size:.75rem; color:var(--t3); padding-left:.3rem; }
+  .th-hint { font-size:.62rem; color:var(--n400); margin-left:.4rem; font-weight:400; letter-spacing:0; }
   .pm-id { font-family:var(--mono); font-weight:600; color:var(--primary-900); display:flex; align-items:center; gap:.5rem; }
   .pm-dot { width:7px; height:7px; border-radius:50%; flex:none; }
   .pm-args { display:flex; flex-wrap:wrap; gap:.3rem; }
@@ -486,26 +490,9 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
       <div class="vsteps" id="steps"></div>
     </div>
 
-    <div class="section" id="panels"></div>
-
-    <div class="section">
-      <div class="section-header">
-        <span class="section-number">PART 05</span><span class="section-title">工具明细</span>
-        <span class="section-sub" id="tool-count"></span>
-      </div>
-      <div class="filters" id="filters"></div>
-      <table>
-        <thead><tr>
-          <th style="width:225px">工具 id（＝MCP name）</th><th style="width:100px">机制</th>
-          <th style="width:90px">状态</th><th style="width:105px">safety</th>
-          <th>参数</th><th style="width:245px">sourceRef</th>
-        </tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
     <div class="section" id="deliverables">
       <div class="section-header">
-        <span class="section-number">PART 06</span><span class="section-title">交付物 · 配对矩阵</span>
+        <span class="section-number">PART 04</span><span class="section-title">工具明细 · 交付物配对矩阵</span>
         <span class="section-sub">点击行查看注入上游 Agent 的完整函数定义</span>
       </div>
       <div class="dl-strip" id="dl-strip"></div>
@@ -519,15 +506,16 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
       <div class="pm-wrap">
         <table class="pmatrix">
           <thead><tr>
-            <th style="width:22%">能力 ＝ 函数名</th>
+            <th style="width:21%">能力 ＝ 函数名<span class="th-hint">悬停见溯源</span></th>
+            <th style="width:11%">机制 · 安全</th>
             <th>function schema 参数（实心 ＝ 必填）</th>
-            <th style="width:17%">registry</th>
-            <th style="width:12%">serve</th>
+            <th style="width:16%">registry</th>
             <th style="width:6%">一致</th>
           </tr></thead>
           <tbody id="pm-body"></tbody>
         </table>
       </div>
+      <div class="pm-foot" id="pm-foot"></div>
     </div>
     <div class="pdrawer-back" id="pd-back"></div>
     <aside class="pdrawer" id="pdrawer" aria-label="配对详情"></aside>
@@ -691,140 +679,6 @@ function renderSteps(S) {
   ].join("");
 }
 
-/* ---------- 附注 ---------- */
-function renderPanels() {
-  let html = `<div class="section-header" style="margin-bottom:.9rem">
-      <span class="section-number">PART 04</span><span class="section-title">附注</span></div>`;
-  const R = D.registry;
-  if (R.present) {
-    const ok = R.missingFromRegistry.length === 0 && R.extraInRegistry.length === 0;
-    html += `<div class="note"><span class="ni">※</span><div>
-      <div class="nt">registry 一致性 -- ${ok ? "一致 ✓" : "不一致"}</div>
-      <div class="nb">${ok
-        ? `计 ${R.tools} tools，与 analysis 非-broken 能力集合完全相符（media_* 由执行器内置，不入 registry）`
-        : `缺失（${R.missingFromRegistry.length}）：${esc(R.missingFromRegistry.join("、"))}；多出（${R.extraInRegistry.length}）：${esc(R.extraInRegistry.join("、"))}`}</div></div></div>`;
-  }
-  const P = D.probe;
-  if (P.present) {
-    html += `<div class="note"><span class="ni">※</span><div>
-      <div class="nt">车控候选 probe（路由级验证）-- ${P.totalCandidates}/${P.totalCandidates} verified</div>
-      <div class="nb">${esc(P.date)} 实测，全部 functionId 被车控服务支持（detail:成功 / isExist / isValid）。合入 analysis 尚需双校验（正确 args 实测）。</div></div></div>`;
-  }
-  $("panels").innerHTML = html;
-}
-
-/* ---------- 工具明细表（逻辑不变，样式 ZZT 化） ---------- */
-let fMech = "all", fStatus = "all", fQ = "";
-const allRows = [];
-
-function buildRows() {
-  allRows.length = 0;
-  for (const c of D.capabilities) {
-    allRows.push({ kind: "cap", id: c.id, mech: c.mechanism || "execmd", status: c.status || "probe",
-                   safety: c.safetyLevel || "-", params: c.params || [], src: c.sourceRef || "", cap: c });
-  }
-  for (const m of D.mediaBuiltins || []) {
-    allRows.push({ kind: "media", id: m.id, mech: "media", status: "builtin", safety: "-",
-                   params: [], src: "executor 内置（无需 registry）", cap: m });
-  }
-}
-
-function psum(ps) {
-  if (!ps.length) return "-";
-  return ps.map((p) =>
-    `<span class="mono">${esc(p.name)}:${esc(p.type)}${p.optional ? "?" : ""}${p.enum ? `<i>(${p.enum.length})</i>` : ""}</span>`
-  ).join(" · ");
-}
-
-function mechBadge(m) { return `<span class="b m-${esc(m)}">${esc(m)}</span>`; }
-function statusBadge(s) { return `<span class="b s-${esc(s)}">${esc(s)}</span>`; }
-
-function detailHtml(r) {
-  const c = r.cap;
-  const kv = (k, v) => (v === undefined || v === null || v === "" ? "" :
-    `<div class="k">${esc(k)}</div><div class="v">${esc(Array.isArray(v) ? JSON.stringify(v) : v)}</div>`);
-  let wire = "";
-  if (r.kind === "cap") {
-    wire = `<div class="sect">车端 wire 字段（${esc(r.mech)}）</div><div class="kv">` +
-      (r.mech === "execmd" ? kv("methodName", c.methodName) + kv("pattern", c.pattern) + kv("dataClass", c.dataClass) +
-        kv("devicePaths", c.devicePaths && c.devicePaths.length ? c.devicePaths : undefined) + kv("form", c.form)
-       : r.mech === "carcontrol" ? kv("ccDomain", c.ccDomain) + kv("ccFunction", c.ccFunction)
-       : r.mech === "mapnav" ? kv("service", "BanmaMap navigateToForAI")
-       : "") + `</div>`;
-  }
-  const ptable = r.params.length ? `<table class="ptable"><thead><tr>
-      <th>参数</th><th>类型</th><th>必填</th><th>enum</th><th>说明</th></tr></thead><tbody>` +
-    r.params.map((p) => `<tr><td class="id">${esc(p.name)}</td><td>${esc(p.type)}</td>
-      <td>${p.optional ? "否" : "是"}</td><td class="psum">${p.enum ? esc(p.enum.join(" ｜ ")) : "-"}</td>
-      <td class="psum">${esc(p.description || "")}</td></tr>`).join("") + `</tbody></table>` : "";
-  return `<tr class="detail"><td colspan="6">
-    <div class="desc-full">${esc(c.description || "")}</div>
-    ${ptable}
-    ${wire}
-    <div class="sect">service 绑定</div><div class="kv">${kv("servicePackage", c.servicePackage)}${kv("serviceClass", c.serviceClass)}${kv("bindAction", c.bindAction)}</div>
-    <div class="sect">溯源</div><div class="kv">${kv("sourceRef", c.sourceRef)}${kv("domain/object/action", [c.domain, c.object, c.action].filter(Boolean).join(" / "))}</div>
-    <button class="pair-jump" data-id="${esc(r.id)}">⇄ 在配对全景中查看</button>
-  </td></tr>`;
-}
-
-function renderTools() {
-  buildRows();
-  const mechs = ["all", ...new Set(allRows.map((r) => r.mech))];
-  const statuses = ["all", ...new Set(allRows.map((r) => r.status))];
-  const chip = (kind, cur, val, label) =>
-    `<button class="chip${cur === val ? " on" : ""}" data-kind="${kind}" data-f="${val}">${esc(label)}</button>`;
-  $("filters").innerHTML =
-    `<span class="flabel">机制</span>` +
-    mechs.map((m) => chip("mech", fMech, m, m === "all" ? "全部" : m)).join("") +
-    `<span class="sep">｜</span><span class="flabel">状态</span>` +
-    statuses.map((s) => chip("status", fStatus, s, s === "all" ? "全部" : s)).join("") +
-    `<span class="sep">｜</span><input id="search" placeholder="检索 id／描述／sourceRef…" value="${esc(fQ)}">`;
-
-  $("filters").querySelectorAll(".chip").forEach((b) => {
-    b.onclick = () => {
-      if (b.dataset.kind === "mech") fMech = b.dataset.f;
-      else fStatus = b.dataset.f;
-      renderTools();
-    };
-  });
-  const si = $("search");
-  if (si) { si.oninput = () => { fQ = si.value.trim().toLowerCase(); renderTools(); }; }
-
-  const q = fQ;
-  const rows = allRows.filter((r) =>
-    (fMech === "all" || r.mech === fMech) &&
-    (fStatus === "all" || r.status === fStatus) &&
-    (!q || r.id.toLowerCase().includes(q) ||
-      (r.cap.description || "").toLowerCase().includes(q) || (r.src || "").toLowerCase().includes(q)));
-
-  $("tool-count").textContent = `计 ${rows.length} / ${allRows.length} 项（capabilities ${D.capabilities.length} ＋ media 内置 ${(D.mediaBuiltins || []).length}）`;
-  $("tbody").innerHTML = rows.map((r) =>
-    `<tr class="row" data-id="${esc(r.id)}">
-       <td class="id">${esc(r.id)}</td><td>${mechBadge(r.mech)}</td><td>${statusBadge(r.status)}</td>
-       <td class="psum">${esc(r.safety)}</td><td class="psum">${psum(r.params)}</td><td class="src">${esc(r.src)}</td>
-     </tr>${r.expanded ? detailHtml(r) : ""}`).join("");
-
-  if (!pairJumpBound) {
-    pairJumpBound = true;
-    const tb = $("tbody");
-    if (tb) tb.addEventListener("click", (ev) => {
-      const b = ev.target.closest(".pair-jump");
-      if (!b) return;
-      ev.stopPropagation();
-      selectPair(b.dataset.id);
-      const sec = $("deliverables");
-      if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-  $("tbody").querySelectorAll("tr.row").forEach((tr) => {
-    tr.onclick = () => {
-      const r = allRows.find((x) => x.id === tr.dataset.id);
-      r.expanded = !r.expanded;
-      renderTools();
-    };
-  });
-}
-
 /* ---------- 实时跟随（会话订阅式：进度在服务端，刷新页面不丢） ---------- */
 function nodeEl(id) { return document.querySelector(`.fnode[data-stage="${id}"]`); }
 let serverOk = false, pollTimer = null;
@@ -977,7 +831,7 @@ function renderStats() {
   }
 }
 
-/* ---------- PART 06 交付物 · 配对矩阵 + 详情抽屉(通用, 数据驱动, 缺产物优雅降级) ---------- */
+/* ---------- PART 04 工具明细 · 交付物配对矩阵 + 详情抽屉(通用, 数据驱动, 缺产物优雅降级) ---------- */
 function fnDeliverableView() {
   if (D.functionSchemaDeliverable && (D.functionSchemaDeliverable.functions || []).length)
     return D.functionSchemaDeliverable;
@@ -990,7 +844,7 @@ function regEntryMap() {
   for (const t of (D.registry && D.registry.entries) || []) m.set(t.id, t);
   return m;
 }
-let pairSel = null, pairQ = "", pairSt = "all", pairJumpBound = false, pairKeysBound = false, drawerOpen = false;
+let pairSel = null, pairQ = "", pairSt = "all", pairKeysBound = false, drawerOpen = false;
 function pairEntries() {
   const fnv = fnDeliverableView();
   const fnMap = new Map((fnv ? fnv.functions : []).map((f) => [f.name, f]));
@@ -1020,6 +874,12 @@ function renderDeliverables() {
   }), { threshold: 0.3 });
   io.observe($("dl-strip"));
   if (!pairSel) { const e0 = pairEntries()[0]; if (e0) pairSel = e0.cap.id; }
+  const nV = (D.capabilities || []).filter((c) => c.status === "verified").length;
+  const nP = (D.capabilities || []).filter((c) => c.status === "probe").length;
+  document.querySelectorAll(".pm-chip").forEach((ch) => {
+    const st = ch.dataset.st;
+    ch.textContent = st === "all" ? `全部 ${pairEntries().length}` : `${st} ${st === "verified" ? nV : nP}`;
+  });
   renderMatrix();
 }
 function pairRowsFiltered() {
@@ -1031,17 +891,21 @@ function pairRowsFiltered() {
 function renderMatrix() {
   const body = $("pm-body"); if (!body) return;
   const rows = pairRowsFiltered();
-  $("pm-count").textContent = `${rows.length} / ${pairEntries().length}`;
+  const all = pairEntries();
+  $("pm-count").textContent = `${rows.length} / ${all.length}`;
+  const foot = $("pm-foot");
+  if (foot) foot.innerHTML = `＋ media 内置 ${(D.mediaBuiltins || []).length}：<span class="pm-mono">${(D.mediaBuiltins || []).map((m) => m.id).join(" / ")}</span>（serve 直认, 不入 registry/analysis）`;
   body.innerHTML = rows.map((e, i) => {
     const c = e.cap, f = e.fn, r = e.reg;
     const args = f && f.arguments ? Object.entries(f.arguments).map(([k, a]) =>
       `<span class="pm-arg${a.required ? " req" : ""}" title="${esc(a.description || k)}">${esc(k)}</span>`).join("") : "";
+    const stc = ST_COLOR[c.status] || "#999";
     return `<tr class="pm-row${c.id === pairSel ? " on" : ""}" data-id="${esc(c.id)}" style="animation:dl-in .4s ${Math.min(i * 16, 320)}ms both">
-      <td><span class="pm-id"><span class="pm-dot" style="background:${ST_COLOR[c.status] || "#999"}"></span>${esc(c.id)}</span></td>
+      <td title="${esc(c.sourceRef || "")}"><span class="pm-id"><span class="pm-dot" style="background:${stc};box-shadow:0 0 0 3px ${stc}22"></span>${esc(c.id)}</span></td>
+      <td><span class="pm-mech">${esc(c.mechanism || "execmd")}<i>·</i>${esc((c.safetyLevel || "").replace("readonly", "ro"))}</span></td>
       <td>${args ? `<span class="pm-args">${args}</span>` : `<span class="pm-miss">未导出</span>`}</td>
-      <td>${r ? `<span class="pm-mono">${esc(r.methodName || r.id)}</span>` : `<span class="pm-miss">—</span>`}</td>
-      <td>${c.safetyLevel === "readonly" ? `<span class="pm-mono">ro ✓</span>` : `<span class="pm-mono">rw</span>`}</td>
-      <td>${f && r ? `<span class="pm-ok">✓</span>` : `<span class="pm-miss">—</span>`}</td>
+      <td>${r ? `<span class="pm-mono" title="${esc([r.pattern, r.dataClass, r.form].filter(Boolean).join(" · "))}">${esc(r.methodName || r.id)}</span>` : `<span class="pm-miss">—</span>`}</td>
+      <td>${f && r ? `<span class="pm-ok" title="${esc(c.safetyLevel === "readonly" ? "serve 只读" : "serve 可写")}">✓</span>` : `<span class="pm-miss">—</span>`}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="5"><div class="pd-empty">无匹配能力</div></td></tr>`;
 }
@@ -1073,10 +937,14 @@ function openPairDrawer(id) {
         <div class="pd-params">${params || '<div class="pd-param"><div class="pd2">无参数</div></div>'}</div></div>
       <div class="pd-sec" style="animation-delay:140ms"><h5>DESCRIPTION</h5><div class="pd-desc">${esc(f.description || "")}</div></div>`
         : `<div class="pd-sec" style="animation-delay:60ms"><h5>FUNCTION SCHEMA</h5><div class="pd-desc">未导出 — 运行 <code>mcp-pipeline schema --format bridge</code> 后呈现</div></div>`}
-      <div class="pd-sec" style="animation-delay:220ms"><h5>ANALYSIS</h5><div class="pd-kv">
-        ${kv("id", c.id)}${kv("domain/object/action", [c.domain, c.object, c.action])}${kv("mechanism", c.mechanism)}${kv("sourceRef", c.sourceRef)}</div></div>
-      <div class="pd-sec" style="animation-delay:300ms"><h5>REGISTRY</h5><div class="pd-kv">
-        ${r ? kv("methodName", r.methodName) + kv("pattern", r.pattern) + kv("dataClass", r.dataClass) + kv("form", r.form) : "—"}</div></div>
+      <div class="pd-sec" style="animation-delay:220ms"><h5>ANALYSIS · WIRE</h5><div class="pd-kv">
+        ${kv("domain/object/action", [c.domain, c.object, c.action])}${kv("mechanism", c.mechanism)}${kv("sourceRef", c.sourceRef)}
+        ${kv("methodName", c.methodName)}${kv("pattern", c.pattern)}${kv("dataClass", c.dataClass)}
+        ${kv("devicePaths", c.devicePaths)}${kv("form", c.form)}
+        ${kv("ccDomain", c.ccDomain)}${kv("ccFunction", c.ccFunction)}</div></div>
+      <div class="pd-sec" style="animation-delay:300ms"><h5>REGISTRY · SERVICE</h5><div class="pd-kv">
+        ${r ? kv("methodName", r.methodName) + kv("pattern", r.pattern) + kv("dataClass", r.dataClass) + kv("form", r.form) : "—"}
+        ${kv("servicePackage", c.servicePackage)}${kv("serviceClass", c.serviceClass)}${kv("bindAction", c.bindAction)}</div></div>
     </div>`;
   dr.querySelector(".pd-close").onclick = closePairDrawer;
   dr.classList.add("show"); back.classList.add("show");
@@ -1155,8 +1023,6 @@ function renderData() {
 
   renderFlow(S);
   renderSteps(S);
-  renderPanels();
-  renderTools();
   renderDeliverables();
   bindPairInteractions();
 }

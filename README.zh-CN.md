@@ -209,7 +209,7 @@ mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<
 生成的 server 经 adb / file 桥驱动车机。真实设备响应前需：
 
 1. **同事**构建并安装车端 `RpcEngine.ts`，并注册 `page://<app>/rpcagent` manifest page——二者皆产出于 `car-side/`。
-2. 对设备的 **`adb -host`** 可达性。
+2. 对设备的 **`adb -host`** 可达性。仓库仅内置 Windows 版 adb（`tools/adb/adb.exe`）；**macOS/Linux 需自备 adb 并加入 PATH**（如 `brew install android-platform-tools`），或用 `BRIDGE_ADB` 指定路径。
 3. **ZebraAlfred** 保活（或等价手段）——否则设备休眠，sendlink 会间歇性返回 exit `-1`。
 
 手头没有设备？本地验证始终可用：`mcp-pipeline verify --dir <server>`（安装 + tsc + 工具响应性 + 桥就绪性）。

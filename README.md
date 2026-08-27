@@ -198,7 +198,7 @@ Verify the installed version:
 The generated server drives the car over an adb / file bridge. Before a real device responds:
 
 1. **Colleague** builds + installs the car-side `RpcEngine.ts` and registers the `page://<app>/rpcagent` manifest page — both emitted under `car-side/`.
-2. **`adb -host`** reachability to the device.
+2. **`adb -host`** reachability to the device. The repo bundles a Windows adb (`tools/adb/adb.exe`); **macOS/Linux users need adb on PATH** (e.g. `brew install android-platform-tools`) or set `BRIDGE_ADB` to its path.
 3. **ZebraAlfred** keep-alive (or equivalent) — otherwise the device sleeps and sendlink intermittently returns exit `-1`.
 
 No device handy? Local verification always works: `mcp-pipeline verify --dir <server>` (install + tsc + tool responsiveness + bridge readiness).
