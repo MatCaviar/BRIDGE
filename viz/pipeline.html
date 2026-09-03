@@ -951,6 +951,10 @@ function bindScope() {
     showScopeModal(included, excluded, path);
   });
 }
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  try { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); return true; } catch (e) { return false; }
+}
 function showScopeModal(included, excluded, path) {
   const file = path || "<产物目录>/scope-selection.json";
   const cmd = `请按交付 scope 重新产出：读取 ${file}（included=${included.length} 项 / excluded=${excluded.length} 项），` +
@@ -958,22 +962,24 @@ function showScopeModal(included, excluded, path) {
     `重跑 validate → 导出 function-schema.json → 生成 registry.json → 重新生成 viz data.js 并刷新本页。`;
   const m = document.createElement("div"); m.className = "scope-modal";
   m.innerHTML = `<div class="sm-card">
-    <h4>交付 scope 已确认</h4>
-    <div style="font-size:.82rem;color:var(--t2)">选择已落盘，把下面这句交给宿主 codeagent 执行即可完成裁剪交付：</div>
+    <h4>交付 scope 已确认 · 指令已复制</h4>
+    <div style="font-size:.82rem;color:var(--t2)">选择已落盘，<b>指令已自动复制到剪贴板</b>——切换到宿主 codeagent 粘贴发送即可，由它主持裁剪重出。</div>
     <div class="sm-path">📄 ${esc(file)}</div>
-    <div class="sm-cmd" id="sm-cmd">${esc(cmd)}</div>
+    <div class="sm-cmd">${esc(cmd)}</div>
     <div class="sm-row">
-      <button id="sm-close">关闭</button>
-      <button id="sm-copy" class="primary">复制指令</button>
+      <button id="sm-close">完成</button>
+      <button id="sm-copy" class="primary">重新复制</button>
     </div></div>`;
   document.body.appendChild(m);
+  copyText(cmd); // 确认即自动复制(无需手动点)
   m.querySelector("#sm-close").addEventListener("click", () => m.remove());
   m.querySelector("#sm-copy").addEventListener("click", async (ev) => {
-    const t = cmd;
-    try { await navigator.clipboard.writeText(t); } catch { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
-    ev.target.textContent = "✓ 已复制"; setTimeout(() => (ev.target.textContent = "复制指令"), 1500);
+    const ok = await copyText(cmd);
+    ev.target.textContent = ok ? "✓ 已复制" : "复制失败,请手动选择";
+    setTimeout(() => (ev.target.textContent = "重新复制"), 1600);
   });
   m.addEventListener("click", (e) => { if (e.target === m) m.remove(); });
+  setTimeout(() => { if (document.body.contains(m)) m.remove(); }, 12000); // 12s 自动收起
 }
 /* ---- PRD 对照(通用: 无对照产物时优雅降级一行说明) ---- */
 function renderPrdCoverage() {
@@ -1128,6 +1134,7 @@ function bindPairInteractions() {
   });
   const body = $("pm-body");
   if (body) body.addEventListener("click", (ev) => {
+    if (ev.target.closest(".pm-check")) return; // 勾选框点击只做勾选, 不唤出详情
     const tr = ev.target.closest(".pm-row");
     if (tr) selectPair(tr.dataset.id);
   });
