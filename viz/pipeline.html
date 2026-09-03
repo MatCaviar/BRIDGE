@@ -392,6 +392,18 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
     border:1px solid var(--n200); background:#fff; color:var(--t3); cursor:pointer; font-size:15px; line-height:1;
     transition:all .25s; }
   .pd-close:hover { color:var(--danger); border-color:var(--danger); transform:rotate(90deg); }
+  /* 交付说明(抽屉首区): 详尽撰写的自然语言报告 */
+  .dr-report{background:#fbfcfe;border:1px solid var(--primary-100);border-radius:10px;padding:.7rem .85rem;max-height:340px;overflow-y:auto}
+  .dr-report.auto{background:var(--n50);border-style:dashed;border-color:var(--n200)}
+  .dr-report h6{margin:.55rem 0 .2rem;font-size:.72rem;letter-spacing:.1em;color:var(--primary-700);text-transform:uppercase}
+  .dr-report h6:first-child{margin-top:0}
+  .dr-report p{margin:.28rem 0;font-size:.84rem;line-height:1.6;color:var(--t1)}
+  .dr-report ul,.dr-report ol{margin:.25rem 0 .25rem 1.1em;padding:0}
+  .dr-report li{margin:.14rem 0;font-size:.82rem;line-height:1.55;color:var(--t2)}
+  .dr-report li::marker{color:var(--primary-400)}
+  .dr-report b{color:var(--primary-900)}
+  .dr-tag-line{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.45rem}
+  .dr-autolabel{font-size:.66rem;color:var(--t3);letter-spacing:.08em;margin-bottom:.3rem}
   .pd-body { flex:1; overflow-y:auto; padding:1.05rem 1.35rem 1.7rem; }
   .pd-sec { margin-bottom:1.2rem; animation:dl-in .45s both; }
   .pd-sec h5 { font-size:.7rem; color:var(--primary-600); letter-spacing:.14em; margin-bottom:.55rem;
@@ -559,11 +571,11 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
         <table class="pmatrix">
           <thead><tr>
             <th style="width:4%"><input type="checkbox" id="pm-all" checked title="全选/全不选"></th>
-            <th style="width:21%">能力 ＝ 函数名<span class="th-hint">悬停见溯源</span></th>
+            <th style="width:20%">能力 / 函数</th>
             <th style="width:11%">机制 · 安全</th>
-            <th>function schema 参数（实心 ＝ 必填）</th>
+            <th>参数</th>
             <th style="width:16%">registry</th>
-            <th style="width:24%">交付说明<span class="th-hint">scope · PRD/覆盖/未决</span></th>
+            <th style="width:24%">交付说明</th>
           </tr></thead>
           <tbody id="pm-body"></tbody>
         </table>
@@ -1079,6 +1091,47 @@ function renderMatrix() {
     </tr>`;
   }).join("") || `<tr><td colspan="6"><div class="pd-empty">无匹配能力</div></td></tr>`;
 }
+/* 迷你 markdown(交付说明用): ## 小标题 / - 列表 / 1. 列表 / **粗体** / 空行分段 */
+function mdLite(text) {
+  const esc2 = (t) => esc(t);
+  const lines = String(text || "").split(/\r?\n/);
+  let html = "", list = null;
+  const flush = () => { if (list) { html += `</${list}>`; list = null; } };
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { flush(); continue; }
+    const inline = (t) => esc2(t).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+    let m;
+    if ((m = line.match(/^#{1,3}\s+(.*)$/))) { flush(); html += `<h6>${inline(m[1])}</h6>`; }
+    else if ((m = line.match(/^[-*·]\s+(.*)$/))) {
+      if (list !== "ul") { flush(); html += "<ul>"; list = "ul"; }
+      html += `<li>${inline(m[1])}</li>`;
+    } else if ((m = line.match(/^\d+[.、)]\s+(.*)$/))) {
+      if (list !== "ol") { flush(); html += "<ol>"; list = "ol"; }
+      html += `<li>${inline(m[1])}</li>`;
+    } else { flush(); html += `<p>${inline(line)}</p>`; }
+  }
+  flush();
+  return html;
+}
+/* deliverReport 缺失时的结构化自动摘要(明确标注, 不冒充撰写) */
+function deliverReportAuto(c) {
+  const prd = (D.prdCoverage && D.prdCoverage.items || []).filter((i) => (i.capIds || []).includes(c.id));
+  const prdLine = prd.length
+    ? prd.map((i) => `${i.id} ${i.title}${i.status === "partial" ? "(部分)" : ""}`).join("；")
+    : (c.scope === "core" ? "PRD 未提及(超出范围项)" : "—");
+  const scopeZh = { core: "本 app 核心(自身设计目的内)", platform: "平台域(借道可达, 归属其他 app/平台)", shared: "显式共享" }[c.scope || "core"];
+  return `## 定位
+- **归属**: ${scopeZh}
+- **PRD 对应**: ${prdLine}
+## 覆盖与状态
+- **status**: ${c.status || "probe"}（${c.status === "verified" ? "已有溯源/实测证据" : "待复核"}）
+- **机制**: ${c.mechanism || "execmd"}${c.safetyLevel ? " · " + c.safetyLevel : ""}
+## 说明
+${c.deliverNote || "（一句话交付说明待补）"}
+
+*以上为系统依据现有字段自动摘要——详尽交付说明(deliverReport)由 host codeagent 撰写后在此呈现。*`;
+}
 function openPairDrawer(id) {
   const e = pairEntries().find((x) => x.cap.id === id);
   const dr = $("pdrawer"), back = $("pd-back");
@@ -1103,6 +1156,9 @@ function openPairDrawer(id) {
       <div class="pd-sub">function-schema.json · ${esc(c.sourceRef || "")}</div>
     </div>
     <div class="pd-body">
+      <div class="pd-sec" style="animation-delay:40ms"><h5>交付说明 · DELIVERABLE REPORT</h5>
+        <div class="dr-report${c.deliverReport ? "" : " auto"}">${mdLite(c.deliverReport || deliverReportAuto(c))}</div>
+      </div>
       ${f ? `<div class="pd-sec" style="animation-delay:60ms"><h5>PARAMETERS</h5>
         <div class="pd-params">${params || '<div class="pd-param"><div class="pd2">无参数</div></div>'}</div></div>
       <div class="pd-sec" style="animation-delay:140ms"><h5>DESCRIPTION</h5><div class="pd-desc">${esc(f.description || "")}</div></div>`

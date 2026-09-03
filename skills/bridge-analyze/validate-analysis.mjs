@@ -78,6 +78,7 @@ for (const [i, c] of caps.entries()) {
   if (c.scope && !["core", "platform", "shared"].includes(c.scope)) warns.push(`${at}: scope 非法 '${c.scope}'(core|platform|shared)`);
   if (!c.scope) warns.push(`${at}: 缺 scope 归属分级(core 本app核心 / platform 平台域 / shared 共享)`);
   if (!c.deliverNote) warns.push(`${at}: 缺 deliverNote 交付说明(PRD对应/覆盖/未决 一句话)`);
+  if (!c.deliverReport) warns.push(`${at}: 缺 deliverReport 详尽交付说明(6段结构: 定位/PRD/参数依据/执行链/验证证据/未决)`);
   else if (m === "execmd") {
     if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: execmd 缺 servicePackage/serviceClass`);
     if (!c.methodName) errors.push(`${at}: execmd 缺 methodName`);

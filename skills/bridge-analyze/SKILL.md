@@ -173,6 +173,7 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 每个 capability 补两个字段：
 - `scope`: `"core" | "platform" | "shared"` —— **core** = 本 app 自身设计目的的能力（交付物主体，追求全量）；**platform** = 借本 app 通道可达但归属平台/其他 app 域（如地图导航、车控座椅空调、系统页跳转）——默认不进本 app 交付，归各自 app 的 run，避免跨 run 重复与上游同义工具冲突；**shared** = 显式跨 app 共享（须在 note 说明 owner 判定）。判定启发：execmd/aidl 指向 app 自身服务 = core；mapnav/carcontrol/intent 指向其他包 = platform。
 - `deliverNote`: 一句话交付口径说明——写清 PRD 对应（如"PRD 3.2 全覆盖"/"PRD 未提及, 超出范围"）、覆盖情况（部分覆盖写缺口）、未决事项（wire 不确定/待实车复核/stub 等）。矩阵"交付说明"列直接呈现，不要写空话。
+- `deliverReport`: 详尽交付说明（交付页点击条目右侧面板呈现）——**条理清晰、语言自然**，建议 6 段结构：定位(对齐 app.corePurpose 的设计意图) / PRD 对应(条目号·全覆盖·部分缺口·超出) / 参数与取值依据(枚举·区间·默认值的溯源) / 执行链路与依赖(机制·服务·前置条件) / 验证状态与证据(verified 依据·wire 溯源·stub 判定) / 未决事项与建议。支持轻量排版(`## 小标题`、`- 列表`、`**加粗**`、空行分段)。缺失时页面自动以结构化摘要兜底并明确标注非人工撰写。
 
 顶层 `app.corePurpose`: 一句话本 app 设计目的（core 判定基准）。同义工具跨 run 冲突由套件层按"app 自有优先"裁决，单一 app 交付默认只含 core（platform 项用户可在交付页显式勾入）。
 

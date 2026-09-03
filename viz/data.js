@@ -1,6 +1,6 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-09-03T01:56:46.835Z",
+ "generatedAt": "2026-09-03T02:07:27.363Z",
  "version": "0.1.25",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",
@@ -110,7 +110,8 @@ window.__PIPELINE_DATA__ = {
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
    "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
    "scope": "core",
-   "deliverNote": "PRD 3.2 全覆盖(13 档含 AI 音场); wire 枚举经 dex 溯源"
+   "deliverNote": "PRD 3.2 全覆盖(13 档含 AI 音场); wire 枚举经 dex 溯源",
+   "deliverReport": "## 定位\n音场模式切换是 imaudio 的**核心能力**之一，直接对应产品\"沉浸式听音场景\"的设计主线。\n\n## PRD 对应\n- **PRD 3.2 音场/声场切换**：全覆盖。13 个档位中含 4 个 AI 音场（235-238），均为 PRD V2.6 新增章节要求。\n\n## 参数与取值依据\n- `mode` 枚举 13 值，逐个取自 dex 常量池 `SoundStageMode.<clinit>`，非文档臆测；0=自定义时需配合前后/左右声场参数。\n\n## 执行链路\nexecmd 单入口 `executeCommand` → `handleSetSoundStage` → `IMAudioPolicyProvider` 下发；车端 UI 置信刷新由 ui_sync 自动点击对应卡片完成。\n\n## 验证证据\nverified：路由表逐字节溯源 + 实车设置生效（四种模式实拍确认）。\n\n## 未决\n- 自定义模式的 fade/balance 边界组合未逐项实测，建议有车时补 2-3 组边界用例。"
   },
   {
    "id": "set_beosonic_point",
@@ -288,7 +289,8 @@ window.__PIPELINE_DATA__ = {
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
    "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
    "scope": "core",
-   "deliverNote": "PRD 3.1 覆盖; 头枕音区可选参数"
+   "deliverNote": "PRD 3.1 覆盖; 头枕音区可选参数",
+   "deliverReport": "## 定位\n整车音量与头枕音区联动调节，核心能力，对应 PRD 3.1。\n\n## PRD 对应\n- PRD 3.1 全覆盖；头枕独立音区为 PRD 未明说的存量实现，属超出范围项但已在产线使用。\n\n## 参数依据\n- `volume` 0-30 整数（车机标定），`zoneId` 可选——不传即整车。\n\n## 执行链路\nexecmd → `handleSetCarAndHeadrestVolume`；设置后可由 `get_last_volume_data` 回读闭环。\n\n## 验证证据\nverified：实车多次设置/回读一致。\n\n## 未决\n无。"
   },
   {
    "id": "get_last_volume_data",
@@ -401,7 +403,8 @@ window.__PIPELINE_DATA__ = {
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
    "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
    "scope": "core",
-   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围",
+   "deliverReport": "## 定位\n音效库安装，核心能力，PRD 3.4 三件套之一。\n\n## PRD 对应\n- 覆盖；安装进度回报依赖回调注册，见未决。\n\n## 参数依据\n- `libraryId`/`effectId` 由查询接口给出。\n\n## 执行链路\nexecmd 信封 `InstallSoundLibrary` → 云端下载 → 安装结果回调。\n\n## 验证证据\nverified（wire 溯源 + 实车安装一次成功）。\n\n## 未决\n- 断点续传/弱网中断场景未覆盖。"
   },
   {
    "id": "preview_sound",
@@ -437,7 +440,8 @@ window.__PIPELINE_DATA__ = {
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
    "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
    "scope": "core",
-   "deliverNote": "PRD 3.4 覆盖试听; 结果经回调异步"
+   "deliverNote": "PRD 3.4 覆盖试听; 结果经回调异步",
+   "deliverReport": "## 定位\n音效库试听，核心能力，对应 PRD 3.4\"先听后装\"体验闭环的入口。\n\n## PRD 对应\n- PRD 3.4 覆盖；与 install/delete 组成音效库三件套。\n\n## 参数依据\n- `effectId` 取自音效库查询结果的稳定 ID，非硬编码。\n\n## 执行链路\nexecmd 信封 `ICloudServiceRequest{body: PreviewSound}` → 云端内容服务，结果经 IIMAudioCallback 异步回报。\n\n## 验证证据\nverified（wire 层）；实车试听因当前车辆音效库为空未逐条听感确认。\n\n## 未决\n- 云端服务不可达时的错误码语义建议补一次真机观测。"
   },
   {
    "id": "query_effect_library",
@@ -672,7 +676,8 @@ window.__PIPELINE_DATA__ = {
    "serviceClass": "com.ebanma.map.main.service.MapExternalService",
    "bindAction": "com.ebanma.map.service.common",
    "scope": "platform",
-   "deliverNote": "平台域: 地图 app 能力, 借语音通道; 不属 imaudio 交付核心"
+   "deliverNote": "平台域: 地图 app 能力, 借语音通道; 不属 imaudio 交付核心",
+   "deliverReport": "## 定位\n**平台域能力**：地图 app 的导航入口，借语音通道可达，不属于 imaudio 自身交付核心——归属地图 app 的独立 run。\n\n## PRD 对应\n- imaudio PRD 不涉及；在座舱语音总体验收中为必测项。\n\n## 参数依据\n- 目的地坐标优先，缺失时上游先 `geo_search` 联网解析（Photon/OSM），车端另有内置 POI 兜底。\n\n## 执行链路\nmapnav 机制 → `IMapCommonService.navigateToForAI(RequestRouteInfoForAI)`；`confirmPreviewNavigation` 因包名白名单(-403)弃用。\n\n## 验证证据\nverified：同济大学等多目的地实车导航成功；NAV_TIMEOUT 偶发重试即恢复。\n\n## 未决\n- 途经点(wayPoints)组合未实测。"
   },
   {
    "id": "get_speed_volume_status",
