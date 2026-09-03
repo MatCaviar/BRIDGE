@@ -191,17 +191,21 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 **交付 scope 调整（用户在交付页勾选后）**：交付页勾选会落盘 `scope-selection.json`（与 analysis 同目录，含 included/excluded/counts）。用户把页面生成的指令交给你后，按其执行：excluded 项从 `analysis.json` 的 `capabilities` 移除并记入顶层 `excludedFromTools`（理由：用户勾选排除）→ 重跑 `validate` → 重新导出 `function-schema.json` → 重新生成 `registry.json` → 重新生成 viz `data.js`（页面自动刷新）。
 
-## 问题反馈（使用中必做记录 · 推广同事适用）
+## 问题反馈（可选接口 · 仅真正值得讨论的问题）
 
-执行套件过程中凡遇到**真实问题**——套件缺陷/工具报错、能力缺口(如需新机制)、SKILL 文档误导、环境坑(Windows/端口/编码)、改进想法——**当场文件化**, 不要只留印象也不要憋到忘记:
+套件提供反馈通道，**按需使用、宁缺毋滥**——只上报真正值得 BRIDGE 团队讨论或优化的实质问题（设计缺陷、反复踩到的坑、明确的能力缺口、有价值的改进构想）。**不要滥用**：
+
+- 不报：SKILL/文档已写明的已知限制、一次性的环境抖动、可自行绕过的小问题、执行中的正常重试；
+- 值得报：机制性缺陷、误导性文档、需要新增执行通道、多个 app 都会遇到的通用问题；
+- 原则：**高信噪比**——每条反馈都应是"讨论它有价值"的；没有值得报的，就一条都不报（这完全正常）。
+
+使用（`feedback.mjs` 零依赖，详见 `node feedback.mjs` 无参数输出）：
 
 ```bash
-node <套件根>/skills/bridge-analyze/feedback.mjs new   --type bug|gap|doc|env|idea --severity blocker|major|minor   --title "一句话标题" --detail "现象与期望, 条理描述"   [--reproduce "真实命令+关键输出摘录"] [--evidence "文件1,文件2"] [--proposer "姓名/团队"]
+node <套件根>/skills/bridge-analyze/feedback.mjs new --type bug|gap|doc|env|idea   --severity blocker|major|minor --title "…" --detail "现象与期望" [--reproduce "…"] [--proposer "…"]
 ```
 
-- 文件落 `<产物目录>/feedback/`(标准 JSON, 带 app/形态/套件版本/OS 上下文, 便于复现)；
-- **收尾必做**: `node feedback.mjs submit` —— 配置了 `BRIDGE_FEEDBACK_TOKEN` 自动建 GitHub Issue(`[feedback]` 前缀+类型/严重度标签, BRIDGE 团队统一处理); 未配置则自动打包 `feedback-bundle-*.md` 并给出转交指引——**上报失败静默降级, 永不影响主流程**;
-- 诚实原则: 只报真实遇到的(附真实命令与输出), 不虚构不凑数; 已在 SKILL 内写明的已知限制不算问题。
+文件落 `<产物目录>/feedback/`。**如记录了反馈**，收尾时 `node feedback.mjs submit`：有 `BRIDGE_FEEDBACK_TOKEN` 自动建 `[feedback]` Issue（团队统一处理）；无凭证自动打包 bundle 转交；上报失败静默降级，永不影响主流程。
 
 ## 产物去向
 

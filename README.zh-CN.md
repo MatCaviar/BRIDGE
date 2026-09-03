@@ -278,7 +278,7 @@ E2E 快速开始（两种）：**一键** — 打开可视化页 `http://localho
 
 ## 📮 问题反馈（各团队使用 BRIDGE 时）
 
-你的 codeagent 在执行中会自动把遇到的问题/缺口/改进点文件化到 `<产物目录>/feedback/`（标准 JSON，自带环境上下文）。收尾统一上报：
+执行中遇到**真正值得讨论优化的问题**（机制缺陷/误导文档/通用能力缺口/改进构想），codeagent 可按需记录到 `<产物目录>/feedback/`（标准 JSON，自带环境上下文）——按需使用、宁缺毋滥，已知限制与可自行绕过的小问题不必上报。如记录了反馈，收尾统一上报：
 
 ```bash
 node skills/bridge-analyze/feedback.mjs submit
