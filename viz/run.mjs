@@ -21,7 +21,7 @@ import { createServer, request as httpRequest } from "http";
 import { spawn, execFile } from "child_process";
 import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, join, basename, resolve } from "path";
+import { dirname, join, basename, resolve, sep } from "path";
 
 const VIZ = dirname(fileURLToPath(import.meta.url));
 const argValue = (name) => {
@@ -796,6 +796,29 @@ const handler = async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ carIp: state.carIp, carModel: state.carModel,
         serveRunning: !!state.serveProc, serveLogTail: state.serveLog.slice(-8) }));
+    }
+    if (url.pathname === "/api/deliverable/scope" && req.method === "POST") {
+      // 交付 scope 勾选落盘(交付页触发): 写到 analysis 同目录, 宿主 codeagent 按指令读取处理
+      let body = await readBody(req);
+      let sel = {};
+      try { sel = JSON.parse(body || "{}"); } catch {}
+      const dir = dirname(TARGET.analysis);
+      const out = join(dir, "scope-selection.json");
+      try {
+        writeFileSync(out, JSON.stringify({
+          generatedAt: new Date().toISOString(),
+          analysis: TARGET.analysis,
+          included: Array.isArray(sel.included) ? sel.included : [],
+          excluded: Array.isArray(sel.excluded) ? sel.excluded : [],
+          counts: { included: (sel.included || []).length, excluded: (sel.excluded || []).length },
+          note: "用户在交付页勾选确认; 处理约定见 SKILL.md「交付 scope 调整」",
+        }, null, 1));
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ ok: true, path: out.split(sep).join("/") }));
+      } catch (e) {
+        res.writeHead(500, { "content-type": "application/json" });
+        return res.end(JSON.stringify({ ok: false, error: String(e.message) }));
+      }
     }
     if (url.pathname === "/api/target") {
       if (req.method === "POST") {

@@ -123,6 +123,21 @@ const probe = probeJson
     }
   : { present: false };
 
+// PRD 对照(可选): analysis 同目录的 prd-coverage.json, 由分析时对照 PRD 产出
+let prdCoverage = null;
+{
+  const pcPath = argAnalysis
+    ? join(HERE, "..", "prd-coverage.json")
+    : join(ROOT, "e2e", "prd-coverage.json");
+  // 优先: 与 analysis 同目录; 其次套件 e2e/
+  const cand = argAnalysis
+    ? [join(dirname(resolve(argAnalysis)), "prd-coverage.json"), join(ROOT, "e2e", "prd-coverage.json")]
+    : [join(ROOT, "e2e", "prd-coverage.json")];
+  for (const c of cand) {
+    if (existsSync(c)) { try { prdCoverage = JSON.parse(readFileSync(c, "utf-8")); break; } catch {} }
+  }
+}
+
 const payload = {
   generatedAt: new Date().toISOString(),
   version: "0.1.25",
@@ -149,6 +164,7 @@ const payload = {
     registryTools: registry.present ? registry.tools : 0,
   },
   capabilities: caps,
+  prdCoverage,
   mediaBuiltins: MEDIA_BUILTINS,
   registry,
   // 交付物 · 上游 Agent function schema(注入 e2e LLM 的同一份) — 配对全景与交付清单消费

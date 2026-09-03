@@ -286,6 +286,44 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
   #e2e-overlay[hidden]{display:none}
   #e2e-frame{width:100%;height:100%;border:0;background:#fff}
   /* ===== PART 04 工具明细 · 交付物配对矩阵 + 详情抽屉 ===== */
+  /* PRD 对照块 */
+  .prd-block{margin:.9rem 0 0}
+  .prd-absent{color:var(--t3);font-size:.8rem;border:1px dashed var(--n200);border-radius:8px;padding:.5rem .8rem}
+  .prd-h{display:flex;align-items:baseline;gap:.6rem;margin-bottom:.45rem}
+  .prd-h b{font-size:.9rem;color:var(--t1)}
+  .prd-h .prd-src{font-size:.7rem;color:var(--t3);font-family:var(--mono)}
+  .prd-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem}
+  @media(max-width:900px){.prd-cols{grid-template-columns:1fr}}
+  .prd-col{border:1px solid var(--n200);border-radius:10px;overflow:hidden}
+  .prd-col .pc-h{padding:.35rem .7rem;font-size:.74rem;font-weight:600;display:flex;gap:.4rem;align-items:center}
+  .prd-col.matched .pc-h{background:#eef7f0;color:#3f7f55}
+  .prd-col.gap .pc-h{background:#fbf3e6;color:#a76f32}
+  .prd-col.extra .pc-h{background:#edf3fc;color:#3575c8}
+  .prd-col ul{list-style:none;margin:0;padding:.3rem .5rem .5rem;max-height:220px;overflow-y:auto}
+  .prd-col li{padding:.28rem .3rem;border-bottom:1px dashed var(--n100);cursor:default}
+  .prd-col li.clickable{cursor:pointer}
+  .prd-col li.clickable:hover{background:var(--primary-50)}
+  .prd-col .pi-t{font-size:.8rem;color:var(--t2)}
+  .prd-col .pi-n{font-size:.68rem;color:var(--t3);margin-top:.1rem}
+  .prd-col .pi-tag{font-size:.62rem;font-family:var(--mono);color:var(--t3)}
+  /* scope 勾选操作条 */
+  .scope-bar{display:flex;align-items:center;gap:.9rem;margin:.8rem 0 .2rem;padding:.5rem .8rem;background:var(--primary-50);border:1px solid var(--primary-100);border-radius:10px}
+  .scope-all{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--t2);cursor:pointer}
+  .scope-stat{font-size:.78rem;color:var(--t3)}
+  .scope-stat b{color:var(--primary-700);font-family:var(--mono)}
+  .scope-go{margin-left:auto;font:inherit;font-size:.8rem;font-weight:600;color:#fff;background:linear-gradient(135deg,#2f5f99,#3f86e8);border:0;border-radius:8px;padding:.45rem 1rem;cursor:pointer;transition:filter .15s}
+  .scope-go:hover{filter:brightness(1.06)}
+  .scope-note{font-size:.72rem;color:var(--t3);margin:.3rem 0 0}
+  .pm-check{width:14px;height:14px;accent-color:#3f86e8;cursor:pointer}
+  /* scope 确认弹层 */
+  .scope-modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(20,30,45,.45);backdrop-filter:blur(2px)}
+  .scope-modal .sm-card{width:min(680px,92vw);background:#fff;border-radius:14px;padding:1.2rem 1.4rem;box-shadow:0 18px 60px rgba(20,40,70,.3);animation:dl-in .3s both}
+  .scope-modal h4{margin:0 0 .4rem;font-size:1rem;color:var(--primary-900)}
+  .scope-modal .sm-path{font-family:var(--mono);font-size:.76rem;background:var(--n50);border:1px solid var(--n200);border-radius:6px;padding:.4rem .6rem;word-break:break-all;margin:.5rem 0}
+  .scope-modal .sm-cmd{font-family:var(--mono);font-size:.76rem;background:var(--primary-50);border:1px dashed var(--primary-200);border-radius:6px;padding:.55rem .7rem;white-space:pre-wrap;word-break:break-all;margin:.5rem 0 .8rem;color:var(--primary-900)}
+  .scope-modal .sm-row{display:flex;gap:.6rem;justify-content:flex-end}
+  .scope-modal button{font:inherit;font-size:.8rem;border-radius:8px;padding:.42rem 1rem;cursor:pointer;border:1px solid var(--n200);background:#fff;color:var(--t2)}
+  .scope-modal button.primary{background:linear-gradient(135deg,#2f5f99,#3f86e8);color:#fff;border:0;font-weight:600}
   @keyframes dl-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
 
   .dl-strip { display:flex; flex-wrap:wrap; border:1px solid var(--primary-100); border-radius:12px;
@@ -496,6 +534,12 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
         <span class="section-sub">点击行查看注入上游 Agent 的完整函数定义</span>
       </div>
       <div class="dl-strip" id="dl-strip"></div>
+      <div class="prd-block" id="prd-block"></div>
+      <div class="scope-bar" id="scope-bar">
+        <label class="scope-all"><input type="checkbox" id="scope-all" checked> 全选</label>
+        <span class="scope-stat" id="scope-stat"></span>
+        <button class="scope-go" id="scope-go">确认 scope · 唤起 codeagent</button>
+      </div>
       <div class="pm-bar">
         <input class="pm-search" id="pm-search" placeholder="检索能力 / 函数名…" autocomplete="off">
         <button class="pm-chip on" data-st="all">全部</button>
@@ -506,6 +550,7 @@ header h1{font-weight:700;margin-bottom:4.8px;line-height:1.3;color:#3f86e8;lett
       <div class="pm-wrap">
         <table class="pmatrix">
           <thead><tr>
+            <th style="width:4%"><input type="checkbox" id="pm-all" checked title="全选/全不选"></th>
             <th style="width:21%">能力 ＝ 函数名<span class="th-hint">悬停见溯源</span></th>
             <th style="width:11%">机制 · 安全</th>
             <th>function schema 参数（实心 ＝ 必填）</th>
@@ -866,6 +911,97 @@ function pairEntries() {
     .map((c) => ({ cap: c, fn: fnMap.get(c.id) || null, reg: regMap.get(c.id) || null }));
 }
 const ST_COLOR = { verified: "#3f7f55", probe: "#c8a66c", broken: "#9f5555" };
+/* ---- 交付 scope 勾选(默认全选; 变更后可落盘唤起 host codeagent) ---- */
+const scopeSel = new Set((D.capabilities || []).filter((c) => c.status !== "broken").map((c) => c.id));
+function scopeSync() {
+  const all = (D.capabilities || []).filter((c) => c.status !== "broken");
+  const n = all.filter((c) => scopeSel.has(c.id)).length;
+  const stat = $("scope-stat"); if (stat) stat.innerHTML = `交付 scope 已选 <b>${n}</b> / ${all.length} · 排除 <b>${all.length - n}</b> 项（排除项不进入 function-schema / registry）`;
+  const chkAll = $("scope-all"); if (chkAll) chkAll.checked = n === all.length;
+  const pmAll = $("pm-all"); if (pmAll) pmAll.checked = n === all.length;
+}
+function bindScope() {
+  document.addEventListener("change", (e) => {
+    if (e.target.classList && e.target.classList.contains("pm-check")) {
+      const id = e.target.dataset.scope;
+      if (e.target.checked) scopeSel.add(id); else scopeSel.delete(id);
+      scopeSync();
+    }
+  });
+  const toggleAll = (on) => {
+    (D.capabilities || []).filter((c) => c.status !== "broken").forEach((c) => on ? scopeSel.add(c.id) : scopeSel.delete(c.id));
+    document.querySelectorAll(".pm-check[data-scope]").forEach((c) => (c.checked = on));
+    scopeSync();
+  };
+  const a1 = $("scope-all"); if (a1) a1.addEventListener("change", () => toggleAll(a1.checked));
+  const a2 = $("pm-all"); if (a2) a2.addEventListener("change", () => toggleAll(a2.checked));
+  const go = $("scope-go");
+  if (go) go.addEventListener("click", async () => {
+    const caps = (D.capabilities || []).filter((c) => c.status !== "broken");
+    const included = caps.filter((c) => scopeSel.has(c.id)).map((c) => c.id);
+    const excluded = caps.filter((c) => !scopeSel.has(c.id)).map((c) => ({ id: c.id, reason: "用户在交付页勾选排除" }));
+    go.disabled = true; go.textContent = "落盘中…";
+    let path = "";
+    try {
+      const r = await fetch("/api/deliverable/scope", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ included, excluded }) });
+      const j = await r.json(); path = j.path || "";
+    } catch (err) { /* 本地 file:// 或后端旧版: 仍给出指令, path 用约定名 */ }
+    go.disabled = false; go.textContent = "确认 scope · 唤起 codeagent";
+    showScopeModal(included, excluded, path);
+  });
+}
+function showScopeModal(included, excluded, path) {
+  const file = path || "<产物目录>/scope-selection.json";
+  const cmd = `请按交付 scope 重新产出：读取 ${file}（included=${included.length} 项 / excluded=${excluded.length} 项），` +
+    `将 excluded 项从 analysis.json 的 capabilities 移除并记入 excludedFromTools（理由: 用户勾选排除），` +
+    `重跑 validate → 导出 function-schema.json → 生成 registry.json → 重新生成 viz data.js 并刷新本页。`;
+  const m = document.createElement("div"); m.className = "scope-modal";
+  m.innerHTML = `<div class="sm-card">
+    <h4>交付 scope 已确认</h4>
+    <div style="font-size:.82rem;color:var(--t2)">选择已落盘，把下面这句交给宿主 codeagent 执行即可完成裁剪交付：</div>
+    <div class="sm-path">📄 ${esc(file)}</div>
+    <div class="sm-cmd" id="sm-cmd">${esc(cmd)}</div>
+    <div class="sm-row">
+      <button id="sm-close">关闭</button>
+      <button id="sm-copy" class="primary">复制指令</button>
+    </div></div>`;
+  document.body.appendChild(m);
+  m.querySelector("#sm-close").addEventListener("click", () => m.remove());
+  m.querySelector("#sm-copy").addEventListener("click", async (ev) => {
+    const t = cmd;
+    try { await navigator.clipboard.writeText(t); } catch { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+    ev.target.textContent = "✓ 已复制"; setTimeout(() => (ev.target.textContent = "复制指令"), 1500);
+  });
+  m.addEventListener("click", (e) => { if (e.target === m) m.remove(); });
+}
+/* ---- PRD 对照(通用: 无对照产物时优雅降级一行说明) ---- */
+function renderPrdCoverage() {
+  const el = $("prd-block"); if (!el) return;
+  const pc = D.prdCoverage;
+  if (!pc || !pc.items || !pc.items.length) {
+    el.innerHTML = `<div class="prd-absent">PRD 对照：本次输入未包含 PRD，或分析未产出对照表（prd-coverage.json）——如需逐条对照，把 PRD 放入输入后重跑分析。</div>`;
+    return;
+  }
+  const matched = pc.items.filter((i) => i.status === "matched" || i.status === "partial");
+  const gaps = pc.items.filter((i) => i.status === "prd-only");
+  const extraIds = new Set();
+  pc.items.forEach((i) => (i.capIds || []).forEach((c) => extraIds.add(c)));
+  const extras = (D.capabilities || []).filter((c) => c.status !== "broken" && !extraIds.has(c.id));
+  const li = (i, cls) => `<li class="${(i.capIds || []).length ? "clickable" : ""}" data-capid="${esc((i.capIds || [])[0] || "")}">
+      <div class="pi-t">${esc(i.title || i.id)} <span class="pi-tag">${esc(i.id || "")}${i.status === "partial" ? " · 部分" : ""}</span></div>
+      ${i.note ? `<div class="pi-n">${esc(i.note)}</div>` : ""}</li>`;
+  el.innerHTML = `
+    <div class="prd-h"><b>PRD 对照</b><span class="prd-src">${esc(pc.source || "")}</span></div>
+    <div class="prd-cols">
+      <div class="prd-col matched"><div class="pc-h">✓ PRD ↔ 代码 已对应 · ${matched.length}</div><ul>${matched.map((i) => li(i)).join("") || '<li><div class="pi-n">无</div></li>'}</ul></div>
+      <div class="prd-col gap"><div class="pc-h">⚠ PRD 有 · 代码无 · ${gaps.length}</div><ul>${gaps.map((i) => li(i)).join("") || '<li><div class="pi-n">无缺口</div></li>'}</ul></div>
+      <div class="prd-col extra"><div class="pc-h">◆ 代码有 · PRD 未提及 · ${extras.length}</div><ul>${extras.map((c) => `<li class="clickable" data-capid="${esc(c.id)}"><div class="pi-t">${esc(c.id)}</div><div class="pi-n">${esc((c.description || "").slice(0, 46))}…</div></li>`).join("") || '<li><div class="pi-n">无</div></li>'}</ul></div>
+    </div>`;
+  el.querySelectorAll("li.clickable[data-capid]").forEach((liEl) => liEl.addEventListener("click", () => {
+    const id = liEl.dataset.capid; if (id) openPairDrawer(id);
+  }));
+}
 function renderDeliverables() {
   if (!$("deliverables")) return;
   const fnv = fnDeliverableView();
@@ -893,6 +1029,8 @@ function renderDeliverables() {
     ch.textContent = st === "all" ? `全部 ${pairEntries().length}` : `${st} ${st === "verified" ? nV : nP}`;
   });
   renderMatrix();
+  renderPrdCoverage();
+  scopeSync();
 }
 function pairRowsFiltered() {
   const q = pairQ.toLowerCase();
@@ -913,13 +1051,14 @@ function renderMatrix() {
       `<span class="pm-arg${a.required ? " req" : ""}" title="${esc(a.description || k)}">${esc(k)}</span>`).join("") : "";
     const stc = ST_COLOR[c.status] || "#999";
     return `<tr class="pm-row${c.id === pairSel ? " on" : ""}" data-id="${esc(c.id)}" style="animation:dl-in .4s ${Math.min(i * 16, 320)}ms both">
+      <td><input type="checkbox" class="pm-check" data-scope="${esc(c.id)}" ${scopeSel.has(c.id) ? "checked" : ""}></td>
       <td title="${esc(c.sourceRef || "")}"><span class="pm-id"><span class="pm-dot" style="background:${stc};box-shadow:0 0 0 3px ${stc}22"></span>${esc(c.id)}</span></td>
       <td><span class="pm-mech">${esc(c.mechanism || "execmd")}<i>·</i>${esc((c.safetyLevel || "").replace("readonly", "ro"))}</span></td>
       <td>${args ? `<span class="pm-args">${args}</span>` : `<span class="pm-miss">未导出</span>`}</td>
       <td>${r ? `<span class="pm-mono" title="${esc([r.pattern, r.dataClass, r.form].filter(Boolean).join(" · "))}">${esc(r.methodName || r.id)}</span>` : `<span class="pm-miss">—</span>`}</td>
       <td>${f && r ? `<span class="pm-ok" title="${esc(c.safetyLevel === "readonly" ? "serve 只读" : "serve 可写")}">✓</span>` : `<span class="pm-miss">—</span>`}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="5"><div class="pd-empty">无匹配能力</div></td></tr>`;
+  }).join("") || `<tr><td colspan="6"><div class="pd-empty">无匹配能力</div></td></tr>`;
 }
 function openPairDrawer(id) {
   const e = pairEntries().find((x) => x.cap.id === id);
@@ -1036,6 +1175,7 @@ function renderData() {
   renderFlow(S);
   renderSteps(S);
   renderDeliverables();
+  bindScope();
   bindPairInteractions();
 }
 

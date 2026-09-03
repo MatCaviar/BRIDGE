@@ -168,6 +168,20 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 3. **失败即自行优化**：✗（未选中期望工具 / none 却调用了工具）= 对应 description 区分度不足 → 改写 description → 重新导出 function-schema → `POST $BRIDGE_VIZ_URL/api/e2e/restart`（网关按新 analysis 重建配置）→ **仅重测失败项**（≤2 轮）。执行类错误（如设备不可达）属环境问题，如实呈现并说明，不算描述失败。
 4. **报告**：通过率、覆盖统计（工具数/状态数/复合句/近义陷阱/防幻觉）、发现的问题与修正记录。
 
+## 交付对照与 scope
+
+**PRD 对照（输入含 PRD 时必产出）**：对照 PRD 功能条目与枚举出的能力，产出 `prd-coverage.json`（与 analysis.json 同目录）：
+```json
+{ "source": "<PRD 文件名>",
+  "items": [
+    { "id": "prd-3.2", "title": "音场切换", "capIds": ["set_sound_stage"], "status": "matched", "note": "8 种模式全覆盖" },
+    { "id": "prd-4.1", "title": "多音区独立控制", "capIds": [], "status": "prd-only", "note": "代码未见对应入口(逆向确认)" }
+  ] }
+```
+`status`: `matched`(已对应) / `partial`(部分覆盖, note 说明缺口) / `prd-only`(PRD 有代码无——note 必须写明核查结论)。代码有而 PRD 未提及的项由可视化页自动从 capabilities 差集计算，无需手写。此文件驱动交付页"PRD 对照"三栏。
+
+**交付 scope 调整（用户在交付页勾选后）**：交付页勾选会落盘 `scope-selection.json`（与 analysis 同目录，含 included/excluded/counts）。用户把页面生成的指令交给你后，按其执行：excluded 项从 `analysis.json` 的 `capabilities` 移除并记入顶层 `excludedFromTools`（理由：用户勾选排除）→ 重跑 `validate` → 重新导出 `function-schema.json` → 重新生成 `registry.json` → 重新生成 viz `data.js`（页面自动刷新）。
+
 ## 产物去向
 
 `function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope（收尾自动测试验证的正是这条注入链）；机制字段经 `analysis-to-registry` 生成车端 registry；app 侧 wire 配置（如适用）部署到目标 app 执行端即可驱动真机。全部产物的配对关系在可视化页「配对矩阵」中呈现与核对。

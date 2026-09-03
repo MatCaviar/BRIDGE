@@ -1,6 +1,6 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-08-26T15:27:50.991Z",
+ "generatedAt": "2026-09-03T01:15:01.968Z",
  "version": "0.1.25",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",
@@ -1144,6 +1144,62 @@ window.__PIPELINE_DATA__ = {
    "serviceClass": "com.immotors.carcontrol.MainActivity"
   }
  ],
+ "prdCoverage": {
+  "source": "IM audio PRD文档-V2.6-20260527.md",
+  "items": [
+   {
+    "id": "prd-3.1",
+    "title": "音量调节(整车/头枕音区)",
+    "capIds": [
+     "set_car_and_headrest_volume",
+     "get_last_volume_data"
+    ],
+    "status": "matched",
+    "note": "设置+回读均覆盖"
+   },
+   {
+    "id": "prd-3.2",
+    "title": "音场/均衡器切换",
+    "capIds": [
+     "set_sound_stage"
+    ],
+    "status": "matched",
+    "note": "含 K 歌/沉浸等全部音场档位"
+   },
+   {
+    "id": "prd-3.4",
+    "title": "音效库试听/安装/删除",
+    "capIds": [
+     "preview_sound",
+     "install_sound_library",
+     "delete_sound_library"
+    ],
+    "status": "matched",
+    "note": ""
+   },
+   {
+    "id": "prd-5.2",
+    "title": "锁车音自定义(多车机主题)",
+    "capIds": [],
+    "status": "prd-only",
+    "note": ""
+   },
+   {
+    "id": "prd-6.1",
+    "title": "杜比全景声内容开关",
+    "capIds": [],
+    "status": "prd-only",
+    "note": "源码未见对应控制入口(本轮输入形态未含该模块)"
+   },
+   {
+    "id": "prd-6.3",
+    "title": "多用户音效偏好云同步",
+    "capIds": [],
+    "status": "prd-only",
+    "note": "属云端能力, 车端包内无实现"
+   }
+  ]
+ },
  "mediaBuiltins": [
   {
    "id": "media_next",
@@ -1175,9 +1231,352 @@ window.__PIPELINE_DATA__ = {
    "carcontrol": 5,
    "intent": 7
   },
+  "entries": [
+   {
+    "id": "get_sound_stage",
+    "mechanism": "execmd",
+    "methodName": "getSoundStage",
+    "pattern": "none",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:getSoundStage"
+   },
+   {
+    "id": "set_sound_stage",
+    "mechanism": "execmd",
+    "methodName": "setSoundStage",
+    "pattern": "dataclass",
+    "dataClass": "EffectModeAndFB",
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:setSoundStage"
+   },
+   {
+    "id": "set_beosonic_point",
+    "mechanism": "execmd",
+    "methodName": "setBeosonicPoint",
+    "pattern": "dataclass",
+    "dataClass": "BeosonicPoint",
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:setBeosonicPoint"
+   },
+   {
+    "id": "get_mic_vocal",
+    "mechanism": "execmd",
+    "methodName": "getMicVocal",
+    "pattern": "none",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:getMicVocal"
+   },
+   {
+    "id": "set_mic_vocal",
+    "mechanism": "execmd",
+    "methodName": "setMicVocal",
+    "pattern": "scalar",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:setMicVocal"
+   },
+   {
+    "id": "get_fast_audio_mode",
+    "mechanism": "execmd",
+    "methodName": "getFastAudioMode",
+    "pattern": "none",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:getFastAudioMode"
+   },
+   {
+    "id": "set_fast_audio_mode",
+    "mechanism": "execmd",
+    "methodName": "setFastAudioMode",
+    "pattern": "scalar",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:setFastAudioMode"
+   },
+   {
+    "id": "set_car_and_headrest_volume",
+    "mechanism": "execmd",
+    "methodName": "setCarAndHeadrestVolume",
+    "pattern": "scalar",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:setCarAndHeadrestVolume"
+   },
+   {
+    "id": "get_last_volume_data",
+    "mechanism": "execmd",
+    "methodName": "getLastVolumeData",
+    "pattern": "scalar",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:getLastVolumeData"
+   },
+   {
+    "id": "query_current_active_sound",
+    "mechanism": "execmd",
+    "methodName": "queryCurrentActiveSound",
+    "pattern": "none",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:queryCurrentActiveSound"
+   },
+   {
+    "id": "query_sound_library",
+    "mechanism": "execmd",
+    "methodName": "querySoundLibrary",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:querySoundLibrary"
+   },
+   {
+    "id": "install_sound_library",
+    "mechanism": "execmd",
+    "methodName": "installSoundLibrary",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:installSoundLibrary"
+   },
+   {
+    "id": "preview_sound",
+    "mechanism": "execmd",
+    "methodName": "previewSound",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:previewSound"
+   },
+   {
+    "id": "query_effect_library",
+    "mechanism": "execmd",
+    "methodName": "queryEffectLibrary",
+    "pattern": "dataclass",
+    "dataClass": "EffectRequest",
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:queryEffectLibrary"
+   },
+   {
+    "id": "add_effect",
+    "mechanism": "execmd",
+    "methodName": "addEffect",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:addEffect"
+   },
+   {
+    "id": "update_effect",
+    "mechanism": "execmd",
+    "methodName": "updateEffect",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:updateEffect"
+   },
+   {
+    "id": "delete_effect",
+    "mechanism": "execmd",
+    "methodName": "deleteEffect",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:deleteEffect"
+   },
+   {
+    "id": "get_effect_share_code",
+    "mechanism": "execmd",
+    "methodName": "getEffectShareCode",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:getEffectShareCode"
+   },
+   {
+    "id": "add_effect_by_share_code",
+    "mechanism": "execmd",
+    "methodName": "addEffectByShareCode",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:addEffectByShareCode"
+   },
+   {
+    "id": "save_current_effect_data",
+    "mechanism": "execmd",
+    "methodName": "saveCurrentEffectData",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:saveCurrentEffectData"
+   },
+   {
+    "id": "nav_start",
+    "mechanism": "mapnav",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "verified",
+    "sourceRef": "BanmaMap openapi common navigateToForAI (逆向 2026-08-17)"
+   },
+   {
+    "id": "cc_seat_heat_driver",
+    "mechanism": "carcontrol",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "verified",
+    "sourceRef": "CarControlService CustomService seat_heat_driver"
+   },
+   {
+    "id": "cc_seat_heat_level_driver",
+    "mechanism": "carcontrol",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "verified",
+    "sourceRef": "CarControlService seat_heat_level_driver"
+   },
+   {
+    "id": "cc_seat_ventilation_driver",
+    "mechanism": "carcontrol",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "verified",
+    "sourceRef": "CarControlService seat_ventilation_driver"
+   },
+   {
+    "id": "cc_seat_massage_driver",
+    "mechanism": "carcontrol",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "verified",
+    "sourceRef": "CarControlService seat_massage_driver"
+   },
+   {
+    "id": "cc_seat_heat_stone_massage_driver",
+    "mechanism": "carcontrol",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "verified",
+    "sourceRef": "CarControlService seat_heat_stone_massage_driver"
+   },
+   {
+    "id": "delete_sound_library",
+    "mechanism": "execmd",
+    "methodName": "deleteSoundLibrary",
+    "pattern": "envelope",
+    "dataClass": null,
+    "form": "binder",
+    "status": "verified",
+    "sourceRef": "IMAudioServiceAdapter.kt:deleteSoundLibrary"
+   },
+   {
+    "id": "open_air_front_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   },
+   {
+    "id": "open_air_rear_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   },
+   {
+    "id": "open_seat_heat_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   },
+   {
+    "id": "open_seat_massage_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   },
+   {
+    "id": "open_seat_mode_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   },
+   {
+    "id": "open_seat_position_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   },
+   {
+    "id": "open_light_page",
+    "mechanism": "intent",
+    "methodName": "",
+    "pattern": "",
+    "dataClass": null,
+    "form": "",
+    "status": "probe",
+    "sourceRef": "CarControl 应用跳转 Intent 规范 (空调座椅intent跳转.html); registry carcontrol-registry.json"
+   }
+  ],
   "missingFromRegistry": [],
   "extraInRegistry": []
  },
+ "functionSchemaDeliverable": null,
  "probe": {
   "present": false
  }

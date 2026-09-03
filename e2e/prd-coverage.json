@@ -1,0 +1,56 @@
+{
+ "source": "IM audio PRD文档-V2.6-20260527.md",
+ "items": [
+  {
+   "id": "prd-3.1",
+   "title": "音量调节(整车/头枕音区)",
+   "capIds": [
+    "set_car_and_headrest_volume",
+    "get_last_volume_data"
+   ],
+   "status": "matched",
+   "note": "设置+回读均覆盖"
+  },
+  {
+   "id": "prd-3.2",
+   "title": "音场/均衡器切换",
+   "capIds": [
+    "set_sound_stage"
+   ],
+   "status": "matched",
+   "note": "含 K 歌/沉浸等全部音场档位"
+  },
+  {
+   "id": "prd-3.4",
+   "title": "音效库试听/安装/删除",
+   "capIds": [
+    "preview_sound",
+    "install_sound_library",
+    "delete_sound_library"
+   ],
+   "status": "matched",
+   "note": ""
+  },
+  {
+   "id": "prd-5.2",
+   "title": "锁车音自定义(多车机主题)",
+   "capIds": [],
+   "status": "prd-only",
+   "note": ""
+  },
+  {
+   "id": "prd-6.1",
+   "title": "杜比全景声内容开关",
+   "capIds": [],
+   "status": "prd-only",
+   "note": "源码未见对应控制入口(本轮输入形态未含该模块)"
+  },
+  {
+   "id": "prd-6.3",
+   "title": "多用户音效偏好云同步",
+   "capIds": [],
+   "status": "prd-only",
+   "note": "属云端能力, 车端包内无实现"
+  }
+ ]
+}
