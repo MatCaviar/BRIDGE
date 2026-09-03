@@ -168,6 +168,14 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 3. **失败即自行优化**：✗（未选中期望工具 / none 却调用了工具）= 对应 description 区分度不足 → 改写 description → 重新导出 function-schema → `POST $BRIDGE_VIZ_URL/api/e2e/restart`（网关按新 analysis 重建配置）→ **仅重测失败项**（≤2 轮）。执行类错误（如设备不可达）属环境问题，如实呈现并说明，不算描述失败。
 4. **报告**：通过率、覆盖统计（工具数/状态数/复合句/近义陷阱/防幻觉）、发现的问题与修正记录。
 
+## 能力归属分级与交付说明（必做）
+
+每个 capability 补两个字段：
+- `scope`: `"core" | "platform" | "shared"` —— **core** = 本 app 自身设计目的的能力（交付物主体，追求全量）；**platform** = 借本 app 通道可达但归属平台/其他 app 域（如地图导航、车控座椅空调、系统页跳转）——默认不进本 app 交付，归各自 app 的 run，避免跨 run 重复与上游同义工具冲突；**shared** = 显式跨 app 共享（须在 note 说明 owner 判定）。判定启发：execmd/aidl 指向 app 自身服务 = core；mapnav/carcontrol/intent 指向其他包 = platform。
+- `deliverNote`: 一句话交付口径说明——写清 PRD 对应（如"PRD 3.2 全覆盖"/"PRD 未提及, 超出范围"）、覆盖情况（部分覆盖写缺口）、未决事项（wire 不确定/待实车复核/stub 等）。矩阵"交付说明"列直接呈现，不要写空话。
+
+顶层 `app.corePurpose`: 一句话本 app 设计目的（core 判定基准）。同义工具跨 run 冲突由套件层按"app 自有优先"裁决，单一 app 交付默认只含 core（platform 项用户可在交付页显式勾入）。
+
 ## 交付对照与 scope
 
 **PRD 对照（输入含 PRD 时必产出）**：对照 PRD 功能条目与枚举出的能力，产出 `prd-coverage.json`（与 analysis.json 同目录）：

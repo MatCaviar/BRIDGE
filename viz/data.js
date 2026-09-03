@@ -1,6 +1,6 @@
 // 由 viz/gen.mjs 生成 (勿手改); 刷新: node viz/gen.mjs
 window.__PIPELINE_DATA__ = {
- "generatedAt": "2026-09-03T01:15:01.968Z",
+ "generatedAt": "2026-09-03T01:56:46.835Z",
  "version": "0.1.25",
  "sources": {
   "analysis": "e2e/bridge-analysis.json",
@@ -17,7 +17,8 @@ window.__PIPELINE_DATA__ = {
   "framework": "android-kotlin",
   "deviceSources": [
    "vin"
-  ]
+  ],
+  "corePurpose": "imaudio 车机音频应用: 音场/均衡/音效库/音量/媒体播控与相关页面直达"
  },
  "stats": {
   "totalCaps": 36,
@@ -52,7 +53,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "set_sound_stage",
@@ -105,7 +108,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "PRD 3.2 全覆盖(13 档含 AI 音场); wire 枚举经 dex 溯源"
   },
   {
    "id": "set_beosonic_point",
@@ -143,7 +148,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "get_mic_vocal",
@@ -161,7 +168,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "set_mic_vocal",
@@ -186,7 +195,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "get_fast_audio_mode",
@@ -204,7 +215,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "set_fast_audio_mode",
@@ -234,7 +247,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "set_car_and_headrest_volume",
@@ -271,7 +286,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "PRD 3.1 覆盖; 头枕音区可选参数"
   },
   {
    "id": "get_last_volume_data",
@@ -296,7 +313,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "query_current_active_sound",
@@ -314,7 +333,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "query_sound_library",
@@ -348,7 +369,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "install_sound_library",
@@ -376,7 +399,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "preview_sound",
@@ -410,7 +435,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "PRD 3.4 覆盖试听; 结果经回调异步"
   },
   {
    "id": "query_effect_library",
@@ -440,7 +467,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "add_effect",
@@ -471,7 +500,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "update_effect",
@@ -502,7 +533,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "delete_effect",
@@ -527,7 +560,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "get_effect_share_code",
@@ -552,7 +587,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "add_effect_by_share_code",
@@ -577,7 +614,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "save_current_effect_data",
@@ -595,7 +634,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "nav_start",
@@ -629,7 +670,9 @@ window.__PIPELINE_DATA__ = {
    "mechanism": "mapnav",
    "servicePackage": "com.ebanma.map.main",
    "serviceClass": "com.ebanma.map.main.service.MapExternalService",
-   "bindAction": "com.ebanma.map.service.common"
+   "bindAction": "com.ebanma.map.service.common",
+   "scope": "platform",
+   "deliverNote": "平台域: 地图 app 能力, 借语音通道; 不属 imaudio 交付核心"
   },
   {
    "id": "get_speed_volume_status",
@@ -647,7 +690,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 待实车复核; PRD 未提及, 超出范围"
   },
   {
    "id": "set_speed_volume_status",
@@ -672,7 +717,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 待实车复核; PRD 未提及, 超出范围"
   },
   {
    "id": "cc_seat_heat_driver",
@@ -700,7 +747,9 @@ window.__PIPELINE_DATA__ = {
    "ccFunction": "seat_heat_driver",
    "servicePackage": "com.banma.carcontrolservice",
    "serviceClass": "com.banma.carcontrolservice.service.CustomService",
-   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE",
+   "scope": "platform",
+   "deliverNote": "core 能力; 实车 verified"
   },
   {
    "id": "cc_seat_heat_level_driver",
@@ -724,7 +773,9 @@ window.__PIPELINE_DATA__ = {
    "ccFunction": "seat_heat_level_driver",
    "servicePackage": "com.banma.carcontrolservice",
    "serviceClass": "com.banma.carcontrolservice.service.CustomService",
-   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE",
+   "scope": "platform",
+   "deliverNote": "core 能力; 实车 verified"
   },
   {
    "id": "cc_seat_ventilation_driver",
@@ -752,7 +803,9 @@ window.__PIPELINE_DATA__ = {
    "ccFunction": "seat_ventilation_driver",
    "servicePackage": "com.banma.carcontrolservice",
    "serviceClass": "com.banma.carcontrolservice.service.CustomService",
-   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE",
+   "scope": "platform",
+   "deliverNote": "core 能力; 实车 verified"
   },
   {
    "id": "cc_seat_massage_driver",
@@ -780,7 +833,9 @@ window.__PIPELINE_DATA__ = {
    "ccFunction": "seat_massage_driver",
    "servicePackage": "com.banma.carcontrolservice",
    "serviceClass": "com.banma.carcontrolservice.service.CustomService",
-   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE",
+   "scope": "platform",
+   "deliverNote": "core 能力; 实车 verified"
   },
   {
    "id": "cc_seat_heat_stone_massage_driver",
@@ -808,7 +863,9 @@ window.__PIPELINE_DATA__ = {
    "ccFunction": "seat_heat_stone_massage_driver",
    "servicePackage": "com.banma.carcontrolservice",
    "serviceClass": "com.banma.carcontrolservice.service.CustomService",
-   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE"
+   "bindAction": "com.banma.carcontrolservice.BIND_CUSTOM_SERVICE",
+   "scope": "platform",
+   "deliverNote": "core 能力; 实车 verified"
   },
   {
    "id": "delete_sound_library",
@@ -834,7 +891,9 @@ window.__PIPELINE_DATA__ = {
    "form": "binder",
    "servicePackage": "com.immotors.imaudio",
    "serviceClass": "com.immotors.imaudio_service.IMAudioService",
-   "bindAction": "com.immotors.imaudio_service.ACTION_BIND"
+   "bindAction": "com.immotors.imaudio_service.ACTION_BIND",
+   "scope": "core",
+   "deliverNote": "core 能力; 实车 verified; PRD 未提及, 超出范围"
   },
   {
    "id": "open_air_front_page",
@@ -878,7 +937,9 @@ window.__PIPELINE_DATA__ = {
     "subTabName": "frontSeat"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   },
   {
    "id": "open_air_rear_page",
@@ -922,7 +983,9 @@ window.__PIPELINE_DATA__ = {
     "subTabName": "rearSeat"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   },
   {
    "id": "open_seat_heat_page",
@@ -966,7 +1029,9 @@ window.__PIPELINE_DATA__ = {
     "subTabName": "heatVent"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   },
   {
    "id": "open_seat_massage_page",
@@ -1010,7 +1075,9 @@ window.__PIPELINE_DATA__ = {
     "subTabName": "massage"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   },
   {
    "id": "open_seat_mode_page",
@@ -1054,7 +1121,9 @@ window.__PIPELINE_DATA__ = {
     "subTabName": "mode"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   },
   {
    "id": "open_seat_position_page",
@@ -1098,7 +1167,9 @@ window.__PIPELINE_DATA__ = {
     "subTabName": "position"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   },
   {
    "id": "open_light_page",
@@ -1141,7 +1212,9 @@ window.__PIPELINE_DATA__ = {
     "type": "light"
    },
    "servicePackage": "com.immotors.carcontrol",
-   "serviceClass": "com.immotors.carcontrol.MainActivity"
+   "serviceClass": "com.immotors.carcontrol.MainActivity",
+   "scope": "platform",
+   "deliverNote": "core 能力; 待实车复核"
   }
  ],
  "prdCoverage": {

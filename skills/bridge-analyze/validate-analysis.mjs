@@ -75,6 +75,9 @@ for (const [i, c] of caps.entries()) {
   const m = c.mechanism;
   if (!m) { warns.push(`${at}: 缺 mechanism(车端执行字段; serve 忽略但建议补全)`); }
   else if (!VALID_MECH.has(m)) { errors.push(`${at}: mechanism 非法 '${m}'`); }
+  if (c.scope && !["core", "platform", "shared"].includes(c.scope)) warns.push(`${at}: scope 非法 '${c.scope}'(core|platform|shared)`);
+  if (!c.scope) warns.push(`${at}: 缺 scope 归属分级(core 本app核心 / platform 平台域 / shared 共享)`);
+  if (!c.deliverNote) warns.push(`${at}: 缺 deliverNote 交付说明(PRD对应/覆盖/未决 一句话)`);
   else if (m === "execmd") {
     if (!c.servicePackage || !c.serviceClass) errors.push(`${at}: execmd 缺 servicePackage/serviceClass`);
     if (!c.methodName) errors.push(`${at}: execmd 缺 methodName`);
