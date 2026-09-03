@@ -191,6 +191,18 @@ app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一�
 
 **交付 scope 调整（用户在交付页勾选后）**：交付页勾选会落盘 `scope-selection.json`（与 analysis 同目录，含 included/excluded/counts）。用户把页面生成的指令交给你后，按其执行：excluded 项从 `analysis.json` 的 `capabilities` 移除并记入顶层 `excludedFromTools`（理由：用户勾选排除）→ 重跑 `validate` → 重新导出 `function-schema.json` → 重新生成 `registry.json` → 重新生成 viz `data.js`（页面自动刷新）。
 
+## 问题反馈（使用中必做记录 · 推广同事适用）
+
+执行套件过程中凡遇到**真实问题**——套件缺陷/工具报错、能力缺口(如需新机制)、SKILL 文档误导、环境坑(Windows/端口/编码)、改进想法——**当场文件化**, 不要只留印象也不要憋到忘记:
+
+```bash
+node <套件根>/skills/bridge-analyze/feedback.mjs new   --type bug|gap|doc|env|idea --severity blocker|major|minor   --title "一句话标题" --detail "现象与期望, 条理描述"   [--reproduce "真实命令+关键输出摘录"] [--evidence "文件1,文件2"] [--proposer "姓名/团队"]
+```
+
+- 文件落 `<产物目录>/feedback/`(标准 JSON, 带 app/形态/套件版本/OS 上下文, 便于复现)；
+- **收尾必做**: `node feedback.mjs submit` —— 配置了 `BRIDGE_FEEDBACK_TOKEN` 自动建 GitHub Issue(`[feedback]` 前缀+类型/严重度标签, BRIDGE 团队统一处理); 未配置则自动打包 `feedback-bundle-*.md` 并给出转交指引——**上报失败静默降级, 永不影响主流程**;
+- 诚实原则: 只报真实遇到的(附真实命令与输出), 不虚构不凑数; 已在 SKILL 内写明的已知限制不算问题。
+
 ## 产物去向
 
 `function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope（收尾自动测试验证的正是这条注入链）；机制字段经 `analysis-to-registry` 生成车端 registry；app 侧 wire 配置（如适用）部署到目标 app 执行端即可驱动真机。全部产物的配对关系在可视化页「配对矩阵」中呈现与核对。

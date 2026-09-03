@@ -274,3 +274,16 @@ MIT——见 [LICENSE](LICENSE)。`tools/adb/` 内嵌 Google 的 adb，遵循其
 
 E2E 快速开始（两种）：**一键** — 打开可视化页 `http://localhost:8650/pipeline.html` 点「端到端测试」，网关/依赖/配置自动拉起（缺 LLM key 时页面询问，项目模式自动指向本次分析产物）；**手动** — 先起 `asr/asr-whisper-server.py`，再 `cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`，浏览器开 `http://localhost:3000/cockpit`。
 凭据与逆向素材不随仓库分发，见 `handoff/` 与 `reverse/README.md`。
+
+
+## 📮 问题反馈（各团队使用 BRIDGE 时）
+
+你的 codeagent 在执行中会自动把遇到的问题/缺口/改进点文件化到 `<产物目录>/feedback/`（标准 JSON，自带环境上下文）。收尾统一上报：
+
+```bash
+node skills/bridge-analyze/feedback.mjs submit
+```
+
+- **自动建 Issue**：设置环境变量 `BRIDGE_FEEDBACK_TOKEN`（GitHub 细粒度 PAT，仅授予本仓库 `Issues: Read and write`，申请后由 BRIDGE 团队分发/自行创建）→ 反馈自动进入 `MatCaviar/BRIDGE` Issues，带 `[feedback][类型][严重度]` 标签，团队统一处理；
+- **无凭证降级**：自动打包 `feedback-bundle-*.md`，把它发给 BRIDGE 团队即可；
+- 手动记录：`feedback.mjs new --type bug --severity major --title … --detail …`（详见 `--help`）。
