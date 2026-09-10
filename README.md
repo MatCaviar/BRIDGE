@@ -34,6 +34,30 @@ BRIDGE 把车机等本地 app 变成上游智能体可以真实调用的工具�
 
 支持每项能力一个函数，或通过 `action` 区分操作的统一 channel；上下文放在 `extras`，返回 `code / message / data / extras`，默认 `code: 0` 为业务成功。完整定义见[工具契约](docs/tool-contract.md)。应用专属协议与适配代码保存在使用者自己的项目目录中。
 
+**The generation process.** Who does what: the host agent supplies judgment (extraction, wire authoring), and the CLI handles deterministic validation and schema export. Selected capabilities are projected into individual tools or a unified channel, according to the project's contract.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as 🎛️ host codeAgent
+    participant Source as 🧱 app source
+    participant CLI as 🛠️ deterministic CLI
+    participant Tool as 🧩 MCP tool schemas
+
+    Agent->>Source: read proxy + manifest
+    Source-->>Agent: methods · capabilities
+    Agent->>CLI: schema --analysis analysis.json
+    CLI-->>Agent: function-schema.json
+    Agent->>Source: read proxy wire calls
+    Agent->>Agent: author per-op wire specs
+    Agent->>CLI: validate-analysis + schema injection check
+    CLI-->>Agent: pass (or fail → retry)
+    loop each selected capability
+        Agent->>Tool: name / action · inputSchema · annotations
+    end
+    Tool-->>Agent: tool schemas injected
+```
+
 运行期一次工具调用的完整链路：
 
 ```mermaid
