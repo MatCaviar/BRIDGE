@@ -1,6 +1,6 @@
 {
   "name": "mcp-gateway",
-  "version": "0.1.25",
+  "version": "0.2.0",
   "description": "Multi-backend LLM Gateway for MCP ecosystem — bridges Agent APIs to MCP servers",
   "main": "dist/index.js",
   "type": "module",
@@ -11,6 +11,7 @@
   "scripts": {
     "prestart": "npm run build",
     "build": "tsc",
+    "test": "tsc && node --test tests/*.test.mjs",
     "start": "node dist/index.js --config config-cockpit.yaml",
     "dev": "tsx src/index.ts --config config-cockpit.yaml",
     "dashboard": "tsc && node dist/web/server.js --config config-cockpit.yaml",

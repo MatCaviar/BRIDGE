@@ -1,6 +1,7 @@
 import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { randomUUID } from "node:crypto";
 import { CliAdb, mailboxPath, type Adb } from "../car/adb.js";
 
 /**
@@ -8,10 +9,10 @@ import { CliAdb, mailboxPath, type Adb } from "../car/adb.js";
  *
  *   write cmd.json → `am start` the executor Activity → poll result.json → return.
  *
- * Deterministic orchestration over an [Adb] boundary (mockable). The executor (com.immotors.bridge.executor
+ * Deterministic orchestration over an [Adb] boundary (mockable). The executor (org.bridge.executor
  * by default) + its mailbox are derived from the package + foreground user; the op is resolved against
  * the executor's OWN external registry on-car, so this D-step carries no per-app knowledge — it works
- * for any target app reachable through the executor. See memory bridge-android-substrate-plan-a.
+ * for any target app reachable through a configured executor mechanism.
  */
 
 export interface InvokeOptions {
@@ -21,9 +22,9 @@ export interface InvokeOptions {
   readonly args?: Readonly<Record<string, unknown>>;
   /** adb device serial. */
   readonly device: string;
-  /** Foreground user that runs the executor (car default 10). */
+  /** Android user that runs the executor (default 0, override with BRIDGE_USER). */
   readonly user?: number;
-  /** Executor app package (default com.immotors.bridge.executor). */
+  /** Executor app package (default org.bridge.executor). */
   readonly pkg?: string;
   /** Executor activity component suffix (default ".ExecutorActivity"). */
   readonly activity?: string;
@@ -45,13 +46,11 @@ export interface InvokeResult {
   readonly elapsedMs: number;
 }
 
-const DEFAULT_PKG = process.env.BRIDGE_EXECUTOR_PACKAGE || "com.immotors.bridge.executor";
+const DEFAULT_PKG = process.env.BRIDGE_EXECUTOR_PACKAGE || "org.bridge.executor";
 const DEFAULT_ACTIVITY = process.env.BRIDGE_EXECUTOR_ACTIVITY || ".ExecutorActivity";
-const DEFAULT_USER = Number(process.env.BRIDGE_USER || 10);
+const DEFAULT_USER = Number(process.env.BRIDGE_USER || 0);
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_POLL_MS = 500;
-
-let reqCounter = 0;
 
 /** Orchestrate one tool invocation over [adb]. Pure over the boundary — no CLI/process concerns here. */
 export async function invokeTool(adb: Adb, opts: InvokeOptions): Promise<InvokeResult> {
@@ -61,8 +60,11 @@ export async function invokeTool(adb: Adb, opts: InvokeOptions): Promise<InvokeR
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const pollMs = opts.pollMs ?? DEFAULT_POLL_MS;
   const sleep = opts.sleep ?? defaultSleep;
-  const reqId = opts.reqId ?? `req-${Date.now()}-${++reqCounter}`;
-  const mailbox = mailboxPath(pkg, user);
+  const reqId = opts.reqId ?? `req-${randomUUID()}`;
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(reqId)) throw new Error("Invalid request id");
+  if (!/^[A-Za-z][A-Za-z0-9_.]+$/.test(pkg) || !/^\.?[A-Za-z][A-Za-z0-9_.]*$/.test(activity) || !Number.isInteger(user) || user < 0) throw new Error("Invalid executor target");
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(pollMs) || pollMs <= 0) throw new Error("Timeout and poll interval must be positive");
+  const mailbox = `${mailboxPath(pkg, user)}/${reqId}`;
   const started = Date.now();
 
   // 1. Push cmd.json via /data/local/tmp (adb push can't write the app's filesDir directly), then
@@ -70,15 +72,16 @@ export async function invokeTool(adb: Adb, opts: InvokeOptions): Promise<InvokeR
   const tmp = join(tmpdir(), `bridge-cmd-${reqId}.json`);
   writeFileSync(tmp, JSON.stringify({ reqId, op: opts.op, args: opts.args ?? {} }));
   try {
-    await adb.push(tmp, "/data/local/tmp/__bridge_cmd.json");
+    const deviceTmp = `/data/local/tmp/bridge-${reqId}.json`;
+    await adb.push(tmp, deviceTmp);
     await adb.shell(
       `mkdir -p ${mailbox} && chmod 777 ${mailbox} && rm -f ${mailbox}/result.json && ` +
-        `cp /data/local/tmp/__bridge_cmd.json ${mailbox}/cmd.json && chmod 666 ${mailbox}/cmd.json`
+        `cp ${deviceTmp} ${mailbox}/cmd.json && chmod 666 ${mailbox}/cmd.json && rm -f ${deviceTmp}`
     );
 
     // 2. Trigger the executor Activity (foreground launch — bypasses the Android-14 background-service
     //    start denial; the executor binds the target app's callTool service + writes result.json).
-    await adb.shell(`am start --user ${user} -n ${pkg}/${activity}`);
+    await adb.shell(`am start --user ${user} -n ${pkg}/${activity} --es requestId ${reqId}`);
 
     // 3. Poll result.json until the executor reports this reqId (ignore stale/empty), or timeout.
     const attempts = Math.max(1, Math.ceil(timeoutMs / pollMs));
@@ -93,12 +96,13 @@ export async function invokeTool(adb: Adb, opts: InvokeOptions): Promise<InvokeR
     return { reqId, ok: false, error: "TIMEOUT", elapsedMs: Date.now() - started };
   } finally {
     try { unlinkSync(tmp); } catch { /* temp best-effort */ }
+    await adb.shell(`rm -f ${mailbox}/cmd.json ${mailbox}/result.json ${mailbox}/result.pending && rmdir ${mailbox}`).catch(() => {});
   }
 }
 
 function finalize(reqId: string, r: ParsedResult, elapsedMs: number): InvokeResult {
   if (r.ok) return { reqId, ok: true, data: r.data, elapsedMs };
-  return { reqId, ok: false, error: r.error ?? "EXECUTOR_ERROR", elapsedMs };
+  return { reqId, ok: false, data: r.data, error: r.error ?? "EXECUTOR_ERROR", elapsedMs };
 }
 
 interface ParsedResult { reqId?: string; ok?: boolean; data?: unknown; error?: string }
@@ -146,6 +150,7 @@ export function parseInvokeArgs(argv: string[]): InvokeArgs {
     else if (a === "--poll") o.pollMs = Number(next());
     else if (a === "--req-id") o.reqId = next();
     else if (a === "--json") o.json = true;
+    else throw new Error(`Unknown invoke option: ${a}`);
   }
   return o;
 }

@@ -1,0 +1,21 @@
+{
+  "app": {"name":"workspace-device-demo", "framework":"http", "demo":true},
+  "transport": {"type":"http", "url":"http://127.0.0.1:8766/call", "timeoutMs":3000},
+  "toolContract": {
+    "mode":"channel", "name":"device_channelCall", "description":"Control the local demonstration device using the declared action and its parameters.",
+    "actionField":"action", "contextField":"extras",
+    "context":[
+      {"name":"queryId", "type":"string", "optional":true},
+      {"name":"voiceZone", "type":"integer", "minimum":0, "optional":true},
+      {"name":"isAppPlayTts", "type":"boolean", "optional":true},
+      {"name":"source", "type":"string", "enum":["localAgent","cloudAgent","localHf","cloudHf"], "optional":true},
+      {"name":"sourceId", "type":"string", "optional":true},
+      {"name":"callId", "type":"string", "optional":true}
+    ],
+    "response":{"successCodes":[0],"requireCode":true}
+  },
+  "capabilities":[
+    {"id":"set_level", "publicAction":"adjust_level", "domain":"device", "object":"level", "action":"set", "description":"Adjust the local demonstration device level between 0 and 100.", "params":[{"name":"level","type":"integer","minimum":0,"maximum":100}], "dispatch":{"operation":"set_level","parameterMap":{"level":"intensity"}}, "safetyLevel":"normal","status":"probe","scope":"core","sourceRef":"e2e/demo-device.mjs:set_level"},
+    {"id":"set_power", "domain":"device", "object":"power", "action":"set", "description":"Switch the local demonstration device on or off.", "params":[{"name":"enabled","type":"boolean"}], "safetyLevel":"normal","status":"probe","scope":"core","sourceRef":"e2e/demo-device.mjs:set_power"}
+  ]
+}

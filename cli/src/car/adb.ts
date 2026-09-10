@@ -11,8 +11,7 @@ import { fileURLToPath } from "node:url";
  * orchestration in commands/invoke.ts can be unit-tested against a mock [Adb].
  *
  * Runs shell commands as root (`su 0`) — required to write the executor's internal filesDir mailbox
- * and to read result.json across the app/user boundary (the car's foreground user is 10; adb shell is
- * uid 2000). See memory car-execution-constraints.
+ * and to read result.json across the app/user boundary. The Android user is configurable.
  */
 export interface Adb {
   /** Push a local file to a device path (the adb sync daemon runs as root, so this reaches /data/local/tmp). */
@@ -42,8 +41,8 @@ export class CliAdb implements Adb {
 }
 
 /** Per-user filesDir mailbox path for a package's on-car executor. */
-export function mailboxPath(pkg: string, user = 10): string {
-  return `/data/user/${user}/${pkg}/files/imrpc`;
+export function mailboxPath(pkg: string, user = 0): string {
+  return `/data/user/${user}/${pkg}/files/bridge-rpc`;
 }
 
 export function resolveAdbBinary(

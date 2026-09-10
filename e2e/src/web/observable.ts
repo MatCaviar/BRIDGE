@@ -6,7 +6,7 @@
 import { EventEmitter } from "node:events";
 import type { LLMClient, Message } from "../llm/types.js";
 import type { GatewayConfig } from "../config.js";
-import { McpConnector } from "../mcp/connector.js";
+import { McpConnector, toolErrorContent } from "../mcp/connector.js";
 import { convertSchemas } from "../mcp/schema-convert.js";
 import type {
   DashboardEvent,
@@ -239,7 +239,7 @@ export async function runObservable(
 
         messages.push({
           role: "tool_result",
-          content: JSON.stringify({ success: false, error: errorMsg }),
+          content: toolErrorContent(error),
           toolCallId: call.id,
         });
 

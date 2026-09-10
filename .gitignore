@@ -50,3 +50,5 @@ cmd.json
 .zcode/
 tmp/
 viz/.cmd.json
+viz/.e2e-config.yaml
+bridge-executor/local.properties

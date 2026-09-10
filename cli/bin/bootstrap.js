@@ -61,7 +61,9 @@ export function ensureCliReady(cliDir) {
     const installedHash = existsSync(stamp) ? readFileSync(stamp, "utf8").trim() : "";
     if (installedHash !== lockHash) {
       console.error("[bridge] installing CLI dependencies");
-      runNpm(cliDir, ["install", "--omit=dev", "--no-fund", "--no-audit"]);
+      const manifest = JSON.parse(readFileSync(join(cliDir, 'package.json'), 'utf8'));
+      const developmentInstall = Object.keys(manifest.devDependencies ?? {}).some(name => existsSync(join(cliDir, 'node_modules', name)));
+      runNpm(cliDir, ["install", ...(developmentInstall ? [] : ["--omit=dev"]), "--no-fund", "--no-audit"]);
       mkdirSync(join(cliDir, "node_modules"), { recursive: true });
       writeFileSync(stamp, `${lockHash}\n`);
     }

@@ -22,6 +22,7 @@ import { spawn, execFile } from "child_process";
 import { readFileSync, writeFileSync, existsSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join, basename, resolve, sep } from "path";
+import { createTestResult, recordTestEvent, finishTestResult } from './e2e-verdict.mjs';
 
 const VIZ = dirname(fileURLToPath(import.meta.url));
 const argValue = (name) => {
@@ -36,7 +37,7 @@ const ADB = process.env.BRIDGE_ADB ||
 const CLI = join(ROOT, "cli", "bin", "mcp-pipeline.js");
 const VALIDATE = join(ROOT, "skills", "bridge-analyze", "validate-analysis.mjs");
 const GEN_REG = join(ROOT, "e2e", "analysis-to-registry.mjs");
-const EXEC_PKG = process.env.BRIDGE_EXECUTOR_PACKAGE || "com.immotors.bridge.executor";
+const EXEC_PKG = process.env.BRIDGE_EXECUTOR_PACKAGE || "org.bridge.executor";
 const EXEC_ACT = process.env.BRIDGE_EXECUTOR_ACTIVITY || ".ExecutorActivity";
 const MEDIA_BUILTINS = [
   { id: "media_next", action: "next", description: "Control media playback: next on the active session (切下一首)" },
@@ -74,8 +75,8 @@ let TARGET = {
   registry: argValue("--registry")
     ? resolve(PROJECT_ROOT, argValue("--registry"))
     : (analysisArg ? registryForAnalysis(resolvedAnalysis) : join(ROOT, "bridge-executor", "registries", "registry.json")),
-  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio")),
-  adapter: argValue("--adapter") ? resolve(PROJECT_ROOT, argValue("--adapter")) : (analysisArg ? PROJECT_ROOT : join(ROOT, "cli", "tests", "fixtures", "imaudio", "IMAudioServiceAdapter.kt")),
+  srcDir: argValue("--src") ? resolve(PROJECT_ROOT, argValue("--src")) : PROJECT_ROOT,
+  adapter: argValue("--adapter") ? resolve(PROJECT_ROOT, argValue("--adapter")) : PROJECT_ROOT,
 };
 
 const PORT = Number(argValue("--port") || process.env.PORT || 8650);
@@ -116,7 +117,7 @@ async function gwProbe() {
 }
 /** 由 analysis 产物生成 system_prompt 的工具清单段(泛化: 不绑定任何 app, 描述取自 capability) */
 function toolLinesFor(analysis) {
-  const caps = (analysis.capabilities ?? []).filter((c) => c.status !== "broken");
+  const caps = (analysis.capabilities ?? []).filter((c) => c.status !== "broken" && (analysis.deliveryScopes ?? ['core']).includes(c.scope ?? 'core'));
   const byDomain = new Map();
   for (const c of caps) {
     const d = c.domain || (analysis.app && analysis.app.name) || "app";
@@ -129,10 +130,11 @@ function toolLinesFor(analysis) {
     for (const c of list) {
       const brief = String(c.description || "").replace(/\s+/g, " ").split(/(?<=[。;；.])\s*/)[0].slice(0, 110);
       const req = (c.params ?? []).filter((p) => !p.optional).map((p) => p.name).join("/");
-      lines.push(`      - ${c.id}${req ? `(${req})` : "(无参数)"}: ${brief}`);
+      const name = analysis.toolContract?.mode === 'channel' ? `${analysis.toolContract.name}[${analysis.toolContract.actionField ?? 'action'}=${c.publicAction ?? c.id}]` : c.id;
+      lines.push(`      - ${name}${req ? `(${req})` : "(无参数)"}: ${brief}`);
     }
   }
-  lines.push(`    ◆ 媒体播控(内置): media_next / media_prev / media_play / media_pause`);
+  if (analysis.builtins?.length) lines.push(`    ◆ 媒体播控: ${analysis.builtins.join(' / ')}`);
   return lines.join("\n");
 }
 /** 由 capability 可选字段 uiSync={argKey,map} 生成 ui_sync 段(无数据返回空串) */
@@ -145,6 +147,7 @@ function uiSyncYamlFor(analysis) {
   return `ui_sync:\n${blocks.join("\n")}`;
 }
 function gatewayConfigPath() {
+  if (argValue('--e2e-config')) return resolve(PROJECT_ROOT, argValue('--e2e-config'));
   if (process.env.BRIDGE_E2E_CONFIG) return resolve(PROJECT_ROOT, process.env.BRIDGE_E2E_CONFIG);
   const template = read(join(E2E_DIR, "config-cockpit.yaml"));
   if (!template) return join(E2E_DIR, "config-cockpit.yaml");
@@ -156,14 +159,17 @@ function gatewayConfigPath() {
     .replace(/"bridge-ui-server\.mjs"/g, JSON.stringify(join(E2E_DIR, "bridge-ui-server.mjs").replace(/\\/g, "/")))
     .replace(/"\.\.\/cli\/bin\/mcp-pipeline\.js"/g, JSON.stringify(CLI.replace(/\\/g, "/")));
   // 项目模式: serve 指向本次分析产物
-  if (resolvedAnalysis && existsSync(resolvedAnalysis)) {
+  if (TARGET.analysis && existsSync(TARGET.analysis)) {
     text = text.replace(/"--analysis",\s*"bridge-analysis\.json"/,
-      `"--analysis", ${JSON.stringify(resolvedAnalysis.replace(/\\/g, "/"))}`);
+      `"--analysis", ${JSON.stringify(TARGET.analysis.replace(/\\/g, "/"))}`);
   }
   // system_prompt 工具清单与 ui_sync 按本次 analysis 动态生成(泛化, 不绑定任何 app)
   let analysis = null;
-  try { analysis = JSON.parse(read(resolvedAnalysis)); } catch (e) { /* 占位行保留 */ }
+  try { analysis = JSON.parse(read(TARGET.analysis)); } catch (e) { /* 占位行保留 */ }
   if (analysis) {
+    if (analysis.transport?.type === "http") {
+      text = text.replace(/"[^"\n]*bridge-serve-wrapper\.mjs",\s*"--",\s*/g, "");
+    }
     text = text.replace(/^ {4}\(本行由 viz\/run\.mjs 按本次分析产物自动替换为工具清单\)$/m, toolLinesFor(analysis));
     const uiSync = uiSyncYamlFor(analysis);
     if (uiSync) text = text.replace(/\ntask:/, "\n" + uiSync + "\ntask:");
@@ -243,17 +249,18 @@ async function ensureGateway() {
 }
 /** 单条端到端测试: 真实 LLM 回合。判定: expect="none" → 期望不调用任何工具(防幻觉);
  *  expect 为空 → 只记录; 否则 = 期望工具是否被选中 */
-async function runOneE2eTest(message, expect) {
-  const out = { message, expect: expect || "", called: [], final: "", pass: !expect };
+async function runOneE2eTest(message, expect, expectArgs) {
+  const out = createTestResult(message, expect, expectArgs);
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 90000);
   try {
     const r = await fetch(`${E2E_BASE}/api/run`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message }), signal: ac.signal,
     });
-    const { sessionId } = await r.json();
-    if (!sessionId) throw new Error(String((await r.json().catch(() => ({}))).error || "no sessionId"));
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 90000);
+    const started = await r.json();
+    const { sessionId } = started;
+    if (!sessionId) throw new Error(String(started.error || 'no sessionId'));
     const s = await fetch(`${E2E_BASE}/api/events/${sessionId}`, { signal: ac.signal });
     const reader = s.body.getReader();
     const dec = new TextDecoder();
@@ -270,25 +277,20 @@ async function runOneE2eTest(message, expect) {
         if (!dataLine) continue;
         let ev;
         try { ev = JSON.parse(dataLine.slice(6)); } catch { continue; }
-        if (ev.type === "tool_call_started" && ev.toolName) out.called.push(ev.toolName);
-        if (ev.type === "session_completed") out.final = String(ev.finalText || "");
-        if (ev.type === "session_error") out.final = "会话错误: " + String(ev.error || "");
+        recordTestEvent(out, ev);
         if (ev.type === "session_completed" || ev.type === "session_error") {
           clearTimeout(timer);
           try { ac.abort(); } catch { /* already closed */ }
-          out.pass = expect === "none" ? out.called.length === 0
-            : !expect || out.called.includes(expect);
-          return out;
+          return finishTestResult(out);
         }
       }
     }
     clearTimeout(timer);
   } catch (e) {
     out.final = "测试执行异常: " + String(e.message || e);
-  }
-  out.pass = expect === "none" ? out.called.length === 0 && !/异常|会话错误/.test(out.final)
-    : !expect || (expect && out.called.includes(expect));
-  return out;
+    out.errors.push(String(e.message || e));
+  } finally { clearTimeout(timer); ac.abort(); }
+  return finishTestResult(out);
 }
 /** host codeagent 驱动的自动端到端测试: 顺序执行, 实时状态供 cockpit 展示(自动跟随逐轮),
  * 判定 = LLM 是否选中期望工具(以发现问题为导向); 不写管线会话日志。 */
@@ -314,7 +316,7 @@ async function runE2eTests(tests) {
     gw.tests.index = i + 1;
     gw.tests.current = t.message;
     gw.tests.updatedAt = Date.now();
-    const r = await runOneE2eTest(t.message, expect);
+    const r = await runOneE2eTest(t.message, expect, t.expectArgs);
     results.push(r);
     gw.tests.results = results;
     gw.tests.updatedAt = Date.now();
@@ -323,7 +325,7 @@ async function runE2eTests(tests) {
   const failed = results.filter((r) => !r.pass);
   return finish({
     ok: true, pass: passed, total: results.length, results,
-    note: failed.length ? `未通过 ${failed.length} 条(期望工具未被选中 → 优化对应 description 后 POST /api/e2e/restart 重测)` : "全部通过",
+    note: failed.length ? `未通过 ${failed.length} 条；请分别检查 selectionPass、executionPass 与错误详情` : "全部通过",
   });
 }
 /** 同源代理: /e2e/* → gateway(*)。HTML 响应注入 fetch/EventSource 前缀补丁, 让页面内
@@ -440,7 +442,8 @@ async function requireCar() {
 }
 async function currentUser(serial) {
   const r = await adbRun(["-s", serial, "shell", "am get-current-user"]);
-  return r.ok ? r.output.trim() : "10";
+  if (!r.ok || !/^\d+$/.test(r.output.trim())) throw new Error('Cannot determine Android user');
+  return r.output.trim();
 }
 
 /* ---------- 阶段执行 ---------- */
@@ -449,11 +452,14 @@ const stat = (p) => { try { return statSync(p); } catch { return null; } };
 function targetViewData() {
   const analysis = JSON.parse(readFileSync(TARGET.analysis, "utf8"));
   const caps = analysis.capabilities ?? [];
-  const active = caps.filter((cap) => cap.status !== "broken");
+  const active = caps.filter((cap) => cap.status !== "broken" && (analysis.deliveryScopes ?? ["core"]).includes(cap.scope ?? "core"));
+  const builtins = MEDIA_BUILTINS.filter(b => analysis.builtins?.includes(b.id));
+  const toolCount = analysis.toolContract?.mode === "channel" ? (active.length ? 1 : 0) : active.length + builtins.length;
   const byStatus = {}, byMechanism = {};
   for (const cap of caps) {
     byStatus[cap.status ?? "probe"] = (byStatus[cap.status ?? "probe"] ?? 0) + 1;
-    byMechanism[cap.mechanism ?? "execmd"] = (byMechanism[cap.mechanism ?? "execmd"] ?? 0) + 1;
+    const mechanism = analysis.transport?.type ?? cap.mechanism ?? 'unknown';
+    byMechanism[mechanism] = (byMechanism[mechanism] ?? 0) + 1;
   }
   let registryTools = [];
   try { registryTools = JSON.parse(readFileSync(TARGET.registry, "utf8")).tools ?? []; } catch { /* optional */ }
@@ -464,7 +470,7 @@ function targetViewData() {
     const mechanism = tool.mechanism ?? "execmd";
     registryByMechanism[mechanism] = (registryByMechanism[mechanism] ?? 0) + 1;
   }
-  const activeIds = new Set(active.map((cap) => cap.id));
+  const activeIds = new Set([...active.map((cap) => cap.dispatch?.operation ?? cap.id), ...builtins.map(b => b.id)]);
   const registryIds = new Set(registryTools.map((tool) => tool.id));
   let version = "";
   try { version = JSON.parse(readFileSync(join(ROOT, ".claude-plugin", "plugin.json"), "utf8")).version ?? ""; } catch { /* optional */ }
@@ -488,8 +494,8 @@ function targetViewData() {
       probe: byStatus.probe ?? 0,
       broken: byStatus.broken ?? 0,
       active: active.length,
-      serveTools: active.length + MEDIA_BUILTINS.length,
-      functionSchemas: functionSchemas.length || active.length + MEDIA_BUILTINS.length,
+      serveTools: toolCount,
+      functionSchemas: functionSchemas.length || toolCount,
       byMechanism,
       registryTools: registryTools.length,
     },
@@ -502,13 +508,13 @@ function targetViewData() {
         pattern: t.pattern ?? "", dataClass: t.dataClass ?? null, form: t.form ?? "",
         status: t.status ?? "probe", sourceRef: t.sourceRef ?? "",
       })),
-      missingFromRegistry: [...activeIds].filter((id) => !registryIds.has(id)),
+      missingFromRegistry: analysis.transport ? [] : active.filter(c => !registryIds.has(c.dispatch?.operation ?? c.id)).map(c => c.id),
       extraInRegistry: [...registryIds].filter((id) => !activeIds.has(id)),
     },
     functionSchemaDeliverable: functionSchemas.length
       ? { path: TARGET.functionSchema.replace(/\\/g, "/"), count: functionSchemas.length, functions: functionSchemas }
       : null,
-    mediaBuiltins: MEDIA_BUILTINS,
+    mediaBuiltins: builtins,
     probe: { present: false },
   };
 }
@@ -520,11 +526,7 @@ async function stageInputs() {
     ["被分析源码（适配器）", TARGET.adapter],
     ["唯一真相源（分析产物）", TARGET.analysis],
     ["执行器契约面", TARGET.srcDir],
-    ...(suiteSampleMode ? [
-      ["车控 handler 映射（逆向产物）", join(ROOT, "tools", "carcontrol_handlers.json")],
-      ["车控候选工具（逆向产物）", join(ROOT, "tools", "carcontrol_tools_candidate.json")],
-      ["逆向素材说明（dex dump 位置）", join(ROOT, "reverse", "README.md")],
-    ] : []),
+    ...(suiteSampleMode ? [["本地模拟服务", join(ROOT, "e2e", "demo-device.mjs")]] : []),
   ];
   const out = [
     `【输入素材盘点】bridge-analyze 输入形态：源码 / PRD / APK / adb 观察`,
@@ -549,10 +551,11 @@ async function stageAnalyze() {
   const byStatus = {}, byMech = {};
   for (const c of caps) {
     byStatus[c.status || "probe"] = (byStatus[c.status || "probe"] || 0) + 1;
-    const m = c.mechanism || "execmd";
+    const m = a.transport?.type || c.mechanism || "unknown";
     byMech[m] = (byMech[m] || 0) + 1;
   }
-  const active = caps.filter((c) => c.status !== "broken").length;
+  const active = caps.filter((c) => c.status !== "broken" && (a.deliveryScopes ?? ['core']).includes(c.scope ?? 'core')).length;
+  const publicCount = a.toolContract?.mode === 'channel' ? (active ? 1 : 0) : active + (a.builtins?.length ?? 0);
 
   const SRC = TARGET.srcDir;
   // 通用 sourceRef 可定位性核对 — 项目/套件演示同一实现, 不绑定任何样例契约;
@@ -565,7 +568,7 @@ async function stageAnalyze() {
   const out = [
     `【载入真相源】${TARGET.analysis.replace(/\\/g, "/")}`,
     `  capabilities: ${caps.length}（verified ${byStatus.verified || 0} · broken ${byStatus.broken || 0}）`,
-    `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${active + 4}`,
+    `  机制分布: ${Object.entries(byMech).map(([m, n]) => `${m} ${n}`).join(" · ")} · serve 工具面 ${publicCount}`,
     ``,
     `【sourceRef 可定位性核对（通用）】${SRC.replace(/\\/g, "/")}`,
     `  非 broken ${activeCaps.length}: sourceRef 文件可定位 ${activeCaps.length - miss.length}/${activeCaps.length}${miss.length ? `（待核: ${miss.map((c) => c.id).join("、")}）` : " ✓"}`,
@@ -583,22 +586,27 @@ async function stageRegistry() {
   return run(process.execPath, [GEN_REG, TARGET.analysis, TARGET.registry]);
 }
 async function stageDeploy() {
+  if (JSON.parse(readFileSync(TARGET.analysis,"utf8")).transport) return {ok:true, output:"HTTP 适配器在宿主侧运行，无需部署 Android registry"};
   const car = await requireCar();
   if (!car.ok) return { ok: false, error: car.error };
   const U = await currentUser(car.carIp);
   const fdir = `/data/user/${U}/${EXEC_PKG}/files`;
-  const a = await adbRun(["push", TARGET.registry, "/data/local/tmp/__reg.json"]);
+  if (!/^[A-Za-z][A-Za-z0-9_.]+$/.test(EXEC_PKG)) return {ok:false,error:'Invalid executor package'};
+  const tempRegistry = `/data/local/tmp/bridge-registry-${process.pid}-${Date.now()}.json`;
+  const a = await adbRun(["-s", car.carIp, "push", TARGET.registry, tempRegistry]);
   if (!a.ok) return { ok: false, error: `adb push 失败: ${a.output.slice(-160)}` };
-  const b = await adbRun(["-s", car.carIp, "shell",
-    `cp /data/local/tmp/__reg.json ${fdir}/registry.json && chmod 666 ${fdir}/registry.json && echo deployed`]);
+  const command = `test -d ${fdir} && cp ${tempRegistry} ${fdir}/registry.pending && chmod 644 ${fdir}/registry.pending && mv ${fdir}/registry.pending ${fdir}/registry.json && echo deployed; rm -f ${tempRegistry}`;
+  const prefix = process.env.BRIDGE_ADB_SHELL_PREFIX ?? 'su 0 sh -c';
+  const remote = prefix.trim() ? `${prefix.trim()} '${command.replace(/'/g, "'\\''")}'` : command;
+  const b = await adbRun(["-s", car.carIp, "shell", remote]);
   if (!b.ok || !b.output.includes("deployed")) return { ok: false, error: `部署失败: ${(b.output || "").slice(-160)}` };
   return { ok: true, output: `deployed → ${fdir}/registry.json (设备 ${car.carIp})` };
 }
 async function stageServeStart(args) {
   if (state.serveProc) return { ok: true, output: "serve 已在运行", already: true };
   const analysis = JSON.parse(readFileSync(TARGET.analysis, "utf8"));
-  const active = (analysis.capabilities ?? []).filter((c) => c.status !== "broken").length;
-  const serveTools = active + MEDIA_BUILTINS.length;
+  const active = (analysis.capabilities ?? []).filter((c) => c.status !== "broken" && (analysis.deliveryScopes ?? ["core"]).includes(c.scope ?? "core")).length;
+  const serveTools = analysis.toolContract?.mode === "channel" ? (active ? 1 : 0) : active + (analysis.builtins?.length ?? 0);
   // serve 启动只注册工具面，--device 仅在 tools/call 时才连车；
   // 故 MCP server 生成不依赖车在线。默认用占位设备串。
   const device = (args && args.device) || "viz-no-car";
@@ -611,7 +619,7 @@ async function stageServeStart(args) {
   p.on("close", (code) => { pushServeLog(`[serve 进程退出 code=${code}]`); state.serveProc = null; });
   await sleep(1300);
   if (!state.serveProc) return { ok: false, error: `serve 启动即退出: ${state.serveLog.join(" ").slice(-240)}` };
-  return { ok: true, output: `serve 已启动（pid ${p.pid}，--device ${device}）\nMCP Server 就绪，工具面 ${serveTools} tools 注册（active ${active} + media 内置 4）\n${state.serveLog.slice(0, 6).join("\n")}` };
+  return { ok: true, output: `serve 已启动（pid ${p.pid}）\nMCP 工具面 ${serveTools} tools，选中能力 ${active}\n${state.serveLog.slice(0, 6).join("\n")}` };
 }
 function pushServeLog(s) {
   s.split("\n").filter(Boolean).slice(-20).forEach((l) => {
@@ -626,6 +634,8 @@ async function stageServeStop() {
   return { ok: true, output: "serve 已停止" };
 }
 async function stageCarcheck() {
+  const analysis = JSON.parse(readFileSync(TARGET.analysis,"utf8"));
+  if (analysis.transport) return {ok:true, output:`HTTP 适配器: ${analysis.transport.url}。调用结果由业务接口返回。`};
   const car = await requireCar();
   if (!car.ok) return { ok: false, error: car.error };
   return { ok: true, output: `设备在线 ${car.carIp} · model ${car.carModel}` };
@@ -633,27 +643,14 @@ async function stageCarcheck() {
 async function stageInvoke(args) {
   const op = args.op || "";
   if (!op) return { ok: false, error: "缺少 op" };
-  const car = await requireCar();
-  if (!car.ok) return { ok: false, error: car.error };
-  const U = await currentUser(car.carIp);
-  const fdir = `/data/user/${U}/${EXEC_PKG}/files`;
-  const reqId = `rt${Date.now()}`;
-  writeFileSync(join(ROOT, "viz", ".cmd.json"),
-    JSON.stringify({ reqId, op, args: args.args || {} }));
-  const a = await adbRun(["push", join(ROOT, "viz", ".cmd.json"), "/data/local/tmp/__rt_cmd.json"]);
-  if (!a.ok) return { ok: false, error: `adb push 失败: ${a.output.slice(-120)}` };
-  const b = await adbRun(["-s", car.carIp, "shell",
-    `cp /data/local/tmp/__rt_cmd.json ${fdir}/imrpc/cmd.json && chmod 666 ${fdir}/imrpc/cmd.json && rm -f ${fdir}/imrpc/result.json`]);
-  if (!b.ok) return { ok: false, error: "写入车端信箱失败" };
-  await adbRun(["-s", car.carIp, "shell", "am start --user", U, "-n", `${EXEC_PKG}/${EXEC_ACT}`]);
-  const t0 = Date.now();
-  while (Date.now() - t0 < 9000) {
-    await sleep(450);
-    const c = await adbRun(["-s", car.carIp, "shell", `cat ${fdir}/imrpc/result.json 2>/dev/null`]);
-    const out = c.output.trim();
-    if (out) return { ok: true, output: `invoke ${op} → ${out}` };
+  const analysis = JSON.parse(readFileSync(TARGET.analysis,"utf8"));
+  const argv = [CLI,"call","--analysis",TARGET.analysis,"--op",op,"--args",JSON.stringify(args.args ?? {})];
+  if (!analysis.transport) {
+    const car = await requireCar();
+    if (!car.ok) return {ok:false,error:car.error};
+    argv.push("--device",car.carIp,"--user",await currentUser(car.carIp));
   }
-  return { ok: false, error: `invoke ${op} 超时（9s 无 result）` };
+  return run(process.execPath,argv);
 }
 
 const STAGES = {
@@ -825,6 +822,10 @@ const handler = async (req, res) => {
         let body = await readBody(req);
         const t = JSON.parse(body || "{}");
         if (t.analysis) {
+          if (gw.tests.running || gw.starting) { res.writeHead(409, {'content-type':'application/json'}); return res.end(JSON.stringify({ok:false,error:'Finish the current E2E run before switching projects'})); }
+          JSON.parse(readFileSync(resolve(PROJECT_ROOT, String(t.analysis)), 'utf8'));
+          await stageServeStop();
+          if (gw.proc) { gw.proc.kill(); gw.proc = null; }
           TARGET.analysis = resolve(PROJECT_ROOT, String(t.analysis));
           TARGET.functionSchema = functionSchemaForAnalysis(TARGET.analysis);
           TARGET.registry = registryForAnalysis(TARGET.analysis);
@@ -966,7 +967,7 @@ createServer(handler).listen(PORT, "127.0.0.1", () => {
   // 默认即在用户默认浏览器(Chrome/Edge/Safari 随系统)打开页面 — host codeagent 只要启动本后端,
   // 浏览器必然被拉起, 不依赖 agent 自行拼命令(Git Bash 下 cmd start 常转义失败, 这是历史坑)。
   // 关闭: --no-open 或 BRIDGE_VIZ_OPEN=0; 无图形环境静默忽略, 由调用方以文字告知地址。
-  const wantOpen = !argValue("--no-open") && process.env.BRIDGE_VIZ_OPEN !== "0";
+  const wantOpen = !process.argv.includes("--no-open") && process.env.BRIDGE_VIZ_OPEN !== "0";
   if (argValue("--open") || wantOpen) {
     const url = `http://127.0.0.1:${PORT}/pipeline.html`;
     try {

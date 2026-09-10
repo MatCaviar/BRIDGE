@@ -14,7 +14,7 @@ Universal inputs enter BRIDGE Analyze. The resulting `function-schema.json` is v
 
 Figure 3 is deliberately an internal implementation cutaway rather than another execution overview. The `bridge-analyze` plugin feeds a dominant canonical `analysis.json` capability IR. Its Agent-facing fields (`id`, `description`, `params`, safety) and execution-facing fields (`status`, `sourceRef`, mechanism, route) drive five deterministic projections: `function-schema.json`, MCP `tools/list`, OpenAI tools, Anthropic tools, and `registry.json`.
 
-Below the contract, `mcp-pipeline schema / serve / invoke` form the host runtime. The ADB `cmd.json ↔ result.json` mailbox joins it to the generic `Bridge Executor`, whose external registry selects AIDL, execmd, Intent, media, mapnav, or carcontrol adapters. A cross-cutting rail represents live visualization, schema injection checks, contract tests, invoke tests, and E2E smoke tests. Upstream-Agent dialogue, app inputs, real vehicles, cockpit UI, GUI fallback, and safety approval are intentionally absent because Figure 2 already owns that end-to-end narrative.
+Below the contract, `mcp-pipeline schema / serve / invoke` form the host runtime. The ADB `cmd.json ↔ result.json` mailbox joins it to the generic `Bridge Executor`, whose external registry selects configured AIDL, execmd, Intent, and media mechanisms; project-owned HTTP adapters provide other integration paths. A cross-cutting rail represents live visualization, schema injection checks, contract tests, invoke tests, and E2E smoke tests. Upstream-Agent dialogue, app inputs, real vehicles, cockpit UI, GUI fallback, and safety approval are intentionally absent because Figure 2 already owns that end-to-end narrative.
 
 ### Figure 3 final ImageGen prompt
 

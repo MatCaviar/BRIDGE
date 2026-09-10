@@ -218,8 +218,7 @@
   .b { display:inline-block; font-family:var(--mono); font-size:12px; letter-spacing:.04em;
        border:1px solid; padding:0 7px; line-height:17px; border-radius:4px; white-space:nowrap; }
   .m-execmd { color:var(--primary-600); border-color:var(--primary-200); background:var(--primary-50); }
-  .m-carcontrol { color:#7c5aa8; border-color:#e2d7f2; background:#f8f4fd; }
-  .m-mapnav { color:var(--gold); border-color:#eee0c4; background:#fdf9ef; }
+  .m-http { color:#7c5aa8; border-color:#e2d7f2; background:#f8f4fd; }
   .m-media { color:var(--t3); border-color:var(--n200); background:var(--n50); }
   .s-verified { color:var(--success); border-color:#c4e7cd; background:var(--success-50); }
   .s-broken { color:var(--danger); border-color:#efc9c9; background:var(--danger-50); }
@@ -699,11 +698,11 @@ function renderFlow(S) {
     `<div class="fork">
        <div class="fbranch">${n("n4a", "④", "projector", "甲 · 上游 Agent schema 注入 + MCP serve",
          `function-schema.json 与 MCP tools/list 均为 <b class="cnt" data-count="${S.serveTools}">0</b> tools；E2E gateway 转为 OpenAI / Anthropic function envelope<br>` +
-         `Agent tool call -> invoke -> adb push cmd.json -> 车端 imrpc 信箱 -> ExecutorActivity -> result.json`,
+         `Agent tool call → 参数校验与映射 → 项目 HTTP adapter / Android bridge-rpc → 业务结果`,
          ["mcp-pipeline schema --analysis " + ((D.sources && D.sources.analysis) || "analysis.json") + " --out function-schema.json",
           "mcp-pipeline serve --analysis " + ((D.sources && D.sources.analysis) || "analysis.json") + " --device <serial>"])}</div>
        <div class="fbranch">${n("n4b", "④", "cardfile", "乙 · registry 生成（车端分派表）",
-         `registry.json <b class="cnt" data-count="${reg ? reg.tools : 0}">0</b> tools（跳过 media_*/broken；机制字段投影）`,
+         `registry.json <b class="cnt" data-count="${reg ? reg.tools : 0}">0</b> tools（所选 Android 能力；HTTP 模式无需部署）`,
           ["node e2e/analysis-to-registry.mjs <analysis.json> <registry.json>",
            "adb push <registry.json> <executor-filesDir>/registry.json"])}</div>
      </div>`,
@@ -714,7 +713,7 @@ function renderFlow(S) {
     `<div class="forkbar" data-for="n5"></div>`,
     drop("n5", true),
     n("n5", "⑤", "engine", "车端 bridge_executor · 按机制分派",
-      `registry.json -- execmd <b class="cnt" data-count="${regMech.execmd ?? 0}">0</b> · carcontrol <b class="cnt" data-count="${regMech.carcontrol ?? 0}">0</b> · mapnav <b class="cnt" data-count="${regMech.mapnav ?? 0}">0</b> · media <b>内置</b>`),
+      `registry.json · ${Object.entries(regMech).map(([name,count]) => esc(name)+' '+count).join(' · ') || 'HTTP adapter，无 Android 分派项'}`),
     drop("n6", false),
     n("n6", "⑥", "gauge", "真实车机结果",
       `result.json <code>{reqId, ok, data}</code> -- 音量 / 音场 / 切歌 / 导航 / 座椅… 真实生效`),

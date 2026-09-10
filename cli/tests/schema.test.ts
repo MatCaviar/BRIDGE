@@ -16,6 +16,7 @@ const readingLight: CapabilityDef = {
   status: "verified",
   sourceRef: "CarLightService.kt:setReadingLight",
   description: "控制车内阅读灯的开关和亮度，提供乘客阅读时的局部照明。",
+  mechanism: "aidl", interfaceClass: "org.example.Light", servicePackage: "org.example.device", serviceClass: "LightService", methodName: "setLight",
   params: [
     { name: "position", type: "List[str]", optional: true, enum: ["主驾", "副驾", "二排左", "二排右", "三排左", "三排右"], description: "灯光分区列表（支持多个）" },
     { name: "state", type: "List[str]", optional: true, enum: ["开", "关"], description: "与 position 一一对应" },
@@ -52,11 +53,11 @@ describe("upstream Agent function schema projection", () => {
     expect(schema.required).toBeUndefined();
   });
 
-  it("keeps MCP and OpenAI envelopes aligned and adds four BRIDGE media tools", () => {
+  it("keeps MCP and OpenAI envelopes aligned without unsolicited media tools", () => {
     const mcp = mcpToolArtifact(analysis) as { tools: Array<Record<string, any>> };
     const openai = openAIToolArtifact(analysis) as Array<Record<string, any>>;
-    expect(mcp.tools).toHaveLength(5);
-    expect(openai).toHaveLength(5);
+    expect(mcp.tools).toHaveLength(1);
+    expect(openai).toHaveLength(1);
     expect(openai[0].function.parameters).toEqual(mcp.tools[0].inputSchema);
     expect(mcp.tools[0].annotations.readOnlyHint).toBe(false);
   });

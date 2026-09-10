@@ -22,7 +22,7 @@ class MockAdb implements Adb {
 
 const noSleep = async () => {};
 const base = (over: Partial<InvokeOptions> = {}): InvokeOptions => ({
-  op: "get_mic_vocal", device: "SERIAL", reqId: "r1", sleep: noSleep, timeoutMs: 800, pollMs: 100, ...over,
+  op: "read_level", device: "SERIAL", reqId: "r1", sleep: noSleep, timeoutMs: 800, pollMs: 100, ...over,
 });
 
 describe("invokeTool", () => {
@@ -35,10 +35,10 @@ describe("invokeTool", () => {
     expect(res.data).toEqual({ code: 1000, message: "SUCCESS", data: 0 });
     // cmd.json payload
     const cmd = JSON.parse(adb.pushedContent);
-    expect(cmd).toEqual({ reqId: "r1", op: "get_mic_vocal", args: { x: 1 } });
-    expect(adb.pushes[0]!.device).toBe("/data/local/tmp/__bridge_cmd.json");
-    // am start targets the executor component + foreground user 10
-    expect(adb.shells.some((s) => /am start --user 10 -n com\.immotors\.bridge\.executor\/\.ExecutorActivity/.test(s))).toBe(true);
+    expect(cmd).toEqual({ reqId: "r1", op: "read_level", args: { x: 1 } });
+    expect(adb.pushes[0]!.device).toBe("/data/local/tmp/bridge-r1.json");
+    // The default Android user is 0; multi-user targets are explicitly configurable.
+    expect(adb.shells.some((s) => /am start --user 0 -n org\.bridge\.executor\/\.ExecutorActivity/.test(s))).toBe(true);
   });
 
   it("ignores stale/empty results, matching only its own reqId", async () => {
@@ -70,9 +70,9 @@ describe("invokeTool", () => {
   it("respects --package / --activity overrides (retargets the executor component)", async () => {
     const adb = new MockAdb();
     adb.queueShells("", "", "", JSON.stringify({ reqId: "r1", ok: true }));
-    await invokeTool(adb, base({ pkg: "com.other.app", activity: ".Exec" }));
+    await invokeTool(adb, base({ pkg: "com.other.app", activity: ".Exec", user: 10 }));
     expect(adb.shells.some((s) => /am start --user 10 -n com\.other\.app\/\.Exec/.test(s))).toBe(true);
-    expect(adb.shells.some((s) => s.includes("/data/user/10/com.other.app/files/imrpc"))).toBe(true);
+    expect(adb.shells.some((s) => s.includes("/data/user/10/com.other.app/files/bridge-rpc"))).toBe(true);
   });
 
   it("treats a cat failure (adb reject) as an empty poll, not a crash", async () => {
@@ -96,9 +96,9 @@ describe("invokeTool", () => {
 
 describe("parseInvokeArgs", () => {
   it("parses --op/--device/--args + numeric + flags", () => {
-    const o = parseInvokeArgs(["--op", "set_mic_vocal", "--device", "b12bf58e", "--args", '{"vol":3}', "--user", "0", "--timeout", "5000", "--json"]);
-    expect(o.op).toBe("set_mic_vocal");
-    expect(o.device).toBe("b12bf58e");
+    const o = parseInvokeArgs(["--op", "set_level", "--device", "DEVICE_SERIAL", "--args", '{"vol":3}', "--user", "0", "--timeout", "5000", "--json"]);
+    expect(o.op).toBe("set_level");
+    expect(o.device).toBe("DEVICE_SERIAL");
     expect(o.args).toEqual({ vol: 3 });
     expect(o.user).toBe(0);
     expect(o.timeoutMs).toBe(5000);

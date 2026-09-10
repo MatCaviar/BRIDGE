@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.immotors.bridge.executor"
+    namespace = "org.bridge.executor"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     val bridgeKeystorePath = providers.gradleProperty("bridgeKeystore")
@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.immotors.bridge.executor"
+        applicationId = "org.bridge.executor"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
@@ -47,9 +47,12 @@ android {
     buildFeatures {
         aidl = true
     }
-}
-
-dependencies {
-    // car v1 IIMAudioService (executeCommand/onCallback) AIDL lives in this module's src/main/aidl.
-    // 不依赖 :imaudio_service_client — 它的 AIDL 是 v50 specific-method 接口, 本车(gen5_gvm v1)不暴露。
+    // Optional user-owned AIDL/Java contracts and manifest; no target application is bundled.
+    providers.environmentVariable("BRIDGE_ADAPTER_DIR").orNull?.let { adapter ->
+        sourceSets.getByName("main") {
+            java.srcDir("$adapter/java")
+            aidl.srcDir("$adapter/aidl")
+            if (file("$adapter/AndroidManifest.xml").exists()) manifest.srcFile("$adapter/AndroidManifest.xml")
+        }
+    }
 }

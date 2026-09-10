@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { deepStrictEqual } from 'node:assert';
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { convertToAnthropic, convertToOpenAI } from "./dist/mcp/schema-convert.js";
 
@@ -44,6 +45,13 @@ const mcpDefs = listed.tools.map((tool) => ({
 const openai = convertToOpenAI(mcpDefs);
 const anthropic = convertToAnthropic(mcpDefs);
 if (openai.length !== actual.length || anthropic.length !== actual.length) throw new Error("provider schema conversion count mismatch");
+for (const [i,tool] of listed.tools.entries()) {
+  const artifact = bridgeArtifact.functions.find(fn=>fn.name===tool.name);
+  deepStrictEqual(tool.inputSchema,artifact.inputSchema,`${tool.name}: file vs tools/list input`);
+  deepStrictEqual(tool.outputSchema,artifact.outputSchema,`${tool.name}: output contract`);
+  deepStrictEqual(openai[i].function.parameters,tool.inputSchema,`${tool.name}: OpenAI input`);
+  deepStrictEqual(anthropic[i].input_schema,tool.inputSchema,`${tool.name}: Anthropic input`);
+}
 if (!openai.every((tool) => /^[a-zA-Z0-9_-]{1,64}$/.test(tool.function.name))) throw new Error("provider function name is not API-safe");
 
 const sample = openai.find((tool) => Object.keys((tool.function.parameters.properties ?? {})).length > 0) ?? openai[0];

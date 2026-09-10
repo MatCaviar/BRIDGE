@@ -1,80 +1,19 @@
 #!/usr/bin/env node
-/**
- * analysis → car registry 生成器 (bridge-analyze 规格的唯一真相源落地)。
- *
- * bridge-analyze 的 analysis.json 同时携带 serve 字段 + 车端机制字段;
- * 本脚本把机制字段投影为执行器 registry.json, 消除双份手写维护。
- *
- * 用法: node analysis-to-registry.mjs <analysis.json> <registry.json>
- */
-import { readFileSync, writeFileSync } from "fs";
-
-const [, , analysisPath, outPath] = process.argv;
-if (!analysisPath || !outPath) {
-  console.error("usage: node analysis-to-registry.mjs <analysis.json> <registry.json>");
-  process.exit(1);
-}
-
-const analysis = JSON.parse(readFileSync(analysisPath, "utf-8"));
-const tools = [];
-const builtinMedia = new Set(["media_next", "media_prev", "media_play", "media_pause"]);
-
-for (const cap of analysis.capabilities ?? []) {
-  if (builtinMedia.has(cap.id)) continue; // media_* 内置, 不进 registry
-  if (cap.status === "broken") continue;  // serve 也跳过
-  const t = {
-    id: cap.id,
-    status: cap.status ?? "probe",
-    sourceRef: cap.sourceRef ?? "",
-  };
-  const m = cap.mechanism ?? "execmd";
-  switch (m) {
-    case "aidl":
-      Object.assign(t, {
-        mechanism: "aidl",
-        methodName: cap.methodName ?? cap.id,
-        pattern: cap.pattern ?? "scalar",
-        devicePaths: cap.devicePaths ?? [],
-        dataClass: cap.dataClass,
-        form: cap.form ?? "binder",
-      });
-      break;
-    case "execmd":
-      Object.assign(t, {
-        mechanism: "execmd",
-        methodName: cap.methodName ?? cap.id,
-        pattern: cap.pattern ?? "scalar",
-        devicePaths: cap.devicePaths ?? [],
-        dataClass: cap.dataClass,
-        form: cap.form ?? "binder",
-      });
-      break;
-    case "carcontrol":
-      Object.assign(t, {
-        mechanism: "carcontrol",
-        ccDomain: cap.ccDomain ?? "002",
-        ccFunction: cap.ccFunction ?? cap.id,
-      });
-      break;
-    case "mapnav":
-      t.mechanism = "mapnav";
-      break;
-    case "intent":
-      t.mechanism = "intent";
-      Object.assign(t, { component: cap.component, intentScreens: cap.intentScreens, extras: cap.extras, dataUri: cap.dataUri, args: cap.defaultArgs });
-      break;
-    default:
-      t.mechanism = m;
-  }
-  // bind 目标 (有值才写; 缺省执行器回退顶层默认)
-  if (cap.interfaceClass) t.interfaceClass = cap.interfaceClass;
-  if (cap.servicePackage) t.servicePackage = cap.servicePackage;
-  if (cap.serviceClass) t.serviceClass = cap.serviceClass;
-  if (cap.bindAction) t.bindAction = cap.bindAction;
-  if (cap.safetyLevel) t.safetyLevel = cap.safetyLevel;
-  tools.push(t);
-}
-
-const registry = { tools };
-writeFileSync(outPath, JSON.stringify(registry, null, 1));
-console.log(`registry written: ${tools.length} tools -> ${outPath}`);
+import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
+import {dirname} from 'node:path';
+import {assertAnalysis} from '../contract/analysis.mjs';
+const [input,output]=process.argv.slice(2);
+if(!input||!output) throw new Error('usage: analysis-to-registry.mjs <analysis.json> <registry.json>');
+const a=JSON.parse(readFileSync(input,'utf8'));assertAnalysis(a);
+const scopes=a.deliveryScopes??['core'];
+const selected=a.capabilities.filter(c=>c.status!=='broken'&&scopes.includes(c.scope??'core'));
+const fields=['mechanism','methodName','pattern','binder','interfaceClass','servicePackage','serviceClass','bindAction','component','extras','dataUri','preconditions','safetyLevel','sessionPackage','timeoutMs'];
+const tools=a.transport ? [] : selected.map(c=>{
+  if(!['aidl','execmd','intent','media'].includes(c.mechanism)) throw new Error(`Unsupported executor mechanism for ${c.id}: ${c.mechanism}`);
+  return {id:c.dispatch?.operation??c.id,status:c.status,sourceRef:c.sourceRef,...Object.fromEntries(fields.filter(k=>c[k]!==undefined).map(k=>[k,c[k]]))};
+});
+for(const name of a.builtins??[]) tools.push({id:name,mechanism:'media',methodName:name.slice('media_'.length),status:'probe',sourceRef:'BRIDGE builtin media',safetyLevel:'normal'});
+if(new Set(tools.map(t=>t.id)).size!==tools.length) throw new Error('Duplicate executor operation');
+mkdirSync(dirname(output),{recursive:true});
+writeFileSync(output,JSON.stringify({tools},null,2)+'\n');
+console.log(`registry written: ${tools.length} tools -> ${output}${a.transport?' (host HTTP transport; no Android registry needed)':''}`);

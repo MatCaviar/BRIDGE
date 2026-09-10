@@ -1,278 +1,78 @@
-<div align="center">
-
-# 🎛️ 代码智能体套件 BRIDGE
+# 代码智能体套件 BRIDGE
 
 **B**uilding **R**eal-device **I**nterfaces via **D**eterministic **G**ated **E**xecution
 
-![version](https://img.shields.io/badge/version-0.1.23-0066cc)
+![version](https://img.shields.io/badge/version-0.2.0-0066cc)
 
-</div>
+BRIDGE 将应用源码、接口文档、APK 和运行观察转化为上游智能体可调用的工具，适用于本地应用、Android 设备、车机与仿真台架。应用专属契约与适配代码保存在使用者自己的项目目录中。
 
-BRIDGE 把车机 app 变成上游智能体可以真实调用的工具。输入一个 app（源码工程、多模块模板、APK、PRD 皆可），产出一套完整的 MCP 交付物：函数 schema、MCP Server、车端分派表、验证证据。
+## 安装
 
-## 🧠 工作原理
+在 Codex 插件设置中添加本仓库并安装 **BRIDGE**（`im-mcp-codeagent`）。插件标识保持兼容，便于已有用户升级。
 
-给定应用源码与 manifest，BRIDGE 产出一套 **MCP 套件**：面向智能体的函数 schema、可运行的 MCP Server、RPC wire 契约、车端桥接产物与验证证据。上游智能体可调用这些工具**真正驱动设备**，EQ、声场、Beosonic、卡拉 OK、车辆信号等，而非桩式 mock。函数 schema 接口面是供上游模型理解的首要产物；套件的其余部分使这些工具可执行、可审计。
+Claude Code：
 
-下方 pipeline 给出各阶段；其后的图展示生成期各角色的分工。
-
-**Pipeline**，每一步均为确定性 CLI 子命令或智能体 skill：
-
-```
-输入任意 app › bridge-analyze 产出 analysis.json › validate-analysis 校验 › serve 投影 MCP 工具 › invoke 上车执行 🟢
+```text
+/plugin marketplace add https://github.com/MatCaviar/BRIDGE.git
+/plugin install im-mcp-codeagent@im-mcp-marketplace
 ```
 
-进度持久化于 `.mcp-pipeline/<app>/state.json`，支持断点续跑，`--from`、`--only`、`--step`、`--batch`。
+安装后，让 `bridge-analyze` 分析你的项目。产物保存到项目目录，与插件安装目录分开。CLI 首次使用自动安装依赖并构建，需要 Node.js 20.19+。
 
-> 两道闸门（`validate_config` + `wire_check`）是 `generate` 的内联子步骤，二者均通过后 pipeline 才会推进（失败即重试）。`[curate]` 为可选。
+## 产物与调用方式
 
-**生成过程。** 分工：宿主智能体提供判断（抽取、wire 编写），CLI 负责确定性执行（scaffold、闸门）。每个能力映射到一个工具定义，`name ← id`、`inputSchema ← params`、`annotations ← safety`。
+- `analysis.json`：能力定义、参数约束、公开工具契约与执行配置。
+- `function-schema.json`：提供给上游智能体的函数定义，包含完整的嵌套输入与输出规格。
+- MCP Server：通过 `tools/list` 注入相同规格，通过 `tools/call` 校验并执行。
+- 按需生成 `registry.json` 和项目自己的 Android 适配代码。
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Agent as 🎛️ 宿主 codeAgent
-    participant Source as 🧱 应用源码
-    participant CLI as 🛠️ 确定性 CLI
-    participant Tool as 🧩 MCP 工具 schema
+支持“每项能力一个工具”和“单个 channel 工具”两种方式。统一入口接受 `arguments.action`、业务参数及 `arguments.extras`，返回 `code / message / data / extras`；默认仅 `code: 0` 表示业务成功。字段名称、参数映射和上下文来源均可配置，详见[工具契约](docs/tool-contract.md)与[示例](examples/)。
 
-    Agent->>Source: 读取 proxy + manifest
-    Source-->>Agent: 方法 · 能力
-    Agent->>CLI: scaffold（analysis）
-    CLI-->>Agent: server 骨架 + adapter
-    Agent->>Source: 读取 proxy wire 调用
-    Agent->>Agent: 编写每 op 的 wire 规格
-    Agent->>CLI: validate_config + wire_check
-    CLI-->>Agent: 通过（或失败 → 重试）
-    loop 每个 capability
-        Agent->>Tool: name ← id · inputSchema ← params · annotations ← safety
-    end
-    Tool-->>Agent: 注入 N 个工具 schema
-```
+## 本地体验
 
-**运行期桥接。** 构建完成后，一次工具调用从上游智能体经生成出的 server 与确定性桥接流向真实设备，传输层可替换（`adb` / file / socket），wire 纯由 `rpc/config.json` 构造，故桥接不含任何 app 字面量。
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Agent as ⚛️ 上游智能体
-    participant Server as 📡 MCP 服务器
-    participant Bridge as 🔌 RPC 桥
-    participant Engine as ⚙️ 车端引擎
-
-    Agent->>Server: tools/call (name, args)
-    Note over Server: 安全校验工具先校验前置条件（fail-closed）
-    Server->>Bridge: dispatch(tool, args)
-    Bridge->>Bridge: 按 rpc/config.json 构造 wire
-    Bridge->>Engine: command（adb / file / socket）
-    Engine->>Engine: 驱动真实 app 操作
-    Engine-->>Bridge: reply
-    Bridge->>Bridge: 解析 reply → 工具返回 shape
-    Bridge-->>Server: 类型化 result
-    Server-->>Agent: tool result
-```
-
-## 📦 交付物
-
-一次成功的运行应产出一套可评审的交付 bundle，而非仅仅一个生成目录：
-
-| 读者 | 交付物 | 位置 | 为何重要 |
-|---|---|---|---|
-| **上游智能体** | 函数 schema 接口面 | `schema_preview` 产出的 `tools-schema.json`，以及生成 server 内的 `src/tools/schema.ts` | 注入 Claude / Codex 的精确工具名、描述、输入 schema、安全 annotation 与可执行性标记。 |
-| **MCP 宿主** | 可运行的 MCP Server | 生成 server 目录、构建后的 `dist/index.js` 与 `conf/config.yaml` | 托管工具的 stdio 服务器。 |
-| **应用 / 设备集成方** | RPC wire 契约 | `rpc/config.json`、`src/rpc/*` 与 `car-side/` | 从每次工具调用到真实 app / 设备操作的可追溯桥接。 |
-| **评审者** | 验证证据 | `.mcp-pipeline/<app>/state.json`、`.mcp-pipeline/test-results.json`、闸门输出、构建输出、verify 输出 | 呈现 schema 合法性、wire 覆盖率、可构建性、工具发现与工具调用响应性的审计轨迹。 |
-
-可直接由 analysis（及可选的 wire 状态）产出面向上游智能体的 schema：
+在仓库根目录启动中性 HTTP 仿真服务：
 
 ```bash
-mcp-pipeline schema_preview <analysis.json> [<rpc/config.json>] --output tools-schema.json
+node e2e/demo-device.mjs
 ```
 
-`rpc/config.json` 可在 `_deferred` 中标记有意不接线的工具；这些工具以 `executable:false` 呈现，而非静默伪装可工作。
-
-完成的判定标准：
-
-1. `tools-schema.json` 精确地、各一次地暴露每个选中能力。
-2. 每个工具都有具体的描述、具体的输入 schema、正确的枚举值与安全 annotation。
-3. `validate-analysis.mjs`、`validate_config`、`wire_check`、`test`、`build`、`verify` 全部通过。
-4. `verify` 证明的是业务工具调用，而非仅 `health_check`。
-5. `car-side/` 可直接交付给设备端同事，无需其逆向 pipeline 内部。
-
-完整契约见 [`docs/DELIVERABLE_CONTRACT.md`](docs/DELIVERABLE_CONTRACT.md)。
-
-## 🛡️ 为何可靠
-
-| 保障 | 如何落实 |
-|---|---|
-| **确定性输出** | 生成器不含任何 app 字面量，任意 app、任意机器，逐字节可复现。 |
-| **构建前验证** | 两道 fail-closed 闸门，`validate_config`（schema + 覆盖率 + 可调度）与 `wire_check`（proxy wire 格式匹配），必须通过宿主唯一的判断产物 `rpc/config.json`。 |
-| **fail-closed 安全** | `p_gear_required` 工具在未验证 P 档时即被拦截；退化输入（空 / 不匹配）报错而非空洞放行。 |
-| **诚实的 selection** | `--selection` 遇缺失文件、未知 id 或空列表时**显式报错**，而非静默地多生成或少生成。 |
-| **真实桥接，无外部网络** | 车端 RPC 引擎（交付给同事）经 adb / file / sendlink 桥接 宿主 → 设备。 |
-| **自包含** | CLI 经 skill-base 相对路径运行；`framework/` + `cli/` 依赖在首次会话自动安装并构建。 |
-
-## 📥 安装与运行
-
-**30 秒首次体验（无需安装任何东西）**：`git clone` 本仓库后直接运行
+另开终端：
 
 ```bash
+node cli/bin/mcp-pipeline.js schema --analysis examples/channel-analysis.json --format all --out function-schema.json
+node cli/bin/mcp-pipeline.js call --analysis examples/channel-analysis.json --op set_level --args '{"level":35}'
 node viz/run.mjs --open
 ```
 
-可视化页在默认浏览器自动打开（内置仓库样例数据）；点击「▶ 端到端测试」即自动安装依赖 → 构建 → 生成配置 → 拉起网关（缺 LLM key 时页面会询问），全程零手动步骤。对任意 app 做正式分析请走下方插件流程（bridge-analyze skill 会自动把可视化切到该项目）。
+内置示例提供三个仿真控制项，不连接真实设备。可视化包含实时执行视图及可选的智能体端到端测试入口；模型测试使用你配置的服务与凭据。
 
-**Claude Code**
-
-```bash
-/plugin marketplace add https://github.com/MatCaviar/im-mcp-codeagent.git
-/plugin install im-mcp-codeagent
-```
-
-首次会话启动会自动安装 `framework/` + `cli/` 并构建 `cli/dist`（幂等）。随后启动一次 pipeline 运行：
-
-```
-/mcp-pipeline ./path/to/your-app
-```
-
-入口，`/mcp-pipeline` · `/mcp-verify <dir>` · `/mcp-help`。
-
-**Codex** 读取镜像的 `.codex-plugin/plugin.json`（双端）。
-
-典型运行形态：
+## 接入自己的应用
 
 ```bash
-# analysis 校验 / 确定性生成
-node skills/bridge-analyze/validate-analysis.mjs <analysis.json>
-mcp-pipeline scaffold <analysis.json> --output <server>
-
-# 宿主智能体判断产物 + 确定性闸门
-mcp-pipeline validate_config <server>/rpc/config.json --analysis <analysis.json>
-mcp-pipeline wire_check <server>/rpc/config.json --proxy <path/to/Proxy.ts>
-
-# 上游智能体 schema 与运行期证据
-mcp-pipeline schema_preview <analysis.json> <server>/rpc/config.json --output <server>/tools-schema.json
-mcp-pipeline test --dir <server>
-mcp-pipeline build --dir <server>
-mcp-pipeline verify --dir <server>
+node skills/bridge-analyze/validate-analysis.mjs /path/to/analysis.json
+node cli/bin/mcp-pipeline.js schema --analysis /path/to/analysis.json --out /path/to/function-schema.json --format bridge
+node cli/bin/mcp-pipeline.js serve --analysis /path/to/analysis.json
 ```
 
-普通插件用户通常经 `/mcp-pipeline` 进入；低层 CLI 命令一并列出，使生成出的交付 bundle 可审计、可复现。
+HTTP 适配端地址写在 analysis 中。Android 模式增加 `--device <serial>`，多用户设备按需增加 `--user <id>`；默认用户为 `0`。按[执行器说明](bridge-executor/README.md)构建并部署项目自己的接口与 registry。媒体工具及其他平台能力均按配置选择。
 
-## 🧩 能力筛选
+CLI 命令为 `schema`、`serve`、`call` 与底层 `invoke`。analysis 校验统一使用上面的独立脚本。
 
-多数 app 暴露的能力远多于实际需要 MCP 化的数目。安装并完成首轮 `analyze` 后，可通过 **curate** 选定子集，用户的取舍优先级最高。
+## 开发
 
 ```bash
-# 1. 确定性地枚举候选（不写任何文件）
-mcp-pipeline curate <analysis.json> [--prd <prd.md>]
-
-# 2. /mcp-curate 提议子集，由用户拍板 → 写 selection.json
-# 3. scaffold 仅生成被选中的能力
-mcp-pipeline scaffold <analysis.json> --output <dir> --selection .mcp-pipeline/<app>/selection.json
+npm --prefix cli ci
+npm --prefix cli run build
+npm --prefix cli test
+npm --prefix e2e ci
+npm --prefix e2e run build
+npm --prefix e2e test
+node e2e/schema-injection-smoke.mjs --analysis examples/channel-analysis.json
+node scripts/check-manifests.js
 ```
 
-`selection.json = { "selected": ["<cap.id>", …] }`。可随时重选，generate 层会重新生成，而 `conf/config.yaml` 与 `rpc/config.json` 予以保留。
+CLI、校验器、registry 生成器与可视化共用 analysis 契约。完整流程见[分析 skill](skills/bridge-analyze/SKILL.md)，测试方式见[E2E 说明](e2e/README.md)。
 
-## 🔄 更新（已安装）
+## 许可证
 
-新版本发布时，刷新并重载：
-
-```text
-/plugin marketplace update im-mcp-marketplace        # 1. 刷新目录   （参数 = marketplace 名）
-/plugin update im-mcp-codeagent@im-mcp-marketplace   # 2. 拉取新版本（参数 = plugin@marketplace）
-/reload-plugins                                      # 3. 激活并重跑 build hook
-```
-
-> **必须**执行 `/reload-plugins`（或完整 `/exit` 后重启），在此之前旧版本仍生效。重载后首次会话会重跑 `SessionStart` build hook，为新版本编译 `cli/dist`。
-
-核对已安装版本：
-
-```text
-/plugin list
-```
-
-**兜底**，若 `/plugin update` 报 "already latest" 但代码未变（缓存过期或版本未 bump）：
-
-```text
-/plugin uninstall im-mcp-codeagent@im-mcp-marketplace
-/plugin marketplace update im-mcp-marketplace
-/plugin install im-mcp-codeagent@im-mcp-marketplace
-/reload-plugins
-```
-
-## 📡 真机前置条件
-
-生成的 server 经 adb / file 桥驱动车机。真实设备响应前需：
-
-1. **同事**构建并安装车端 `RpcEngine.ts`，并注册 `page://<app>/rpcagent` manifest page，二者皆产出于 `car-side/`。
-2. 对设备的 **`adb -host`** 可达性。仓库仅内置 Windows 版 adb（`tools/adb/adb.exe`）；**macOS/Linux 需自备 adb 并加入 PATH**（如 `brew install android-platform-tools`），或用 `BRIDGE_ADB` 指定路径。
-3. **ZebraAlfred** 保活（或等价手段），否则设备休眠，sendlink 会间歇性返回 exit `-1`。
-
-手头没有设备？本地验证始终可用：`mcp-pipeline verify --dir <server>`（安装 + tsc + 工具响应性 + 桥就绪性）。
-
-## 🧱 架构
-
-```
-im-mcp-codeagent/
-├── .claude-plugin/       Claude Code manifest + marketplace
-├── .codex-plugin/        Codex manifest（双端镜像）
-├── skills/               mcp-analyze · mcp-curate · mcp-generate · mcp-pipeline · mcp-test（方法论，无模型调用）
-├── commands/             /mcp-pipeline · /mcp-verify · /mcp-help
-├── hooks/                SessionStart → 多语言构建（run-hook.cmd → session-init.sh）
-├── cli/                  @im/mcp-pipeline-cli，确定性 Node
-│   ├── src/generators/   tool-schema · rpc-bridge · car-rpc-engine · …
-│   ├── assets/           car-rpc-engine.ts.template（内嵌、去硬编码）
-│   └── bin/mcp-pipeline.js
-├── framework/            @im/mcp-server-framework（共享 dispatch 核心：constructDbusCall / …）
-└── tools/adb/            内嵌 adb（自包含；见 LICENSE 注）
-```
-
-CLI 经 **skill-base 相对路径**（`${SKILL_DIR}/../../cli/bin/mcp-pipeline.js`）运行，自包含，不依赖 PATH / 全局链接。
-
-## 🛠️ 开发
-
-本节面向修改插件本身的维护者。普通运行 `/mcp-pipeline` 的用户无需这些命令。
-
-```bash
-cd framework && npm install
-cd ../cli     && npm install && npx tsc     # 构建 cli/dist（真实 CLI 加载 dist/，源码改动后须重建）
-cd ../cli     && npx vitest run             # 全套测试
-node scripts/check-manifests.js             # claude / codex manifest 漂移守卫
-```
-
-## 📜 许可证
-
-MIT，见 [LICENSE](LICENSE)。`tools/adb/` 内嵌 Google 的 adb，遵循其自身条款。
-
-<div align="center">
-<sub>代码智能体套件 BRIDGE，由同济大学 & IM 构建 · 面向智能座舱的可控代码生成</sub>
-</div>
-
-
-## 🆕 2026-08 新增: E2E 语音闭环 / bridge-analyze / 车端执行器
-
-本仓库在 0.1.8 插件之上新增落地产物（与插件 CLI 互补，CLI 不变）：
-
-| 新增 | 位置 | 说明 |
-|---|---|---|
-| **bridge-analyze skill** | `skills/bridge-analyze/` | 面向现 E2E serve 规格的重构版分析 skill（任意 app → analysis.json，自带校验器）。取代 mcp-analyze 用于现 E2E 流程，二者并存。 |
-| **E2E 端到端测试** | `e2e/` | 语音→车闭环：mcp-gateway + analysis(唯一真相源) + wrapper(动态IP自愈) + bridge-ui(App型能力) + registry 生成器。38 工具面全绿。 |
-| **车端执行器源码** | `bridge-executor/` | 五机制分派 + 手写 binder 契约。 |
-| **工具脚本/移交文档/本地ASR** | `tools/` `handoff/` `asr/` | car_invoke、车控57候选、移交说明、faster-whisper。 |
-
-E2E 快速开始（两种）：**一键**，打开可视化页 `http://localhost:8650/pipeline.html` 点「端到端测试」，网关/依赖/配置自动拉起（缺 LLM key 时页面询问，项目模式自动指向本次分析产物）；**手动**，先起 `asr/asr-whisper-server.py`，再 `cd e2e && npm install && QWEN_API_KEY=<key> npm run dashboard -- --config config-cockpit.yaml`，浏览器开 `http://localhost:3000/cockpit`。
-凭据与逆向素材不随仓库分发，见 `handoff/` 与 `reverse/README.md`。
-
-
-## 📮 问题反馈（各团队使用 BRIDGE 时）
-
-执行中遇到**真正值得讨论优化的问题**（机制缺陷/误导文档/通用能力缺口/改进构想），codeagent 可按需记录到 `<产物目录>/feedback/`（标准 JSON，自带环境上下文），按需使用、宁缺毋滥，已知限制与可自行绕过的小问题不必上报。如记录了反馈，收尾统一上报：
-
-```bash
-node skills/bridge-analyze/feedback.mjs submit
-```
-
-- **自动建 Issue**：设置环境变量 `BRIDGE_FEEDBACK_TOKEN`（GitHub 细粒度 PAT，仅授予本仓库 `Issues: Read and write`，申请后由 BRIDGE 团队分发/自行创建）→ 反馈自动进入 `MatCaviar/BRIDGE` Issues，带 `[feedback][类型][严重度]` 标签，团队统一处理；
-- **无凭证降级**：自动打包 `feedback-bundle-*.md`，把它发给 BRIDGE 团队即可；
-- 手动记录：`feedback.mjs new --type bug --severity major --title … --detail …`（详见 `--help`）。
+[MIT](LICENSE)。内置 Android 平台工具遵循自身许可证。

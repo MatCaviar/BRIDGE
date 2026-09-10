@@ -1,0 +1,6 @@
+{
+  "app":{"name":"example-device","framework":"android"},
+  "capabilities":[
+    {"id":"open_settings","domain":"device","object":"settings","action":"open","description":"Open the example application's settings activity.","params":[],"safetyLevel":"normal","status":"probe","scope":"core","sourceRef":"user-project/AndroidManifest.xml","mechanism":"intent","component":{"pkg":"org.example.device","cls":"org.example.device.SettingsActivity"}}
+  ]
+}

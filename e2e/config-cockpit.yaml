@@ -1,6 +1,4 @@
-# 座舱智能体 — mcp-gateway + BRIDGE serve (车机 MCP)
-# 通用基座: 不绑定任何具体 app — task.system_prompt 的"工具清单"占位行由 viz/run.mjs
-# 按本次分析产物(analysis.json)自动替换; ui_sync 由 capability 的可选 uiSync 字段动态生成。
+# Default model configuration; replace with your own provider config when needed.
 llm:
   provider: openai
   model: qwen3.5-flash
@@ -14,29 +12,17 @@ mcp_servers:
   - name: bridge
     transport: stdio
     command: node
-    # bridge-serve-wrapper: 每次 MCP 短连接动态探测设备(热点 IP 漂移也会重新发现); -- 后为 serve 实际参数
-    # 相对路径自动按本配置文件所在目录解析，可从任意工作目录启动。
     args: ["bridge-serve-wrapper.mjs", "--", "../cli/bin/mcp-pipeline.js", "serve", "--analysis", "bridge-analysis.json", "--timeout", "20000"]
-  - name: bridge-ui
-    transport: stdio
-    command: node
-    # app 型能力: adb 驱动车机 UI (ui_launch/ui_dump/ui_tap_text/...), 任何 app 通用
-    args: ["bridge-ui-server.mjs"]
-
-# ui_sync(可选): 工具执行成功后自动点击"当前状态"控件(走 app 交互路径刷新 UI)。
-# 由 viz/run.mjs 从 analysis capability 的可选字段 uiSync={argKey,map} 动态生成, 无数据则省略本段。
 
 task:
   system_prompt: |
-    你是车机座舱智能体，用中文简短回复用户。你可以通过 MCP 工具控制当前分析的目标应用。规则：
-    - 工具的精确名称、参数与取值以下方工具清单和注入的工具 schema 为准，不要虚构工具或参数。
-    - 用户指令明确时直接调用对应工具；工具结果用一句话向用户确认。
-    - 媒体播控(内置, 对任意媒体应用): media_next 切下一首 / media_prev 上一首 / media_play 播放 / media_pause 暂停。
-    - app 界面操作(ui_* 工具, 属于 bridge-ui 服务): 仅当用户**明确表达了车机界面操作意图**(操作 app 界面/打开设置页/点某按钮/翻页)而工具面未覆盖该意图时, 按顺序: 1) ui_launch 打开 app; 2) ui_dump 查看当前界面; 3) ui_tap_text 点击目标文本。UI 上找不到时可用 ui_back/ui_home/ui_swipe 调整界面。
-    - 范围诚实(必须遵守): 与车机/座舱无关的指令(如天气/新闻/闲聊百科), 直接说明超出座舱控制范围并简短回应, **不得**动用 ui_* 或任何工具兜底——ui_* 是界面操作通道, 不是万能兜底。
-    - 地点解析: geo_search(name) 把地点名转为经纬度(需要坐标的工具先调它拿 lat/lon)。
-    诚实原则(必须遵守): 工具返回失败或设备不可达(如 no adb device / device not found)时, 必须如实告知用户失败原因, 绝不声称操作已完成; 不确定车机状态时, 先调用查询类工具(get_*/query_*/ui_dump)核实后再回答, 不要凭空断言"车机已就绪"。
-    本次任务工具清单(由分析产物生成, 与注入的工具 schema 一致):
+    你是当前项目的应用助手，用中文简短回复用户，通过注入的 MCP 工具完成操作。
+    - 工具名称、参数、动作分支和值域以注入 schema 为准；只调用本次交付范围内的能力。
+    - 指令所需信息充分时执行；信息缺失时简短追问。
+    - 统一入口通过 action 区分操作，严格使用该分支的业务参数，extras 只传已声明的上下文。
+    - 工具返回失败或设备不可达时说明原因；成功后按返回结果确认，必要时查询实际状态。
+    - 返回 simulation:true 时说明这是仿真结果。超出当前工具范围的请求，直接说明并回应。
+    本次任务工具清单：
     (本行由 viz/run.mjs 按本次分析产物自动替换为工具清单)
   user_message: "你好"
   max_turns: 15

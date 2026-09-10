@@ -14,14 +14,18 @@
  *     -- ../cli/bin/mcp-pipeline.js serve --analysis bridge-analysis.json --timeout 20000
  */
 import { spawn } from "child_process";
+import { readFileSync } from 'node:fs';
 import { discoverAdbDevice, resolveAdbBinary } from "./device-discovery.mjs";
 
 const ADB = resolveAdbBinary();
 
 function startServe(baseArgs) {
-  const device = discoverAdbDevice(ADB);
+  const analysisIndex = baseArgs.indexOf('--analysis');
+  const analysis = analysisIndex >= 0 ? JSON.parse(readFileSync(baseArgs[analysisIndex + 1], 'utf8')) : null;
+  const direct = analysis?.transport?.type === 'http' || baseArgs.includes('--device');
+  const device = direct ? null : discoverAdbDevice(ADB);
   let serial;
-  if (!device) {
+  if (!direct && !device) {
     if (process.env.BRIDGE_STRICT_DEVICE === "1") {
       console.error("[bridge-serve-wrapper] no unique adb device; connect one or set BRIDGE_DEVICE");
       process.exit(1);
@@ -30,11 +34,12 @@ function startServe(baseArgs) {
     // 车端调用将返回设备不可达错误; 设 BRIDGE_STRICT_DEVICE=1 恢复严格失败模式。
     serial = "no-device";
     console.error("[bridge-serve-wrapper] no adb device found; spawning serve with --device no-device (schema/工具面可用, 车端调用将报不可达)");
-  } else {
+  } else if (device) {
     serial = device.serial;
   }
-  console.error(`[bridge-serve-wrapper] serve -> ${serial}`);
-  const serveProc = spawn(process.execPath, [...baseArgs, "--device", serial], { stdio: ["pipe", "pipe", "inherit"] });
+  console.error(`[bridge-serve-wrapper] serve -> ${direct ? analysis?.transport?.type ?? 'explicit device' : serial}`);
+  const serveProc = spawn(process.execPath, direct ? baseArgs : [...baseArgs, "--device", serial], { stdio: ["pipe", "pipe", "inherit"] });
+  serveProc.on('error', error => { console.error(error.message); process.exitCode = 1; });
   serveProc.stdin.on("error", () => {});
   serveProc.stdout.on("error", () => {});
   process.stdin.pipe(serveProc.stdin);

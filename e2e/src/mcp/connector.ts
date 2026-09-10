@@ -19,6 +19,15 @@ interface McpToolResultContent {
   readonly text?: string;
 }
 
+/** Keep business error envelopes intact while emitting a failed tool event. */
+export class ToolExecutionError extends Error {
+  constructor(readonly result: unknown, message: string) { super(message); this.name = 'ToolExecutionError'; }
+}
+export function toolErrorContent(error: unknown): string {
+  if (error instanceof ToolExecutionError) return typeof error.result === 'string' ? error.result : JSON.stringify(error.result);
+  return JSON.stringify({code:'GATEWAY_ERROR',message:error instanceof Error?error.message:String(error),data:{},extras:{}});
+}
+
 /**
  * Connector that bridges the gateway to one or more MCP servers.
  *
@@ -107,16 +116,13 @@ export class McpConnector {
 
       const result = await client.callTool({ name: toolName, arguments: args });
 
-      // Extract text content from the MCP result envelope
+      const structured = result.structuredContent;
+      // Prefer the native structured envelope, with text-only MCP compatibility.
       const content = result.content as
         | McpToolResultContent[]
         | undefined
         | null;
-      if (!content || !Array.isArray(content)) {
-        return null;
-      }
-
-      const textParts = content
+      const textParts = (Array.isArray(content) ? content : [])
         .filter((item) => item.type === "text" && typeof item.text === "string")
         .map((item) => item.text as string);
 
@@ -125,10 +131,10 @@ export class McpConnector {
       // 工具执行错误(isError)必须向上抛 — 否则上游 LLM 与 cockpit 状态面板会把
       // 错误文本误判为成功(如 "Error: no adb device" 被当作车机可达)
       if ((result as { isError?: boolean }).isError) {
-        throw new Error(text ?? `tool "${toolName}" failed`);
+        throw new ToolExecutionError(structured ?? text ?? {}, text ?? `tool "${toolName}" failed`);
       }
 
-      return text;
+      return structured ?? text;
     } finally {
       await this.closeClient(client, serverName);
     }

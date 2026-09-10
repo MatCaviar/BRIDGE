@@ -1,22 +1,33 @@
 {
   "name": "im-mcp-codeagent",
-  "version": "0.1.25",
-  "description": "Model Android and in-vehicle capabilities, export upstream Agent function schemas, expose the same contract as MCP tools, and invoke a thin real-device executor.",
-  "author": { "name": "Tongji University & IM" },
+  "version": "0.2.0",
+  "description": "Model application capabilities, export upstream Agent function schemas, and execute the same MCP contract through project-owned HTTP adapters or a generic Android executor.",
+  "author": {
+    "name": "Tongji University & IM"
+  },
   "homepage": "https://github.com/MatCaviar/BRIDGE",
   "repository": "https://github.com/MatCaviar/BRIDGE",
   "license": "MIT",
-  "keywords": ["android", "automotive", "mcp", "real-device", "codex", "adb"],
+  "keywords": [
+    "android",
+    "automotive",
+    "mcp",
+    "real-device",
+    "codex",
+    "adb"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "BRIDGE",
     "shortDescription": "Project app capabilities into Agent schemas and MCP tools.",
-    "longDescription": "BRIDGE turns source, APK, PRD, or device observations into a portable analysis contract, projects active capabilities into upstream Agent function schemas and a host-side MCP server, and invokes a thin privileged Android executor on real devices.",
+    "longDescription": "BRIDGE turns source, API documentation, APK, PRD, or runtime observations into a portable analysis contract. It exports individual functions or a unified channel, validates calls, and connects local applications, devices and simulations through project-owned HTTP adapters or a generic Android executor.",
     "developerName": "Tongji University & IM",
     "category": "Developer",
-    "capabilities": ["Write"],
+    "capabilities": [
+      "Write"
+    ],
     "defaultPrompt": [
-      "Analyze this Android app and produce a verified BRIDGE capability model.",
+      "Analyze this application and produce a BRIDGE capability model and callable tool schemas.",
       "Export this BRIDGE capability model as function schemas for an upstream Agent.",
       "Serve this BRIDGE analysis as MCP tools for a connected device.",
       "Report unverified or broken paths in this BRIDGE capability model."

@@ -2,7 +2,7 @@
 /**
  * bridge-ui — host-side MCP server for APP-UI driving capabilities (app-type abilities).
  *
- * The BRIDGE executor covers binder-contract tools (execmd, mapnav, carcontrol, media).
+ * The BRIDGE executor covers configured Binder, Intent and media operations.
  * Apps whose behavior is only reachable through their UI (taps/swipes) need a different path:
  * this server drives the car's UI over adb — `uiautomator dump` to discover widgets, `input tap`
  * to click. It is app-agnostic: any app, any screen, driven by text labels. The LLM uses it like
@@ -153,7 +153,7 @@ server.registerTool(
       activity: z.string().optional().describe("Activity 全名, 省略则解析主入口"),
       uri: z.string().optional().describe("deep link URI(优先于 activity), 如 myapp://section/page"),
       action: z.string().optional().describe("intent action(目标服务要求匹配 action 时传, 优先于 uri)"),
-      extras: z.record(z.string()).optional().describe("附加字符串 extras, 如 {\"ToCarControl\": \"{\\\"type\\\":\\\"air\\\"}\"}"),
+      extras: z.record(z.string()).optional().describe("目标 Activity 声明的字符串 extras，例如 {\"section\":\"settings\"}"),
       display: z.string().optional().describe("目标屏 DRIVER/PASSENGER/REAR(按 DisplayManager 名匹配, 失败回退当前屏)"),
     },
   },

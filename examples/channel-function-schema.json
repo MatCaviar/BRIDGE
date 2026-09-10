@@ -1,0 +1,264 @@
+{
+  "schemaVersion": "bridge.function-schema/v1",
+  "app": {
+    "name": "workspace-device-demo",
+    "framework": "http",
+    "demo": true
+  },
+  "functions": [
+    {
+      "name": "device_channelCall",
+      "arguments": {
+        "action": {
+          "type": "str",
+          "options": [
+            "adjust_level",
+            "set_power"
+          ],
+          "schema": {
+            "type": "string",
+            "enum": [
+              "adjust_level",
+              "set_power"
+            ]
+          }
+        },
+        "level": {
+          "type": "int",
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "extras": {
+          "type": "object",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "type": "string"
+              },
+              "voiceZone": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "isAppPlayTts": {
+                "type": "boolean"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "localAgent",
+                  "cloudAgent",
+                  "localHf",
+                  "cloudHf"
+                ]
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "callId": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "enabled": {
+          "type": "bool",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      },
+      "description": "Control the local demonstration device using the declared action and its parameters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "adjust_level",
+              "set_power"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "extras": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "type": "string"
+              },
+              "voiceZone": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "isAppPlayTts": {
+                "type": "boolean"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "localAgent",
+                  "cloudAgent",
+                  "localHf",
+                  "cloudHf"
+                ]
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "callId": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "adjust_level"
+                ]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "extras": {
+                "type": "object",
+                "properties": {
+                  "queryId": {
+                    "type": "string"
+                  },
+                  "voiceZone": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "isAppPlayTts": {
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "localAgent",
+                      "cloudAgent",
+                      "localHf",
+                      "cloudHf"
+                    ]
+                  },
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "callId": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "level"
+            ],
+            "description": "Adjust the local demonstration device level between 0 and 100."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "set_power"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "extras": {
+                "type": "object",
+                "properties": {
+                  "queryId": {
+                    "type": "string"
+                  },
+                  "voiceZone": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "isAppPlayTts": {
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "localAgent",
+                      "cloudAgent",
+                      "localHf",
+                      "cloudHf"
+                    ]
+                  },
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "callId": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "enabled"
+            ],
+            "description": "Switch the local demonstration device on or off."
+          }
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {},
+          "extras": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data",
+          "extras"
+        ],
+        "additionalProperties": true
+      }
+    }
+  ]
+}

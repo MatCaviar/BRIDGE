@@ -1,145 +1,160 @@
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { formatResponse } from "../utils/response.js";
+import { formatResponse, normalizeResponse } from "../utils/response.js";
 import type { AnalysisData, CapabilityDef, FieldShape, ParamDef } from "../types.js";
 import { CliAdb } from "../car/adb.js";
-import { invokeTool, type InvokeOptions } from "./invoke.js";
-import { annotationsForSafety, arrayItemShape, normalizedEnum, normalizedJsonType } from "./schema.js";
+import { invokeTool, type InvokeOptions, type InvokeResult } from "./invoke.js";
+import { activeCapabilities, arrayItemShape, normalizedEnum, normalizedJsonType, publicParams, toolDefinitions } from "./schema.js";
 
-/**
- * serve — run the BRIDGE MCP server on the host (stdio JSON-RPC). Exposes the target app's capabilities
- * (read from analysis.json) as MCP tools; each tool call routes through the `invoke` D-step → on-car
- * generic executor → the mechanism selected by the car-side registry. This lets an external LLM
- * drive the currently modeled car tools without embedding app-specific dispatch code in the server.
- *
- * Tool surface (name / description / inputSchema) is projected from analysis.json — the
- * contract produced by bridge-analyze. The car-side executor resolves the op id to a method via its
- * own registry, so this server stays app-agnostic.
- */
-
-export interface ServeOptions extends Pick<InvokeOptions, "device" | "user" | "pkg" | "activity" | "timeoutMs"> {
+export interface ServeOptions extends Pick<InvokeOptions, "user" | "pkg" | "activity" | "timeoutMs"> {
   readonly analysisPath: string;
-  /** Include tools marked status:"broken" (default false — they're known no-ops). */
+  readonly device?: string;
   readonly includeBroken?: boolean;
+  /** Trusted preconditions supplied by host code, never by model arguments. */
+  readonly preconditions?: Readonly<Record<string, boolean>>;
+  readonly preconditionsPath?: string;
 }
 
-/** Project a capability's params to a Zod raw shape (the SDK wraps it as an object inputSchema). */
 export function inputSchemaFor(cap: CapabilityDef): Record<string, z.ZodTypeAny> {
   return paramsToZodShape(cap.params ?? []);
 }
 
-function paramsToZodShape(ps: readonly ParamDef[]): Record<string, z.ZodTypeAny> {
-  const out: Record<string, z.ZodTypeAny> = {};
-  for (const p of ps) out[p.name] = p.optional ? fieldZod(p).optional() : fieldZod(p);
-  return out;
+function paramsToZodShape(ps: readonly ParamDef[], required?: readonly string[]): Record<string, z.ZodTypeAny> {
+  return Object.fromEntries(ps.map(p => {
+    let s = fieldZod(p);
+    if (p.defaultValue !== undefined) s = s.default(p.defaultValue);
+    else if (required !== undefined ? !required.includes(p.name) : p.optional) s = s.optional();
+    return [p.name, s];
+  }));
 }
 
-function fieldZod(p: ParamDef | FieldShape): z.ZodTypeAny {
+function fieldZod(p: FieldShape): z.ZodTypeAny {
   let s: z.ZodTypeAny;
   const t = normalizedJsonType(p.type);
   if (t === "array") {
     const item = arrayItemShape(p);
-    s = z.array(item ? fieldZod(item) : z.unknown());
-  } else if (p.enum && p.enum.length > 0) {
+    let arr = z.array(item ? fieldZod(item) : z.unknown());
+    if (p.minItems !== undefined) arr = arr.min(p.minItems);
+    if (p.maxItems !== undefined) arr = arr.max(p.maxItems);
+    s = arr;
+  } else if (t === "object") {
+    const obj = z.object(paramsToZodShape(p.properties ?? [], p.required));
+    s = p.additionalProperties ? obj.passthrough() : obj.strict();
+  } else if (t === "number" || t === "integer") {
+    let n = z.number().finite();
+    if (t === "integer") n = n.int();
+    if (p.minimum !== undefined) n = n.min(p.minimum);
+    if (p.maximum !== undefined) n = n.max(p.maximum);
+    s = n;
+  } else if (t === "boolean") s = z.boolean();
+  else {
+    let str = z.string();
+    if (p.minLength !== undefined) str = str.min(p.minLength);
+    if (p.maxLength !== undefined) str = str.max(p.maxLength);
+    if (p.pattern !== undefined) str = str.regex(new RegExp(p.pattern));
+    s = str;
+  }
+  if (p.enum?.length && t !== "array") {
     const values = normalizedEnum(p)!;
-    if (values.every((value): value is string => typeof value === "string")) {
-      s = z.enum(values as [string, ...string[]]);
-    } else {
-      const literals = values.map((value) => z.literal(value));
-      s = literals.length === 1
-        ? literals[0]!
-        : z.union(literals as [z.ZodLiteral<string | number | boolean>, z.ZodLiteral<string | number | boolean>, ...z.ZodLiteral<string | number | boolean>[]]);
-    }
-  } else {
-    if (t === "number" || t === "integer") {
-      let n = z.number();
-      if (t === "integer") n = n.int();
-      if ("minimum" in p && p.minimum !== undefined) n = n.min(p.minimum);
-      if ("maximum" in p && p.maximum !== undefined) n = n.max(p.maximum);
-      s = n;
-    } else if (t === "boolean") s = z.boolean();
-    else if (t === "object") s = z.object(paramsToZodShape(p.properties ?? []));
-    else s = z.string();
+    if (t === "string" && values.every(v => typeof v === "string") && p.pattern === undefined && p.minLength === undefined && p.maxLength === undefined) s = z.enum(values as [string,...string[]]);
+    else s = s.refine(v => values.includes(v), "Value is outside declared enum");
   }
   if (p.description) s = s.describe(p.description);
   return s;
 }
 
-/**
- * Build the McpServer with one tool per capability. Pure over the invoke boundary — pass a mock invoke
- * in tests; production passes the real `invokeTool` (which uses a CliAdb internally).
- */
-export function buildMcpServer(
-  analysis: AnalysisData,
-  opts: ServeOptions,
-  invoke: typeof invokeTool = invokeTool
-): McpServer {
-  const server = new McpServer({
-    name: `bridge-${analysis.app?.name ?? "car"}`,
-    version: "1.0.0",
-  });
-  const adb = new CliAdb(opts.device);
-  const caps = analysis.capabilities ?? [];
+async function httpInvoke(analysis: AnalysisData, cap: CapabilityDef, args: Record<string, unknown>): Promise<InvokeResult> {
+  const transport = analysis.transport!;
+  const headers: Record<string,string> = { "Content-Type": "application/json" };
+  for (const [header, env] of Object.entries(transport.headerEnv ?? {})) {
+    const value = process.env[env];
+    if (!value) throw new Error(`Missing transport environment variable: ${env}`);
+    headers[header] = value;
+  }
+  const name = analysis.toolContract?.mode === "channel" ? analysis.toolContract.name! : cap.dispatch?.operation ?? cap.id;
+  const started = Date.now();
+  const response = await fetch(transport.url, { method: "POST", headers, body: JSON.stringify({ name, arguments: args }), signal: AbortSignal.timeout(transport.timeoutMs ?? 8000), redirect: "error" });
+  const data = await response.json();
+  return { reqId: "http", ok: response.ok, data, error: response.ok ? undefined : `HTTP_${response.status}`, elapsedMs: Date.now() - started };
+}
 
-  const register = (id: string, description: string, inputSchema: Record<string, never>, safetyLevel: string) => {
-    server.registerTool(id, { description, inputSchema, annotations: annotationsForSafety(safetyLevel) }, async (input: Record<string, unknown>) => {
-      try {
-        const res = await invoke(adb, {
-          op: id, args: input, device: opts.device,
-          user: opts.user, pkg: opts.pkg, activity: opts.activity, timeoutMs: opts.timeoutMs,
-        });
-        return formatResponse(res.ok ? { ok: true, data: res.data } : { ok: false, error: res.error });
-      } catch (e) {
-        return formatResponse({ ok: false, error: e instanceof Error ? e.message : String(e) });
+/** tools/list and static export share exactly the same schemas. */
+export function buildMcpServer(analysis: AnalysisData, opts: ServeOptions, invoke: typeof invokeTool = invokeTool): Server {
+  const definitions = toolDefinitions(analysis, opts.includeBroken);
+  const caps = activeCapabilities(analysis, opts.includeBroken);
+  const server = new Server({ name: `bridge-${analysis.app.name}`, version: "0.2.0" }, { capabilities: { tools: {} } });
+  const contract = analysis.toolContract;
+  const channel = contract?.mode === "channel";
+  const actionField = contract?.actionField ?? "action";
+  const contextField = contract?.contextField ?? "extras";
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: definitions as any }));
+  server.setRequestHandler(CallToolRequestSchema, async request => {
+    try {
+      const name = request.params.name;
+      if (!definitions.some(t=>t.name === name)) throw new Error(`Unknown tool: ${name}`);
+      const input = request.params.arguments ?? {};
+      const cap = channel ? caps.find(c=>(c.publicAction ?? c.id) === input[actionField]) : caps.find(c=>c.id === name);
+      if (!cap && channel) throw new Error("Unknown or unavailable channel action");
+      const selected: CapabilityDef = cap ?? { id: name, domain: "media", object: "session", action: name, description: "Media control", safetyLevel: "normal", status: "probe", sourceRef: "builtin", params: [] };
+      if (selected.status === 'broken') throw new Error('Capability is unavailable');
+      const parsed = z.object(paramsToZodShape(publicParams(analysis, selected, channel))).strict().parse(input);
+      const context = { ...((parsed[contextField] ?? {}) as Record<string,unknown>) };
+      for (const [key, binding] of Object.entries(contract?.contextBindings ?? {})) {
+        const value = process.env[binding.env];
+        if (value === undefined) throw new Error(`Missing context environment variable: ${binding.env}`);
+        const field = contract!.context!.find(p => p.name === key)!;
+        if (normalizedJsonType(field.type) === 'string') context[key] = value;
+        else { try { context[key] = JSON.parse(value); } catch { throw new Error(`Context variable ${binding.env} must contain valid JSON for ${field.type}`); } }
       }
-    });
-  };
-
-  for (const cap of caps) {
-    if (!opts.includeBroken && cap.status === "broken") continue;
-    const description = cap.description?.trim() ||
-      `${cap.domain}/${cap.object}/${cap.action} (${cap.safetyLevel})`;
-    register(cap.id, description, inputSchemaFor(cap) as Record<string, never>, cap.safetyLevel);
-  }
-
-  // Bridge built-in media tools (切歌): bridge-level, work for ANY media app exposing a MediaSession.
-  // The executor handles `media_*` ops without a registry entry (mechanism=media).
-  for (const action of ["next", "prev", "play", "pause"] as const) {
-    register(`media_${action}`, `Control media playback: ${action} on the active session`, {}, "normal");
-  }
+      if (contract?.context?.length) parsed[contextField] = z.object(paramsToZodShape(contract.context)).strict().parse(context);
+      const requirements = [...(selected.preconditions ?? [])];
+      if (selected.safetyLevel.startsWith("p_gear")) requirements.push("park");
+      if (selected.safetyLevel.includes("confirm")) requirements.push("confirmed");
+      if (selected.safetyLevel.includes("network")) requirements.push("network");
+      let trusted = opts.preconditions;
+      if (requirements.length && opts.preconditionsPath) {
+        const snapshot = JSON.parse(readFileSync(opts.preconditionsPath, 'utf8'));
+        if (typeof snapshot.expiresAt !== 'number' || snapshot.expiresAt <= Date.now()) throw new Error('Precondition snapshot is missing or expired');
+        trusted = snapshot.values;
+      }
+      for (const requirement of requirements) if (trusted?.[requirement] !== true) throw new Error(`Precondition not satisfied: ${requirement}`);
+      const args: Record<string,unknown> = {};
+      for (const p of selected.params ?? []) if (parsed[p.name] !== undefined) args[selected.dispatch?.parameterMap?.[p.name] ?? p.name] = parsed[p.name];
+      if (contract?.context?.length && parsed[contextField] !== undefined) args[contextField] = parsed[contextField];
+      if (channel && analysis.transport) args[actionField] = selected.dispatch?.operation ?? selected.publicAction ?? selected.id;
+      const result = analysis.transport ? await httpInvoke(analysis, selected, args) : await invoke(new CliAdb(opts.device ?? "no-device"), {
+        op: selected.dispatch?.operation ?? selected.id, args, device: opts.device ?? "no-device", user: opts.user, pkg: opts.pkg, activity: opts.activity, timeoutMs: opts.timeoutMs,
+      });
+      const normalized = normalizeResponse(result, contract?.response);
+      return formatResponse(normalized.body, !normalized.ok);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return formatResponse({ code: error instanceof z.ZodError ? "INVALID_ARGUMENTS" : "BRIDGE_ERROR", message, data: {}, extras: {} }, true);
+    }
+  });
   return server;
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  CLI wrapper
-// ─────────────────────────────────────────────────────────────────
-
 export function parseServeArgs(argv: string[]): ServeOptions {
-  const o: { analysisPath?: string; device?: string; user?: number; pkg?: string; activity?: string; timeoutMs?: number; includeBroken?: boolean } = {};
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]!;
-    const next = () => argv[++i];
-    if (a === "--analysis") o.analysisPath = next()!;
-    else if (a === "--device") o.device = next()!;
-    else if (a === "--user") o.user = Number(next());
-    else if (a === "--package") o.pkg = next();
-    else if (a === "--activity") o.activity = next();
-    else if (a === "--timeout") o.timeoutMs = Number(next());
-    else if (a === "--include-broken") o.includeBroken = true;
+  const o: any = {};
+  const keys: Record<string,string> = { "--analysis":"analysisPath", "--device":"device", "--user":"user", "--package":"pkg", "--activity":"activity", "--timeout":"timeoutMs", "--preconditions-file":"preconditionsPath" };
+  for (let i=0;i<argv.length;i++) {
+    if (argv[i] === "--include-broken") o.includeBroken = true;
+    else if (keys[argv[i]]) { const key = keys[argv[i]]; const value = argv[++i]; if (!value) throw new Error("Missing argument value"); o[key] = ["user","timeoutMs"].includes(key) ? Number(value) : value; }
+    else throw new Error(`Unknown serve option: ${argv[i]}`);
   }
-  return o as ServeOptions;
+  if (o.user !== undefined && (!Number.isInteger(o.user) || o.user < 0)) throw new Error('Invalid Android user');
+  if (o.timeoutMs !== undefined && (!Number.isFinite(o.timeoutMs) || o.timeoutMs <= 0)) throw new Error('Invalid timeout');
+  return o;
 }
 
 export async function serveCommand(argv: string[]): Promise<void> {
   const opts = parseServeArgs(argv);
-  if (!opts.analysisPath || !opts.device) {
-    throw new Error("serve requires --analysis <analysis.json> --device <serial>  (optional: --user --package --activity --timeout --include-broken)");
-  }
-  const analysis = JSON.parse(readFileSync(opts.analysisPath, "utf-8")) as AnalysisData;
-  const server = buildMcpServer(analysis, opts);
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  // Runs until the LLM client closes stdio.
+  if (!opts.analysisPath) throw new Error("serve requires --analysis <analysis.json>");
+  const analysis = JSON.parse(readFileSync(opts.analysisPath,"utf8")) as AnalysisData;
+  if (!analysis.transport && !opts.device) throw new Error("ADB transport requires --device <serial>; HTTP transport is configured in analysis.json");
+  await buildMcpServer(analysis, opts).connect(new StdioServerTransport());
 }

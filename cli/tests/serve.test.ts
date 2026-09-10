@@ -7,7 +7,7 @@ import type { AnalysisData, CapabilityDef } from "../src/types.js";
 import type { InvokeOptions, InvokeResult } from "../src/commands/invoke.js";
 
 const cap = (over: Partial<CapabilityDef>): CapabilityDef => ({
-  id: "x", domain: "d", object: "o", action: "a", description: "Test capability", safetyLevel: "readonly", status: "verified", sourceRef: "ref", ...over,
+  id: "x", domain: "d", object: "o", action: "a", description: "Test capability", safetyLevel: "readonly", status: "verified", sourceRef: "ref", mechanism:"aidl", interfaceClass:"org.example.Device", servicePackage:"org.example.device", serviceClass:"DeviceService", methodName:"call", ...over,
 });
 
 describe("inputSchemaFor (zod shape)", () => {
@@ -21,7 +21,7 @@ describe("inputSchemaFor (zod shape)", () => {
   });
   it("enum → ZodEnum, array → ZodArray, object → nested ZodObject", () => {
     const s = inputSchemaFor(cap({ params: [
-      { name: "mode", type: "String", enum: ["NORMAL", "KSONG"] },
+      { name: "mode", type: "String", enum: ["NORMAL", "BOOST"] },
       { name: "list", type: "Array", items: { type: "String" } },
       { name: "point", type: "Object", properties: [{ name: "x", type: "Int" }] },
     ] }));
@@ -35,10 +35,12 @@ describe("inputSchemaFor (zod shape)", () => {
 });
 
 const analysis: AnalysisData = {
-  app: { name: "imaudio", framework: "android-kotlin" },
+  app: { name: "example-device", framework: "android-kotlin" },
+  builtins: ["media_next", "media_prev", "media_play", "media_pause"],
+  toolContract: {response: {successCodes: [1000]}},
   capabilities: [
-    cap({ id: "get_mic_vocal", safetyLevel: "readonly", description: "Get mic vocal level" }),
-    cap({ id: "set_fast_audio_mode", safetyLevel: "normal", params: [{ name: "mode", type: "Int" }] }),
+    cap({ id: "read_level", safetyLevel: "readonly", description: "Get mic vocal level" }),
+    cap({ id: "set_mode", safetyLevel: "normal", params: [{ name: "mode", type: "Int" }] }),
     cap({ id: "broken_one", status: "broken", safetyLevel: "readonly" }),
   ],
 } as unknown as AnalysisData;
@@ -46,7 +48,7 @@ const analysis: AnalysisData = {
 const serveOpts: ServeOptions = { analysisPath: "ignored", device: "SERIAL" };
 
 const mockInvoke = (_adb: unknown, opts: InvokeOptions): Promise<InvokeResult> => {
-  const data = opts.op === "get_mic_vocal" ? { code: 1000, data: 0 } : { code: 1000, data: true };
+  const data = opts.op === "read_level" ? { code: 1000, data: 0 } : { code: 1000, data: true };
   return Promise.resolve({ reqId: opts.reqId ?? "r", ok: true, data, elapsedMs: 1 });
 };
 
@@ -63,22 +65,22 @@ describe("buildMcpServer (MCP integration)", () => {
   it("lists capabilities as tools, skipping status:broken; projects inputSchema to JSON-Schema", async () => {
     const res = await withClient(mockInvoke, async (c) => c.listTools());
     const names = res.tools.map((t) => t.name);
-    expect(names).toContain("get_mic_vocal");
-    expect(names).toContain("set_fast_audio_mode");
+    expect(names).toContain("read_level");
+    expect(names).toContain("set_mode");
     expect(names).not.toContain("broken_one");
     // Bridge built-in media tools are always exposed (切歌, no analysis needed).
     for (const a of ["media_next", "media_prev", "media_play", "media_pause"]) expect(names).toContain(a);
 
-    const setter = res.tools.find((t) => t.name === "set_fast_audio_mode")!;
+    const setter = res.tools.find((t) => t.name === "set_mode")!;
     expect(setter.inputSchema.type).toBe("object");
     expect(setter.inputSchema.properties).toHaveProperty("mode");
     expect(setter.inputSchema.required).toEqual(["mode"]);
   });
 
   it("routes a tool call through invoke → formatResponse", async () => {
-    const res = await withClient(mockInvoke, async (c) => c.callTool({ name: "get_mic_vocal", arguments: {} }));
+    const res = await withClient(mockInvoke, async (c) => c.callTool({ name: "read_level", arguments: {} }));
     const text = (res.content as Array<{ type: string; text: string }>).find((b) => b.type === "text")!.text;
-    expect(JSON.parse(text)).toEqual({ ok: true, data: { code: 1000, data: 0 } });
+    expect(JSON.parse(text)).toEqual({ code: 1000, data: 0, message: "success", extras: {} });
   });
 
   it("forwards the tool's input args to invoke", async () => {
@@ -87,8 +89,8 @@ describe("buildMcpServer (MCP integration)", () => {
       seen = opts;
       return Promise.resolve({ reqId: "r", ok: true, data: "ok", elapsedMs: 1 });
     };
-    await withClient(capture as any, async (c) => c.callTool({ name: "set_fast_audio_mode", arguments: { mode: 2 } }));
-    expect(seen!.op).toBe("set_fast_audio_mode");
+    await withClient(capture as any, async (c) => c.callTool({ name: "set_mode", arguments: { mode: 2 } }));
+    expect(seen!.op).toBe("set_mode");
     expect(seen!.args).toEqual({ mode: 2 });
   });
 

@@ -1,12 +1,14 @@
 {
   "name": "im-mcp-marketplace",
-  "description": "BRIDGE 车载真机能力建模与 MCP 执行插件市场（本地/团队）",
-  "owner": { "name": "Tongji University & IM" },
+  "description": "BRIDGE 应用能力建模与 MCP 执行插件市场（本地/团队）",
+  "owner": {
+    "name": "Tongji University & IM"
+  },
   "plugins": [
     {
       "name": "im-mcp-codeagent",
-      "description": "Model Android and in-vehicle capabilities, export upstream Agent function schemas, expose the same contract as MCP tools, and invoke a thin real-device executor.",
-      "version": "0.1.25",
+      "description": "Model application capabilities, export upstream Agent function schemas, and execute the same MCP contract through project-owned HTTP adapters or a generic Android executor.",
+      "version": "0.2.0",
       "source": "./"
     }
   ]

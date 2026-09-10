@@ -1,212 +1,64 @@
 ---
 name: bridge-analyze
-description: '任意应用(源码/PRD/APK/行为观察) → 上游 Agent 可调能力全链路交付: analysis.json(唯一真相源) + function-schema.json(上游注入) + 可选 registry/app wire + 全程可视化 + 收尾自动端到端测试。host codeagent 自主分析一个应用并自证有效。当用户给一个 app(目录/文档/APK) 并要求产出能力清单/工具 schema/agent 可调接口时使用。'
+description: '分析应用源码、PRD、APK 或运行行为，产出上游智能体可调用的 BRIDGE 能力契约、function schema 与项目适配产物。用于将用户指定的应用接入 MCP，支持本地应用、Android 设备及仿真环境。'
 ---
 
-> 🌐 默认用中文与用户交互和输出；代码/命令/标识符/文件名保持英文。
+# bridge-analyze
 
-# bridge-analyze — 应用 → 上游 Agent 能力调用 Schema
+从用户指定的输入中识别可调用能力，生成 `analysis.json`，并由套件确定性导出 `function-schema.json`。先解析本 SKILL.md 的绝对目录，向上两级得到 `<套件根>`；所有套件命令使用该路径，不依赖用户的当前目录。
 
-本 skill 由 **host codeagent 自主执行**：输入任意应用的信息，产出一套可评审的交付 bundle —— `analysis.json`（唯一真相源）、`function-schema.json`（上游 Agent 函数定义）、可选 `registry.json`（车端执行器）/ app 侧 wire 配置，全程可视化跟随，并以自动端到端测试收尾（发现的问题自行优化）。**你(执行 agent)拥有完全自主性**——按下方契约产出，用标准验证链自证有效，不要等用户补充上下文。本文档是自包含的：所有判断标准、输出规格、验证手段都在这里。
+## 项目边界
 
-## 输入 → 输出契约
+产物放在用户指定目录或 `<项目>/.mcp-pipeline/<app>/`。应用专属接口、包名、源码、协议和测试素材保存在项目产物内，保持插件安装目录可复用。需要新增执行适配时，在项目内实现 HTTP adapter，或通过 `BRIDGE_ADAPTER_DIR` 提供 Android 接口源码。
 
-**输入**（用户给什么用什么，可组合）：
-- 应用源码目录（Android/Kotlin+AIDL、TypeScript、其他语言）
-- APK / 安装包：先 zip 解包 → manifest/资源/classes*.dex；dex 无现成工具时自写轻量解析（字符串表/方法名/signature 扫描即可覆盖大部分能力面）。此形态耗时显著长于源码（30-60 分钟量级），**期间更要持续上报阶段事件**让用户看到进展，不要憋到最后一次性补报
-- PRD / 接口文档 / manifest / AIDL 文件
-- APK / 安装包（可逆向：dex、manifest、resources）
-- 运行环境（adb 设备、日志、行为观察）
+读取实际源码、manifest、接口文档和服务注册点确定操作名、参数值域与协议。PRD 描述的能力若缺少可执行入口，记录为待实现项；不要编造 wire。APK 解析按用户范围进行，耗时阶段持续报告进度。
 
-**输出**（产物目录建议 `<输入目录>/.mcp-pipeline/<app>/`，与套件管线状态目录一致）：
-- `analysis.json` — 唯一真相源（**必须**）
-- `function-schema.json` — 上游 Agent 函数定义，由 CLI 从 analysis 确定性导出（**必须**）
-- `registry.json` — 车端执行器 registry，mechanism 字段投影（可选）
-- **app 侧 wire 配置**（如 `rpc/config.json`）— 目标 app 自带配置驱动执行端（如通用 RpcEngine 单入口页）时，按其配置格式把全部能力落成可执行 wire，随 analysis 同步演进（可选，适用即做）
-- 全程可视化跟随 + 收尾自动端到端测试 — 流程的组成部分，不是可选装饰（见对应章节）
-- Agent schema 投影：`capabilities[].id/description/params/status` → `function-schema.json` 的 `name/arguments/options/description`；同一语义也由 MCP `tools/list` 以标准 JSON Schema 注入上游 Agent
-- 车端执行：`capabilities[].mechanism` 等机制字段 → registry（一份产物双用；serve 忽略多余字段）
-- 先把本 `SKILL.md` 所在目录解析为绝对路径 `<skill目录>`，再把其 `../..` 解析为 `<套件根>`（仓库根：`cli/e2e/...`）。所有套件命令都使用这两个绝对路径，不依赖用户当前工作目录。CLI：`node "<套件根>/cli/bin/mcp-pipeline.js" <subcmd>`（`schema`/`serve`/`invoke`）；analysis 校验只使用 `<skill目录>/validate-analysis.mjs`。
+## 契约设计
 
-## 输出规格
+先阅读 [工具契约](../../docs/tool-contract.md)。选择与目标接口匹配的模式：
 
-```jsonc
-{
-  "app": {
-    "name": "app_x",              // serve: server 名 bridge-<name>
-    "framework": "android-kotlin",// 输入形态: android-kotlin | apk-reverse | prd-only | ts | ...
-    "deviceSources": ["vin"],     // 执行器注入的设备值(agent 不传) — 有则列, 无则省略
-    "nativeCallTool": false       // app 是否已实现平台标准 callTool 单入口
-  },
-  "capabilities": [
-    {
-      "id": "set_mode",           // snake_case 动词短语 = MCP 工具名
-      "domain": "app_x", "object": "mode", "action": "set",
-      "safetyLevel": "readonly",  // readonly(无副作用读) | normal(状态改变) | broken(已知不可用)
-      "status": "verified",       // verified(源码溯源或实测过) | probe(待实测) | broken(已知不可用, serve 跳过)
-      "sourceRef": "path/File.kt:methodName",   // 可溯源: 文件:方法(逆向则注明 "逆向 <date>:<依据>")
-      "description": "做什么 + 用户说X时用 + 参数语义/范围 + 前置条件",  // 见"description 规范"
-      "params": [
-        { "name": "mode", "type": "int", "optional": false,
-          "enum": ["0","1","2"],                 // 必须是 wire 真实值, 不是展示名
-          "description": "模式编号 0=X 1=Y 2=Z" }
-      ],
-      // ── 机制字段(车端执行消费; serve 忽略) ──
-      "mechanism": "execmd",       // 见"机制选择"
-      "methodName": "setMode",     // execmd: 命令名
-      "pattern": "dataclass",      // execmd: none|scalar|dataclass|envelope
-      "dataClass": "ModeParam",    // dataclass: 反序列化类型
-      "devicePaths": ["body.vin"], // envelope: 设备值注入点(须在 app.deviceSources)
-      "servicePackage": "com.x.app", "serviceClass": "com.x.app.Service", "bindAction": "com.x.app.ACTION_BIND",
-      "ccDomain": "002", "ccFunction": "func_id",  // carcontrol 专用
-      "uiSync": { "argKey": "mode", "map": { "1": "运动模式" } }  // 可选: e2e cockpit 在该工具成功后自动点击对应 UI 文案做状态同步(map=参数值→界面文本, 按目标 app 实际文案填写; 无此需求省略)
-    }
-  ]
-}
-```
+- `individual`：每项能力一个函数。
+- `channel`：一个公开工具，通过 action 区分能力；业务字段、extras 与返回码依据项目接口定义。
+- 上游语义名称与底层字段不同，使用 `publicAction`、`dispatch.operation` 和 `dispatch.parameterMap` 映射。
+- 上下文在 `toolContract.context` 定义。宿主注入值用 `contextBindings` 引用环境变量，禁止把凭据写入产物。
+- params 必须展开对象和数组的 `properties/items`；保留 enum、范围、单位、默认值与必填语义。description 说明操作用途、参数含义与依赖。
+- 每个能力注明 `sourceRef`、`scope` 和 `status`。core 是本项目能力；shared/platform 通过 `deliveryScopes` 显式加入。媒体 builtin 同样按需选择。
+- `probe` 表示待运行验证，`verified` 表示已通过目标环境调用及相关结果检查，`broken` 表示已知不可用。记录源码核对与实机验证的区别。
+- 前置条件通过可信宿主或设备状态供给，避免让模型自行声明满足。
 
-**机制选择**（从 app 对外形态判断；拿不准 → 选最可能 + status=probe）。注意**源码形态与实机部署版本可能不同**（如源码是多方法 AIDL、实机是 executeCommand 单入口）——以源码判断机制, 但涉及实机行为的 status 谨慎标 verified; 有实机时用 invoke 复核后升级。执行通道是**通用底座**：aidl(多方法AIDL反射)/execmd(单入口)/media/mapnav/carcontrol/intent + UI 驱动(ui_* 兜底, 任何 app 可操作)。**新形态的执行端适配由你(执行 codeagent)自行完成**（改执行器/写适配器），套件不自动生成执行代码——分析产物(schema)是唯一的自动交付物：
+HTTP 与 Android 示例分别见 [channel-analysis](../../examples/channel-analysis.json) 和 [android-analysis](../../examples/android-analysis.json)。选择 Android 时阅读 [执行器说明](../../bridge-executor/README.md)，确认签名、权限、事务码及部署用户符合目标环境。
 
-| mechanism | 适用形态 | 关键字段 |
-|---|---|---|
-| `aidl` | AIDL 多方法反射(每个能力一个方法, 参数为 JSON 字符串) | interfaceClass(接口全类名, 须编译进执行器 APK) / methodName/pattern/form |
-| `execmd` | AIDL 单入口 executeCommand 式(命令名+参数JSON) | methodName/pattern/dataClass/devicePaths |
-| `media` | 媒体会话控制(切歌/播放/暂停, 任意媒体 app) | 内置 media_* 工具, 不进 analysis |
-| `mapnav` | 地图/导航类 AI 接口(设目的地+起导航) | bindAction + 目的地参数(name/lat/lon) |
-| `carcontrol` | 车控服务 JSON functionId 契约 | ccDomain/ccFunction/bindAction |
-| `intent` | 任意 app 页面直达(Form 1 startActivity; 组件/deep link uri/extras 皆可, 多屏可选) | component{pkg,cls} 或 intentScreens{byDisplay}; extras[{key,value/fromArgs}]; defaultArgs |
-
-## 分析规范（判断标准 — 你的责任）
-
-### 枚举能力
-app 每个**对外可触发、可观测**的操作 = 一个 capability。漏一个 = 用户少一个工具；写错 sourceRef = 不可验证。宁可多列(probe)不可漏。
-
-### description 规范（LLM 选工具的第一信号）
-写**给上游 LLM 看**的，它不读源码：
-- 触发场景对号入座："用户说'X'/'要Y'时用"——同类能力之间必须能区分（调音量 vs 切歌 vs 导航不可互相模糊）
-- 枚举写 `值=含义`；范围写死（`0-31`）；单位注明
-- 前置/互斥/关联写清楚（"先开总开关"、"不要与 XX 混用"）
-**描述模糊 = LLM 幻觉选错工具**（弱描述下把 A 地名导成 B 地名的实测教训）。
-
-### params 规范
-- 类型/范围/optional 来自源码类型标注；设备注入值不进 params, 进 `app.deviceSources`。内置执行器当前解析 `vin`；新增设备源时须同步加入执行器 resolver
-- enum 必须 wire 真实值（从源码/枚举定义逐字抽取, 不是展示名/中文名）——agent 按 schema 原样传值
-- 对象/数组参数: 用 `properties`/`items` 展开内层形状(递归), 否则 agent 只能猜
-
-### status 三态（诚实是可靠性的前提）
-- `verified`: 源码核对过 wire 或**实测通过**
-- `probe`: 推断合理但未实测（服务是否 exported、action 是否匹配、值域是否有效）
-- `broken`: 已知 stub/no-op/不可达（serve 自动跳过, 不污染工具面）
-
-## 验证协议（必须执行 — 用标准链自证有效）
-
-产出后按序验证, 每条都要过:
-
-1. **schema 校验**: `node "<skill目录>/validate-analysis.mjs" <analysis.json>` — 零错误
-2. **Agent schema 导出**: `node "<套件根>/cli/bin/mcp-pipeline.js" schema --analysis <analysis.json> --out <function-schema.json> --format bridge`；数组参数必须导出为 `List[T]`，枚举必须落为 `options`
-3. **运行时注入**: `node "<套件根>/cli/bin/mcp-pipeline.js" serve --analysis <analysis.json> --device <任意串>` 启动无异常；MCP `tools/list` 返回完整 `inputSchema`；工具数 = 非 broken capabilities + 4(media_*)
-4. **端到端 schema 测试**: `node "<套件根>/e2e/schema-injection-smoke.mjs" --analysis <analysis.json> --report <schema-injection-report.json>` — BRIDGE 文件产物、MCP `tools/list`、OpenAI 与 Anthropic envelope 四层数量和字段一致
-5. **契约核对**(有源码时): 逐字核对机制字段与 AIDL 声明——methodName 与 `.aidl` 方法名逐字一致、interfaceClass 全类名、override 实现/manifest 服务类/bindAction 三源一致（无现成 `validate_aidl` 工具时自写等效核对脚本，输出逐项检查清单）
-6. **实测**(有设备/执行环境时): 对 `probe` 工具逐个 `invoke --op <id> --device <serial> [--args ...]`, 通过 → status 升 `verified`; 确定不可用 → `broken`; 结果写回 analysis
-7. **报告**: 向用户说明 — 工具数、function schema 注入结果、机制分布、哪些 verified/probe/broken、验证证据、端到端自动演示结果（sessionId/LLM 回复摘要）、下一步(部署/实测)
-
-无设备时: 1-4 必做, 6 留待有环境, status 保持 probe 并明确告知。
-
-## 通用陷阱（逆向/分析时必须验证, 不要假设）
-
-- **binder 契约以对端为准**: 事务码可能是**声明顺序**也可能是**字母序**(由编译工具决定) — 从对端(服务实现)的常量/onTransact 提取, 不要按惯例猜。接口方法、参数顺序、parcelable 字段顺序都须逐字对齐。
-- **bind 的隐性要求**: 服务可能要求 intent action 匹配 filter; onBind 可能读 extra(如 packageName)做白名单 — 空则静默拦截(bind 成功但永不回调)。bindAction/permission 从 manifest intent-filter 提取; extra 要求从对端 onBind 字节码确认。
-- **typed-parcelable 格式**: AIDL typed-parcelable 的 writeToParcel 带 size 前缀块 + 0/1 标记 — 手写复刻时缺一不可, 否则对端报 "Overflow in the size of parcelable"。
-- **执行成功 ≠ 界面可见**: 许多 app 的 UI 刷新依赖进程内事件, 跨进程调用收不到 — description 不要承诺界面反馈; 界面操作是另一层能力(ui_* 兜底)的职责。
-- **离线/云端依赖**: 车/设备无外网时云搜索/云服务不可用 — 依赖坐标/云查询的能力需兜底方案(内置字典/联网 geocode), description 注明。
-- **标识符对不上**: 服务的真实 functionId/命令名可能与 SDK 常量/文档不同 — 以服务端注册表(handler/路由)为准。
-
-## 流程（端到端总览 — 步骤可并行/重排，验证协议与收尾测试不可省）
-
-1. 摸清输入形态 → 定位对外能力面(manifest/AIDL/服务/页面/媒体/functionId 清单)
-2. 枚举能力 → 逐项定 id/params/status/mechanism
-3. 写 description(触发场景模板)
-4. 产出 analysis.json → CLI 确定性导出 function-schema.json（+ 可选 registry / app 侧 wire 配置）
-5. 执行验证协议(七步) → 修正
-6. 可视化跟随(--open 自动开浏览器, 会话上报实时点亮；见「可视化同步」)
-7. 收尾自动端到端测试(全量套件, 失败自行优化；见「收尾」)
-8. 报告(验证证据 + 测试通过率与覆盖统计 + 下一步)
-
-## 可视化同步（适配层，默认开启；不影响执行流程）
-
-执行各步时**顺带上报进度**（纯观察，不改变判断与产物）。地址 `BRIDGE_VIZ_URL` 默认 `http://127.0.0.1:8650`（置空该环境变量即关闭）；上报失败**静默忽略**，不阻断。
-
-**编码约定**：上报 POST 的 JSON body 必须是 UTF-8 字节——Windows 下不要用 GBK 控制台内联 `curl -d '<中文>'`；把 body 写入 UTF-8 临时文件后 `curl --data-binary @file`，或直接 `node -e "fetch(...)"`。后端虽有 GBK 兜底解码，源头规范才根治乱码。
-
-**开始执行 skill 时（必做）— 可视化跟本次输入走（通用，不绑定特定 app）**：
-
-1. 复制 `<套件根>/viz/` 整体到 `<输入目录>/viz/`（输入目录不可写时放产物目录）；
-2. 导出 `<产物目录>/function-schema.json` 后生成项目数据：`node <输入目录>/viz/gen.mjs <analysis.json> [<registry.json>]`（页面身份与数字由它驱动）；
-3. 后台启动查看器（**启动即默认在用户默认浏览器(Chrome/Edge/Safari 随系统)自动打开页面**——不要让用户手动打开，也不要自行拼 shell 打开命令；`--open` 现为默认行为，`--no-open` 才是关闭。**启动后必须确认**输出日志出现 `已请求在默认浏览器打开` 或 `页面: http://…` 且进程存活，失败则修正参数重试，不得静默跳过——可视化对用户是硬要求）：
-   **身份核对（必做）**：启动后 `GET <地址>/api/health`，确认返回的 `project.title/caps` 属于**本次输入**（data.js 已由第 2 步重生成为前提）。若对不上——你连到的是别的项目或残留实例（常见：旧测试环境的后端还占着端口）——立即换空闲端口自起，绝不能把会话事件发给错误后端。
-   `node "<输入目录>/viz/run.mjs" --open --suite-root "<套件根>" --project-root "<输入目录>" --analysis "<analysis.json>" --src "<输入目录>"`
-   （端口默认 8650，被占用加 `--port 87xx` 并把 `BRIDGE_VIZ_URL` 指向实际地址；查看器经 `--suite-root` 复用套件的 CLI/校验器，不要求用户项目自带 cli/skills/e2e。无图形环境打开会静默失败——此时把页面地址以**醒目文字**告知用户，并说明端到端视图在页面状态小球一键可达。）
-
-页面自带端到端测试入口（同源 `/e2e/cockpit`：网关与依赖由后端自动拉起，缺 LLM key 时页面会向用户询问）——skill 无需、也不应另行启动网关。
-
-**上报协议**（每步开始/结束都发，失败静默）：
-- 会话开始：`POST $BRIDGE_VIZ_URL/api/session/start` `{"name":"bridge-analyze · <app>"}`
-- 步事件：`POST $BRIDGE_VIZ_URL/api/session/event` `{"stage":"n1","status":"running|done|skipped","msg":"<该步真实结论>"}`
-- 节点：`n1` 输入形态 / `n2` 枚举能力 / `n3` 产出·校验 / `n4a` serve 投影 / `n4b` registry / `n5` 车端部署·自检 / `n6` 实测
-- `msg` 写**真实结论**（如 "枚举 29 caps，methodName 逐名核对 21/21"），不写台本；`skipped`（如车离线）注明原因。
-
-**收尾 · 自动端到端测试（验证协议通过后必做 — 全自动）**：
-
-1. **构造全量测试集**（由你按本次 analysis 现构 — 模拟真实座舱用户语音指令、以发现问题为导向；**不要写死成脚本或固定查询清单**）。覆盖维度：
-   - **工具**：全部非 broken capabilities 各 ≥1 条（套件大时按 domain/object 分层，目标仍是全覆盖）；
-   - **状态**：带 enum 的工具覆盖多个取值；readonly 与 normal 都测；
-   - **复合长难句**：多意图一句（如"调小声顺便切个安静的模式"）、口语指代/纠偏、长句噪音，各 domain ≥1 条；
-   - **近义区分**：语义相近的能力对互造易混指令，验证 description 区分度；
-   - **防幻觉**：≥2 条与能力面无关的指令，`expectTool` 填 `"none"` — 期望不调用任何工具，选中即判失败；
-   - query 必须自包含可执行：参数带具体值、不写占位符、不用会诱发"追问参数/先查再改"的歧义表述。query 首选取自各 capability `description` 的触发场景原句，其余按上述维度生成。
-2. **分批执行**：`POST $BRIDGE_VIZ_URL/api/e2e/test` body `{"tests":[{"message":"…","expectTool":"<id>|none|省略"},…]}`，**每批 ≤12 条**同步返回逐条判定；全量套件分多批顺序提交。测试开始即自动把用户页面切到 cockpit：逐轮自动跟随实时展示 + 进度条 ✓/✗（不写管线日志）。接口返回 `needsKey` 时页面向用户询问 key。
-3. **失败即自行优化**：✗（未选中期望工具 / none 却调用了工具）= 对应 description 区分度不足 → 改写 description → 重新导出 function-schema → `POST $BRIDGE_VIZ_URL/api/e2e/restart`（网关按新 analysis 重建配置）→ **仅重测失败项**（≤2 轮）。执行类错误（如设备不可达）属环境问题，如实呈现并说明，不算描述失败。
-4. **报告**：通过率、覆盖统计（工具数/状态数/复合句/近义陷阱/防幻觉）、发现的问题与修正记录。
-
-## 能力归属分级与交付说明（必做）
-
-每个 capability 补两个字段：
-- `scope`: `"core" | "platform" | "shared"` —— **core** = 本 app 自身设计目的的能力（交付物主体，追求全量）；**platform** = 借本 app 通道可达但归属平台/其他 app 域（如地图导航、车控座椅空调、系统页跳转）——默认不进本 app 交付，归各自 app 的 run，避免跨 run 重复与上游同义工具冲突；**shared** = 显式跨 app 共享（须在 note 说明 owner 判定）。判定启发：execmd/aidl 指向 app 自身服务 = core；mapnav/carcontrol/intent 指向其他包 = platform。
-- `deliverNote`: 一句话交付口径说明——写清 PRD 对应（如"PRD 3.2 全覆盖"/"PRD 未提及, 超出范围"）、覆盖情况（部分覆盖写缺口）、未决事项（wire 不确定/待实车复核/stub 等）。矩阵"交付说明"列直接呈现，不要写空话。
-- `deliverReport`: 详尽交付说明（交付页点击条目右侧面板呈现）——**条理清晰、语言自然**，建议 6 段结构：定位(对齐 app.corePurpose 的设计意图) / PRD 对应(条目号·全覆盖·部分缺口·超出) / 参数与取值依据(枚举·区间·默认值的溯源) / 执行链路与依赖(机制·服务·前置条件) / 验证状态与证据(verified 依据·wire 溯源·stub 判定) / 未决事项与建议。支持轻量排版(`## 小标题`、`- 列表`、`**加粗**`、空行分段)。缺失时页面自动以结构化摘要兜底并明确标注非人工撰写。
-
-顶层 `app.corePurpose`: 一句话本 app 设计目的（core 判定基准）。同义工具跨 run 冲突由套件层按"app 自有优先"裁决，单一 app 交付默认只含 core（platform 项用户可在交付页显式勾入）。
-
-## 交付对照与 scope
-
-**PRD 对照（输入含 PRD 时必产出）**：对照 PRD 功能条目与枚举出的能力，产出 `prd-coverage.json`（与 analysis.json 同目录）：
-```json
-{ "source": "<PRD 文件名>",
-  "items": [
-    { "id": "prd-3.2", "title": "音场切换", "capIds": ["set_sound_stage"], "status": "matched", "note": "8 种模式全覆盖" },
-    { "id": "prd-4.1", "title": "多音区独立控制", "capIds": [], "status": "prd-only", "note": "代码未见对应入口(逆向确认)" }
-  ] }
-```
-`status`: `matched`(已对应) / `partial`(部分覆盖, note 说明缺口) / `prd-only`(PRD 有代码无——note 必须写明核查结论)。代码有而 PRD 未提及的项由可视化页自动从 capabilities 差集计算，无需手写。此文件驱动交付页"PRD 对照"三栏。
-
-**交付 scope 调整（用户在交付页勾选后）**：交付页勾选会落盘 `scope-selection.json`（与 analysis 同目录，含 included/excluded/counts）。用户把页面生成的指令交给你后，按其执行：excluded 项从 `analysis.json` 的 `capabilities` 移除并记入顶层 `excludedFromTools`（理由：用户勾选排除）→ 重跑 `validate` → 重新导出 `function-schema.json` → 重新生成 `registry.json` → 重新生成 viz `data.js`（页面自动刷新）。
-
-## 问题反馈（可选接口 · 仅真正值得讨论的问题）
-
-套件提供反馈通道，**按需使用、宁缺毋滥**——只上报真正值得 BRIDGE 团队讨论或优化的实质问题（设计缺陷、反复踩到的坑、明确的能力缺口、有价值的改进构想）。**不要滥用**：
-
-- 不报：SKILL/文档已写明的已知限制、一次性的环境抖动、可自行绕过的小问题、执行中的正常重试；
-- 值得报：机制性缺陷、误导性文档、需要新增执行通道、多个 app 都会遇到的通用问题；
-- 原则：**高信噪比**——每条反馈都应是"讨论它有价值"的；没有值得报的，就一条都不报（这完全正常）。
-
-使用（`feedback.mjs` 零依赖，详见 `node feedback.mjs` 无参数输出）：
+## 生成与验证
 
 ```bash
-node <套件根>/skills/bridge-analyze/feedback.mjs new --type bug|gap|doc|env|idea   --severity blocker|major|minor --title "…" --detail "现象与期望" [--reproduce "…"] [--proposer "…"]
+node "<套件根>/skills/bridge-analyze/validate-analysis.mjs" "<产物>/analysis.json"
+node "<套件根>/cli/bin/mcp-pipeline.js" schema --analysis "<产物>/analysis.json" --format bridge --out "<产物>/function-schema.json"
+node "<套件根>/e2e/analysis-to-registry.mjs" "<产物>/analysis.json" "<产物>/registry.json"
 ```
 
-文件落 `<产物目录>/feedback/`。**如记录了反馈**，收尾时 `node feedback.mjs submit`：有 `BRIDGE_FEEDBACK_TOKEN` 自动建 `[feedback]` Issue（团队统一处理）；无凭证自动打包 bundle 转交；上报失败静默降级，永不影响主流程。
+需要 OpenAI/Anthropic 原生 envelope 时导出 `--format all`。MCP `tools/list` 与文件共用同一生成器。channel 模式工具数量为 1，动作数量由所选能力决定；individual 模式数量为所选能力加显式 builtins。
 
-## 产物去向
+运行 [schema 注入测试](../../e2e/schema-injection-smoke.mjs)核对文件、stdio tools/list 与 provider 转换；首次执行先按 E2E README 安装依赖并构建。在可用且已授权的环境中使用 `call --analysis ... --op ... --args ...` 验证业务操作，包括非法参数与失败返回。Android 另传 `--device` 和实际 `--user`。底层 `invoke` 用于排查传输，绕过公开 schema 的调用不能代替完整测试。
 
-`function-schema.json` 可直接交付上游 Agent；同一 schema 在 `serve` 时通过 MCP `tools/list` 动态注入，并由 E2E gateway 转换为 OpenAI/Anthropic function envelope（收尾自动测试验证的正是这条注入链）；机制字段经 `analysis-to-registry` 生成车端 registry；app 侧 wire 配置（如适用）部署到目标 app 执行端即可驱动真机。全部产物的配对关系在可视化页「配对矩阵」中呈现与核对。
+缺少设备、接口权限或模型凭据时，先完成本地契约验证，清楚报告尚待运行的部分。Intent/media 的 dispatched 结果只说明操作已提交，必要时继续读取状态或观察界面。
+
+## 可视化与端到端
+
+默认提供与本项目对应的可视化。复制 `<套件根>/viz/` 到产物目录；使用绝对路径生成数据并启动：
+
+```bash
+node "<产物>/viz/gen.mjs" "<产物>/analysis.json" "<产物>/registry.json"
+node "<产物>/viz/run.mjs" --suite-root "<套件根>" --project-root "<项目>" --analysis "<产物>/analysis.json" --src "<项目>" --open
+```
+
+端口默认 8650；冲突时选择其他端口。检查 `/api/health` 中项目身份与本次输入一致。无法打开浏览器时提供可访问地址。通过 `/api/session/start` 与 `/api/session/event` 上报真实进度：n1 输入、n2 能力、n3 校验、n4a schema、n4b registry、n5 部署、n6 运行。JSON 使用 UTF-8；观察服务失败不阻断产物生成。
+
+页面 E2E 入口可拉起模型网关。按实际能力构造测试：典型操作、枚举边界、多意图、近义指令、范围外请求；每批至多 12 条。channel 测试除了工具名，还检查 action 和业务参数。工具选择与执行结果分开判断；设备失败不能通过改写 description 消除。只重测受修改影响的用例。
+
+补充 PRD 对照与交付说明时，使用当前项目实际材料。用户调整 scope 后，同步重新生成 schema、registry 与可视化。
+
+## 交付
+
+说明产物位置、选中能力和工具数量、调用方式、测试结果与待部署项。对真实设备执行仅报告观察到的结果，仿真结果明确标注。
+
+可选反馈保存在项目内；如需使用 `feedback.mjs submit` 向远端创建 Issue，先取得用户对该次外部提交的授权。

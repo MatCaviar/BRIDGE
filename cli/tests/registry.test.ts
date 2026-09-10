@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = join(import.meta.dirname, "../..");
-const ANALYSIS = join(ROOT, "e2e/bridge-analysis.json");
+const ANALYSIS = join(ROOT, "examples/android-analysis.json");
 const GENERATOR = join(ROOT, "e2e/analysis-to-registry.mjs");
 
 describe("analysis-to-registry", () => {
