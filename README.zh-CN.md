@@ -265,6 +265,7 @@ E2E 快速开始（两种）：**一键**，打开可视化页 `http://localhost
 node skills/bridge-analyze/feedback.mjs submit
 ```
 
-- **自动建 Issue**：设置环境变量 `BRIDGE_FEEDBACK_TOKEN`（GitHub 细粒度 PAT，仅授予本仓库 `Issues: Read and write`，申请后由 BRIDGE 团队分发/自行创建）→ 反馈自动进入 `MatCaviar/BRIDGE` Issues，带 `[feedback][类型][严重度]` 标签，团队统一处理；
-- **无凭证降级**：自动打包 `feedback-bundle-*.md`，把它发给 BRIDGE 团队即可；
+- **自动建 Issue（GitHub 优先）**：设置环境变量 `BRIDGE_FEEDBACK_TOKEN`（GitHub 细粒度 PAT，仅授予本仓库 `Issues: Read and write`，申请后由 BRIDGE 团队分发/自行创建）→ 反馈自动进入 `MatCaviar/BRIDGE` Issues，带 `[feedback][类型][严重度]` 标签，团队统一处理；
+- **内网 GitLab 兜底**：GitHub 未配置或上报失败时，设置环境变量 `BRIDGE_FEEDBACK_GITLAB_TOKEN`（内网 GitLab PAT，需 `api` scope，对 `im-mcp/bridge` 有 Reporter 及以上权限）→ 自动转投 `gitlab-ha.immotors.com/im-mcp/bridge` Issues（同样带标签，本地记录会标注 `channel: gitlab`）；
+- **无凭证降级**：两个凭证均不可用时，自动打包 `feedback-bundle-*.md`，把它发给 BRIDGE 团队即可；
 - 手动记录：`feedback.mjs new --type bug --severity major --title … --detail …`（详见 `--help`）。

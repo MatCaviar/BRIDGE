@@ -61,4 +61,4 @@ node "<产物>/viz/run.mjs" --suite-root "<套件根>" --project-root "<项目>"
 
 说明产物位置、选中能力和工具数量、调用方式、测试结果与待部署项。对真实设备执行仅报告观察到的结果，仿真结果明确标注。
 
-可选反馈保存在项目内；如需使用 `feedback.mjs submit` 向远端创建 Issue，先取得用户对该次外部提交的授权。
+可选反馈保存在项目内；如需使用 `feedback.mjs submit` 向远端创建 Issue（GitHub 优先，失败自动兜底内网 GitLab），先取得用户对该次外部提交的授权。

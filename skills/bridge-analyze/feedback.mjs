@@ -9,8 +9,10 @@
  *   node feedback.mjs submit [--dir <目录>] [--id fb-...]     # 默认提交全部未上报的
  *
  * 文件: <dir>/issue-<id>.json  (dir 默认 ./feedback, 可用 BRIDGE_FEEDBACK_DIR 覆盖)
- * 上报: 有 BRIDGE_FEEDBACK_TOKEN(细粒度 PAT, 仅 issues:write) → 自动建 GitHub Issue 并回写 issueUrl;
- *       无凭证/失败 → 生成 feedback-bundle-<时间戳>.md 打包全部未上报项, 打印转交指引(降级永不阻断)。
+ * 上报链: 1) BRIDGE_FEEDBACK_TOKEN(GitHub 细粒度 PAT, 仅 issues:write) → 建 GitHub Issue;
+ *         2) GitHub 不成功(未配置/请求失败) → 兜底 BRIDGE_FEEDBACK_GITLAB_TOKEN(内网 GitLab PAT, 需 api scope)
+ *            → gitlab-ha.immotors.com im-mcp/bridge 建 Issue;
+ *         3) 全部不成功 → 生成 feedback-bundle-<时间戳>.md 打包全部未上报项, 打印转交指引(降级永不阻断)。
  * 原则: 只报真实遇到的问题; reproduce 附真实命令与输出摘录; 上报失败静默降级, 不影响主流程。
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
@@ -18,6 +20,8 @@ import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const REPO = "MatCaviar/BRIDGE";
+const GITLAB_HOST = "gitlab-ha.immotors.com";
+const GITLAB_PROJECT = "im-mcp/bridge";
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const SUITE_ROOT = resolve(HERE, "..", "..");
 const TYPES = ["bug", "gap", "doc", "env", "idea"];
@@ -101,44 +105,80 @@ ${it.evidence && it.evidence.length ? `\n## 证据\n${it.evidence.map((e) => `- 
 `).join("\n---\n\n");
 }
 
+async function postGitHub(it, token) {
+  const r = await fetch(`https://api.github.com/repos/${REPO}/issues`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "content-type": "application/json" },
+    body: JSON.stringify({
+      title: `[feedback][${it.type}][${it.severity}] ${it.title}`,
+      body: renderMd([it]),
+      labels: ["feedback", `type-${it.type}`, `sev-${it.severity}`],
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.html_url) return { url: j.html_url, channel: "github" };
+  throw new Error(j.message || `HTTP ${r.status}`);
+}
+
+async function postGitLab(it, token) {
+  const r = await fetch(`https://${GITLAB_HOST}/api/v4/projects/${encodeURIComponent(GITLAB_PROJECT)}/issues`, {
+    method: "POST",
+    headers: { "PRIVATE-TOKEN": token, "content-type": "application/json" },
+    body: JSON.stringify({
+      title: `[feedback][${it.type}][${it.severity}] ${it.title}`,
+      description: renderMd([it]),
+      labels: ["feedback", `type-${it.type}`, `sev-${it.severity}`].join(","),
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.web_url) return { url: j.web_url, channel: "gitlab" };
+  throw new Error(j.message || `HTTP ${r.status}`);
+}
+
+function markSubmitted(d, it, done) {
+  it.submitted = true; it.issueUrl = done.url; it.channel = done.channel;
+  writeFileSync(join(d, `issue-${it.id}.json`), JSON.stringify(it, null, 1), "utf-8");
+  console.log(`✓ ${it.id} → ${done.url} [${done.channel}]`);
+}
+
+// 降级: 打包 + 转交指引(绝不阻断)
+function degrade(items) {
+  const d = dir();
+  const bundle = join(d, `feedback-bundle-${now()}.md`);
+  writeFileSync(bundle,
+    `# BRIDGE 使用反馈包 · ${new Date().toISOString()}\n\n共 ${items.length} 条未上报反馈。请把本文件发给 BRIDGE 团队(或配置 BRIDGE_FEEDBACK_TOKEN / BRIDGE_FEEDBACK_GITLAB_TOKEN 后重跑 submit 自动建 Issue)。\n\n` +
+    "---\n\n" + renderMd(items), "utf-8");
+  console.log(`GitHub / GitLab 均不可用 —— 已打包待转交: ${bundle}`);
+  console.log(`请将此文件转交 BRIDGE 团队统一处理(共 ${items.length} 条)。`);
+}
+
 async function cmdSubmit() {
   const only = arg("--id");
   let items = loadIssues().filter((x) => !x.submitted);
   if (only) items = items.filter((x) => x.id === only);
   if (!items.length) { console.log("没有待上报的反馈"); return; }
-  const token = process.env.BRIDGE_FEEDBACK_TOKEN;
+  const ghToken = process.env.BRIDGE_FEEDBACK_TOKEN;
+  const glToken = process.env.BRIDGE_FEEDBACK_GITLAB_TOKEN;
   const d = dir();
-  if (token) {
-    let ok = 0, fail = 0;
-    for (const it of items) {
-      try {
-        const r = await fetch(`https://api.github.com/repos/${REPO}/issues`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "content-type": "application/json" },
-          body: JSON.stringify({
-            title: `[feedback][${it.type}][${it.severity}] ${it.title}`,
-            body: renderMd([it]),
-            labels: ["feedback", `type-${it.type}`, `sev-${it.severity}`],
-          }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (r.ok && j.html_url) {
-          it.submitted = true; it.issueUrl = j.html_url; ok++;
-          writeFileSync(join(d, `issue-${it.id}.json`), JSON.stringify(it, null, 1), "utf-8");
-          console.log(`✓ ${it.id} → ${it.issueUrl}`);
-        } else { fail++; console.error(`✗ ${it.id}: ${j.message || r.status}`); }
-      } catch (e) { fail++; console.error(`✗ ${it.id}: ${e.message}`); }
+  if (!ghToken && !glToken) { degrade(items); return; }
+  let ok = 0;
+  const failed = [];
+  for (const it of items) {
+    let done = null;
+    if (ghToken) {
+      try { done = await postGitHub(it, ghToken); }
+      catch (e) { console.error(`✗ github ${it.id}: ${e.message}`); }
     }
-    console.log(`上报完成: 成功 ${ok} / 失败 ${fail}${fail ? "(失败项保留本地, 稍后重试)" : ""}`);
-    return;
+    // GitHub 不成功(未配置/请求失败) → GitLab 兜底
+    if (!done && glToken) {
+      try { done = await postGitLab(it, glToken); }
+      catch (e) { console.error(`✗ gitlab ${it.id}: ${e.message}`); }
+    }
+    if (done) { markSubmitted(d, it, done); ok++; }
+    else failed.push(it);
   }
-  // 降级: 打包 + 转交指引(绝不阻断)
-  const bundle = join(d, `feedback-bundle-${now()}.md`);
-  writeFileSync(bundle,
-    `# BRIDGE 使用反馈包 · ${new Date().toISOString()}\n\n共 ${items.length} 条未上报反馈。请把本文件发给 BRIDGE 团队(或配置 BRIDGE_FEEDBACK_TOKEN 后重跑 submit 自动建 Issue)。\n\n` +
-    "---\n\n" + renderMd(items), "utf-8");
-  console.log(`未配置 BRIDGE_FEEDBACK_TOKEN —— 已打包待转交: ${bundle}`);
-  console.log(`请将此文件转交 BRIDGE 团队统一处理(共 ${items.length} 条)。`);
+  console.log(`上报完成: 成功 ${ok} / 失败 ${failed.length}${failed.length ? "(失败项保留本地, 稍后重试)" : ""}`);
+  if (failed.length) degrade(failed);
 }
 
 const cmd = process.argv[2];
@@ -149,6 +189,6 @@ else {
   console.log(`BRIDGE 反馈通道
   new     记录一条反馈(--type bug|gap|doc|env|idea --severity blocker|major|minor --title --detail [--reproduce --evidence a,b --proposer])
   list    列出本地反馈
-  submit  上报(需 BRIDGE_FEEDBACK_TOKEN; 无则打包降级)  [--id fb-...] 指定单条
+  submit  上报(GitHub 需 BRIDGE_FEEDBACK_TOKEN; 不成功兜底 GitLab 需 BRIDGE_FEEDBACK_GITLAB_TOKEN; 均不可用则打包降级)  [--id fb-...] 指定单条
 目录: --dir 或 BRIDGE_FEEDBACK_DIR, 默认 ./feedback`);
 }
