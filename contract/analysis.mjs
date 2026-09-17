@@ -50,6 +50,9 @@ export function validateAnalysis(a) {
   const contextField = contract.contextField ?? 'extras';
   fieldName(actionField, 'toolContract.actionField'); fieldName(contextField, 'toolContract.contextField');
   if (actionField === contextField) fail('toolContract', 'action and context field names must differ');
+  if (contract.version !== undefined && (typeof contract.version !== 'string' || !contract.version.trim())) fail('toolContract.version', 'expected nonempty string');
+  if (contract.timeoutMs !== undefined && (!Number.isFinite(contract.timeoutMs) || contract.timeoutMs <= 0)) fail('toolContract.timeoutMs', 'positive timeout required');
+  if (contract.clientPackage !== undefined && (typeof contract.clientPackage !== 'string' || !contract.clientPackage.trim())) fail('toolContract.clientPackage', 'expected nonempty string');
   if (contract.context !== undefined) fields(contract.context, 'toolContract.context');
   for (const [key,binding] of Object.entries(contract.contextBindings ?? {})) {
     if (!contract.context?.some(p => p.name === key)) fail('contextBindings', `${key} is undeclared`);
@@ -60,6 +63,24 @@ export function validateAnalysis(a) {
     if (!plain(response)) fail('toolContract.response', 'expected object');
     else {
       if (response.successCodes !== undefined && (!Array.isArray(response.successCodes) || !response.successCodes.length || response.successCodes.some(v => !['number','string'].includes(typeof v)))) fail('response.successCodes', 'nonempty string/number array required');
+      if (response.errorCodes !== undefined) {
+        if (!Array.isArray(response.errorCodes) || !response.errorCodes.length) fail('response.errorCodes', 'nonempty array required');
+        else {
+          const codes = new Set();
+          for (const [i, e] of response.errorCodes.entries()) {
+            const at = `response.errorCodes[${i}]`;
+            if (!plain(e)) { fail(at, 'expected object'); continue; }
+            if (!['string','number'].includes(typeof e.code) || e.code === '') fail(at, 'code must be a nonempty string/number');
+            else {
+              if (codes.has(String(e.code))) fail(at, 'duplicate error code');
+              codes.add(String(e.code));
+              if ((response.successCodes ?? []).some(s => String(s) === String(e.code))) fail(at, 'collides with successCodes');
+            }
+            if (typeof e.message !== 'string' || !e.message.trim()) fail(at, 'message required');
+            if (e.description !== undefined && (typeof e.description !== 'string' || !e.description.trim())) fail(at, 'description must be a nonempty string');
+          }
+        }
+      }
       for (const key of ['codeField','messageField','dataField','extrasField']) if (response[key] !== undefined) fieldName(response[key], `response.${key}`);
       if (response.requireCode !== undefined && typeof response.requireCode !== 'boolean') fail('response.requireCode', 'expected boolean');
     }
@@ -73,6 +94,8 @@ export function validateAnalysis(a) {
     if (!['verified','probe','broken'].includes(c.status)) fail(at,'status must be verified/probe/broken');
     for (const key of ['description','sourceRef','safetyLevel']) if (typeof c[key] !== 'string' || !c[key].trim()) fail(at, `${key} required`);
     if (c.scope !== undefined && !scopes.includes(c.scope)) fail(at,'invalid scope');
+    if (c.utterances !== undefined && (!Array.isArray(c.utterances) || !c.utterances.length || c.utterances.some(u => typeof u !== 'string' || !u.trim()))) fail(at, 'utterances must be a nonempty array of nonempty strings');
+    else if (c.utterances?.length && new Set(c.utterances).size !== c.utterances.length) fail(at, 'duplicate utterance');
     fields(c.params ?? [], `${at}.params`);
     const action = c.publicAction ?? c.id;
     if (typeof action !== 'string' || !action) fail(at, 'publicAction must be nonempty string');
@@ -114,7 +137,9 @@ export function validateAnalysis(a) {
   if (a.builtins?.some(n=>ids.has(n))) fail('builtins','builtin duplicates a capability id');
   if (contract.mode === 'channel' && a.builtins?.length) fail('builtins','declare media capabilities explicitly for channel mode');
   if (a.deliveryScopes !== undefined && (!Array.isArray(a.deliveryScopes) || !a.deliveryScopes.length || a.deliveryScopes.some(s=>!scopes.includes(s)))) fail('deliveryScopes','invalid scope selection');
-  if (contract.mode === 'channel' && !caps.some(c=>c?.status !== 'broken' && (a.deliveryScopes ?? ['core']).includes(c?.scope ?? 'core'))) fail('toolContract','channel requires a selected capability');
+  // Channel needs something to expose; PRD-only drafts (all capabilities broken) stay valid here —
+  // they export only with --include-broken for review, and serve/call still block broken execution.
+  if (contract.mode === 'channel' && !caps.some(c => (a.deliveryScopes ?? ['core']).includes(c?.scope ?? 'core'))) fail('toolContract','channel requires a selected capability');
   if (a.transport !== undefined) {
     if (a.builtins?.length) fail('builtins','HTTP adapters must declare their capabilities explicitly');
     if (a.transport.type !== 'http') fail('transport','unsupported transport');

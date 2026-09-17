@@ -89,4 +89,54 @@ describe('generic contract projections and execution',()=>{
     const a:any=androidChannel();a.capabilities.push({id:'future_operation',description:'Planned integration',params:[],sourceRef:'spec',safetyLevel:'normal',status:'broken'});
     expect(validateAnalysis(a)).toEqual([]);expect((mcpToolArtifact(a) as any).tools[0].inputSchema.oneOf).toHaveLength(2);
   });
+  it('validates the error-code table and channel metadata in the contract',()=>{
+    const a:any=channel();
+    a.toolContract.version='1.0';a.toolContract.timeoutMs=5000;a.toolContract.clientPackage='com.immotors.imaudio';
+    a.toolContract.response.errorCodes=[{code:1400,message:'音量值不在范围内'},{code:1401,message:'非法值',description:'outside enum'}];
+    expect(validateAnalysis(a)).toEqual([]);
+    for(const mutate of [(a:any)=>a.toolContract.response.errorCodes.push({code:1400,message:'duplicate'}),
+      (a:any)=>a.toolContract.response.errorCodes.push({code:0,message:'collides with success'}),
+      (a:any)=>a.toolContract.response.errorCodes.push({code:1500}),
+      (a:any)=>a.toolContract.timeoutMs=-1,
+      (a:any)=>a.toolContract.clientPackage='']){
+      const b=channel() as any;b.toolContract.version='1.0';b.toolContract.response.errorCodes=[{code:1400,message:'x'}];mutate(b);
+      expect(validateAnalysis(b).length).toBeGreaterThan(0);
+    }
+  });
+  it('renders error codes and channel metadata into exported tool descriptions across formats',async()=>{
+    const a:AnalysisData=channel();
+    (a.toolContract!.response as any).errorCodes=[{code:1400,message:'value out of range'},{code:1401,message:'illegal value'}];
+    a.toolContract!.version='1.0';a.toolContract!.timeoutMs=5000;a.toolContract!.clientPackage='com.immotors.imaudio';
+    const expected=['Response codes: 0=success; 1400=value out of range; 1401=illegal value.','Channel: contract v1.0; timeout 5000ms; client com.immotors.imaudio.'];
+    await session(a,async c=>{
+      const described=(await c.listTools()).tools[0].description as string;
+      for(const line of expected)expect(described).toContain(line);
+    });
+    const mcp=(mcpToolArtifact(a) as any).tools;const bundle:any=schemaArtifact(a,'all');
+    for(const described of [mcp[0].description,bundle.openai[0].function.description,bundle.anthropic[0].description,bundle.bridge.functions[0].description])
+      for(const line of expected)expect(described).toContain(line);
+    expect(mcp[0].inputSchema).toEqual((mcpToolArtifact({...a,toolContract:{...a.toolContract,version:undefined,timeoutMs:undefined,clientPackage:undefined,response:{successCodes:[0],requireCode:true}}}) as any).tools[0].inputSchema);
+  });
+  it('accepts PRD-sourced utterances and renders them for action selection',()=>{
+    const a:any=channel();
+    a.capabilities[0].utterances=['帮我把设备档位调到7','可以调到第3挡吗'];
+    expect(validateAnalysis(a)).toEqual([]);
+    a.capabilities[0].utterances=['重复','重复'];
+    expect(validateAnalysis(a).join()).toContain('duplicate');
+    const b:any=channel();b.capabilities[0].utterances=['ok',42];
+    expect(validateAnalysis(b).join()).toContain('utterances');
+    const withU=(u:string[])=>{const x:any=channel();x.capabilities[0].utterances=u;return x;};
+    expect((mcpToolArtifact(withU(['帮我把设备档位调到7'])) as any).tools[0].inputSchema.oneOf[0].description).toContain('Example utterances: "帮我把设备档位调到7"');
+    const ind:any=withU(['u-1']);ind.toolContract={mode:'individual'};
+    expect((mcpToolArtifact(ind) as any).tools[0].description).toContain('Example utterances: "u-1"');
+    expect((schemaArtifact(ind,'bridge') as any).functions[0].description).toContain('Example utterances: "u-1"');
+  });
+  it('lets a PRD-only channel draft validate and export with --include-broken',()=>{
+    const a:any=channel();delete a.transport;
+    for(const c of a.capabilities){c.status='broken';delete c.dispatch;}
+    expect(validateAnalysis(a)).toEqual([]);
+    expect(()=>mcpToolArtifact(a)).toThrow('No selected capabilities');
+    const tools=(mcpToolArtifact(a,true) as any).tools;
+    expect(tools).toHaveLength(1);expect(tools[0].inputSchema.oneOf).toHaveLength(2);
+  });
 });

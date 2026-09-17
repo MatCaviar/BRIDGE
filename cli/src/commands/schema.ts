@@ -159,6 +159,7 @@ function bridgeFunctionFor(capability: CapabilityDef): BridgeFunctionSchema {
 
 export function bridgeFunctionArtifact(analysis: AnalysisData, includeBroken = false): Record<string, unknown> {
   const definitions = toolDefinitions(analysis, includeBroken);
+  const suffix = analysis.toolContract?.mode === "channel" ? "" : contractDescriptionSuffix(analysis);
   const functions = definitions.map(tool => {
     const cap = activeCapabilities(analysis, includeBroken).find(c => c.id === tool.name);
     const base = cap && analysis.toolContract?.mode !== "channel" ? bridgeFunctionFor({ ...cap, params: publicParams(analysis, cap) }) : {
@@ -167,7 +168,7 @@ export function bridgeFunctionArtifact(analysis: AnalysisData, includeBroken = f
         ...(schema.enum ? {options:schema.enum} : {}), ...(schema.description ? {description:schema.description} : {}), schema,
       }])), description: tool.description,
     };
-    return { ...base, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema };
+    return { ...base, description: (base.description ?? "") + (cap ? utteranceSuffix(cap) : "") + suffix, inputSchema: tool.inputSchema, outputSchema: tool.outputSchema };
   });
   return {
     schemaVersion: "bridge.function-schema/v1",
@@ -178,6 +179,42 @@ export function bridgeFunctionArtifact(analysis: AnalysisData, includeBroken = f
 
 export function mcpToolArtifact(analysis: AnalysisData, includeBroken = false): Record<string, unknown> {
   return { tools: toolDefinitions(analysis, includeBroken) };
+}
+
+/**
+ * Renders the response code table (success + business errors) and channel metadata
+ * (contract version, timeout, client package) into exported tool descriptions, so the
+ * upstream agent sees the failure semantics of the channel envelope in-band.
+ */
+export function contractDescriptionSuffix(analysis: AnalysisData): string {
+  const contract = analysis.toolContract;
+  if (!contract) return "";
+  const notes: string[] = [];
+  const errorCodes = contract.response?.errorCodes ?? [];
+  if (errorCodes.length || contract.response?.successCodes?.length) {
+    const success = contract.response?.successCodes ?? [0];
+    const codes = [
+      ...success.map((code) => `${code}=success`),
+      ...errorCodes.map((entry) => `${entry.code}=${entry.message}`),
+    ];
+    notes.push(`Response codes: ${codes.join("; ")}.`);
+  }
+  const meta = [
+    contract.version ? `contract v${contract.version}` : "",
+    contract.timeoutMs ? `timeout ${contract.timeoutMs}ms` : "",
+    contract.clientPackage ? `client ${contract.clientPackage}` : "",
+  ].filter(Boolean).join("; ");
+  if (meta) notes.push(`Channel: ${meta}.`);
+  return notes.length ? `\n\n${notes.join("\n")}` : "";
+}
+
+/**
+ * Renders PRD-sourced example utterances into exported descriptions, so the upstream
+ * agent can map user phrasings to the right action in-band.
+ */
+export function utteranceSuffix(capability: CapabilityDef): string {
+  const utterances = capability.utterances ?? [];
+  return utterances.length ? `\n\nExample utterances: ${utterances.map((u) => `"${u}"`).join(" ")}` : "";
 }
 
 export function publicParams(analysis: AnalysisData, capability: CapabilityDef, includeAction = false): readonly ParamDef[] {
@@ -206,7 +243,7 @@ export function toolDefinitions(analysis: AnalysisData, includeBroken = false): 
   const contract = analysis.toolContract;
   if (contract?.mode === "channel") {
     if (!caps.length) throw new Error("No selected capabilities for channel");
-    const branches: JsonSchema[] = caps.map(c => ({...objectSchema(publicParams(analysis, c, true)), description:c.description}));
+    const branches: JsonSchema[] = caps.map(c => ({...objectSchema(publicParams(analysis, c, true)), description: c.description + utteranceSuffix(c)}));
     // MCP requires an object root. oneOf enforces action-specific names, types and required fields.
     const properties: Record<string, unknown> = {};
     const choices: Record<string, JsonSchema[]> = {};
@@ -218,11 +255,12 @@ export function toolDefinitions(analysis: AnalysisData, includeBroken = false): 
       properties[name] = unique.length === 1 ? unique[0] : {anyOf:unique};
     }
     properties[contract.actionField ?? "action"] = { type: "string", enum: caps.map(c => c.publicAction ?? c.id) };
-    return [{ name: contract.name!, description: contract.description ?? caps.map(c => `${c.publicAction ?? c.id}: ${c.description}`).join("\n"),
+    return [{ name: contract.name!, description: (contract.description ?? caps.map(c => `${c.publicAction ?? c.id}: ${c.description}`).join("\n")) + contractDescriptionSuffix(analysis),
       inputSchema: { type: "object", properties, required: [contract.actionField ?? "action"], oneOf: branches, additionalProperties: false },
       outputSchema, annotations: annotationsForSafety(caps.every(c => c.safetyLevel === "readonly") ? "readonly" : caps.some(c => /confirm/.test(c.safetyLevel)) ? "confirm" : "normal") }];
   }
-  const tools: ToolDefinition[] = caps.map(c => ({ name: c.id, description: c.description, inputSchema: objectSchema(publicParams(analysis, c)), outputSchema, annotations: annotationsForSafety(c.safetyLevel) }));
+  const suffix = contractDescriptionSuffix(analysis);
+  const tools: ToolDefinition[] = caps.map(c => ({ name: c.id, description: c.description + utteranceSuffix(c) + suffix, inputSchema: objectSchema(publicParams(analysis, c)), outputSchema, annotations: annotationsForSafety(c.safetyLevel) }));
   for (const builtin of MEDIA_BUILTINS.filter(b => analysis.builtins?.includes(b.name))) {
     tools.push({
       name: builtin.name,

@@ -13,12 +13,23 @@ description: '分析应用源码、PRD、APK 或运行行为，产出上游智�
 
 读取实际源码、manifest、接口文档和服务注册点确定操作名、参数值域与协议。PRD 描述的能力若缺少可执行入口，记录为待实现项；不要编造 wire。APK 解析按用户范围进行，耗时阶段持续报告进度。
 
+## PRD 输入
+
+只有 PRD（PDF/xlsx/CSV/文档）也能产出 MCP 协议表：
+
+1. **抽取**：xlsx 逐 sheet 转成表格逐行核对；PDF 先抽取文本与表格再判断成色——拿到的是明细（功能名/参数/类型/必填/取值范围/话术示例/错误码）还是仅范围清单。索引型 PRD 只有功能名和引用文件名，不要据此编造参数。
+2. **映射**：明细逐条映射 capability（参数、enum、min/max、required，话术示例进 `utterances`）；错误码表进 `toolContract.response.errorCodes`；契约头（版本/超时/client 包名）进 `toolContract.version/timeoutMs/clientPackage`；PRD 出处写 `sourceRef`。索引型 PRD 登记能力骨架（`status:"broken"`、空 params、`description` 注明依据），同时产出待补明细清单请用户补齐引用文件。
+3. **交付**：PRD-only 没有执行链，不写 transport/mechanism，能力保持 `broken`；校验通过后用 `schema --format mcp --include-broken` 导出协议表。交付口径 = 协议表（全部能力标注待验证）+ 待实现/待补明细清单；registry 与部署等执行链接入后再补。
+
+E2E 用例可直接取各能力 `utterances` 作首批话术。
+
 ## 契约设计
 
 先阅读 [工具契约](../../docs/tool-contract.md)。选择与目标接口匹配的模式：
 
 - `individual`：每项能力一个函数。
 - `channel`：一个公开工具，通过 action 区分能力；业务字段、extras 与返回码依据项目接口定义。
+- 通道元数据（契约版本、超时声明、client 包名）与错误码表用 `toolContract.version`/`timeoutMs`/`clientPackage` 与 `toolContract.response.errorCodes` 声明，导出时自动并入工具描述，上游 Agent 在协议表内即可看到失败语义。
 - 上游语义名称与底层字段不同，使用 `publicAction`、`dispatch.operation` 和 `dispatch.parameterMap` 映射。
 - 上下文在 `toolContract.context` 定义。宿主注入值用 `contextBindings` 引用环境变量，禁止把凭据写入产物。
 - params 必须展开对象和数组的 `properties/items`；保留 enum、范围、单位、默认值与必填语义。description 说明操作用途、参数含义与依赖。
@@ -27,6 +38,15 @@ description: '分析应用源码、PRD、APK 或运行行为，产出上游智�
 - 前置条件通过可信宿主或设备状态供给，避免让模型自行声明满足。
 
 HTTP 与 Android 示例分别见 [channel-analysis](../../examples/channel-analysis.json) 和 [android-analysis](../../examples/android-analysis.json)。选择 Android 时阅读 [执行器说明](../../bridge-executor/README.md)，确认签名、权限、事务码及部署用户符合目标环境。
+
+## 执行链接
+
+把 MCP 调用链接到真实应用时，先逆向目标接口再选路径，不要猜线格式：
+
+1. **逆向契约**：应用接口常在 AAR/jar 里（如 `libs/*.aar`）。解包取 `classes.jar`，用 `javap -p`（或解析 class 常量池）提取接口方法签名与 descriptor；AIDL 单方法接口事务码 = `FIRST_CALL_TRANSACTION + 方法声明序`。
+2. **线格式判断**：与执行器四种机制（`aidl` 单 JSON 串方法 / `execmd` (String JSON, Binder) 双参与单 string 回调 / `intent` / `media`）逐 parcel 段对照。匹配 → 生成 registry（必要时 `BRIDGE_ADAPTER_DIR` 提供接口源码）；不匹配（回调式多参、多字段回调、自定义 parcelable）→ 项目自持 HTTP 适配器，`transport` 指向它，不部署执行器 APK。
+3. **适配器形态**：只做协议转换——校验工具名后把 `arguments` 原样透传给应用入口，应用应答组装 `{code,message,data,extras}` 信封；对业务 action 透明，应用新增 action 无需改适配器。仅监听 `127.0.0.1`，宿主经 `adb forward` 访问。参考结构见套件外项目（逆向 AIDL + HTTP 桥 + 离线构建脚本）。
+4. **验证**：`call --analysis ... --name ... --args ...` 走与 MCP 完全相同的校验与响应路径，附非法参数与越界值用例；无设备时交付构建与部署手册，能力保持 `probe`/`broken`，并注明执行链出处（`sourceRef`）。
 
 ## 生成与验证
 

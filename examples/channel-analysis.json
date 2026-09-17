@@ -3,6 +3,7 @@
   "transport": {"type":"http", "url":"http://127.0.0.1:8766/call", "timeoutMs":3000},
   "toolContract": {
     "mode":"channel", "name":"device_channelCall", "description":"Control the local demonstration device using the declared action and its parameters.",
+    "version":"1.0", "timeoutMs":3000, "clientPackage":"com.example.device",
     "actionField":"action", "contextField":"extras",
     "context":[
       {"name":"queryId", "type":"string", "optional":true},
@@ -12,10 +13,13 @@
       {"name":"sourceId", "type":"string", "optional":true},
       {"name":"callId", "type":"string", "optional":true}
     ],
-    "response":{"successCodes":[0],"requireCode":true}
+    "response":{"successCodes":[0],"requireCode":true,"errorCodes":[
+      {"code":1400,"message":"value out of range","description":"a numeric argument violates its declared minimum/maximum"},
+      {"code":1401,"message":"illegal value","description":"a string argument is outside its declared enum"}
+    ]}
   },
   "capabilities":[
-    {"id":"set_level", "publicAction":"adjust_level", "domain":"device", "object":"level", "action":"set", "description":"Adjust the local demonstration device level between 0 and 100.", "params":[{"name":"level","type":"integer","minimum":0,"maximum":100}], "dispatch":{"operation":"set_level","parameterMap":{"level":"intensity"}}, "safetyLevel":"normal","status":"probe","scope":"core","sourceRef":"e2e/demo-device.mjs:set_level"},
+    {"id":"set_level", "publicAction":"adjust_level", "domain":"device", "object":"level", "action":"set", "description":"Adjust the local demonstration device level between 0 and 100.", "params":[{"name":"level","type":"integer","minimum":0,"maximum":100}], "utterances":["把设备档位调到35","可以调到一半吗"], "dispatch":{"operation":"set_level","parameterMap":{"level":"intensity"}}, "safetyLevel":"normal","status":"probe","scope":"core","sourceRef":"e2e/demo-device.mjs:set_level"},
     {"id":"set_power", "domain":"device", "object":"power", "action":"set", "description":"Switch the local demonstration device on or off.", "params":[{"name":"enabled","type":"boolean"}], "safetyLevel":"normal","status":"probe","scope":"core","sourceRef":"e2e/demo-device.mjs:set_power"}
   ]
 }

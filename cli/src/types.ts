@@ -35,6 +35,10 @@ export interface ToolContract {
   readonly mode?: "individual" | "channel";
   readonly name?: string;
   readonly description?: string;
+  /** Optional channel metadata rendered into exported tool descriptions. */
+  readonly version?: string;
+  readonly timeoutMs?: number;
+  readonly clientPackage?: string;
   readonly actionField?: string;
   readonly contextField?: string;
   readonly context?: readonly ParamDef[];
@@ -42,6 +46,12 @@ export interface ToolContract {
   readonly contextBindings?: Readonly<Record<string, { readonly env: string }>>;
   readonly response?: {
     readonly successCodes?: readonly (string | number)[];
+    /** Business error-code table, exported alongside success codes. */
+    readonly errorCodes?: readonly {
+      readonly code: string | number;
+      readonly message: string;
+      readonly description?: string;
+    }[];
     readonly requireCode?: boolean;
     readonly codeField?: string;
     readonly messageField?: string;
@@ -71,6 +81,8 @@ export interface CapabilityDef {
   readonly sourceRef: string;
   readonly scope?: "core" | "shared" | "platform";
   readonly publicAction?: string;
+  /** PRD-sourced example utterances, rendered into exported descriptions for action selection. */
+  readonly utterances?: readonly string[];
   readonly dispatch?: {
     readonly operation?: string;
     readonly parameterMap?: Readonly<Record<string, string>>;
