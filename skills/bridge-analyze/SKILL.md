@@ -19,7 +19,7 @@ description: '分析应用源码、PRD、APK 或运行行为，产出上游智�
 
 1. **抽取**：xlsx 逐 sheet 转成表格逐行核对；PDF 先抽取文本与表格再判断成色——拿到的是明细（功能名/参数/类型/必填/取值范围/话术示例/错误码）还是仅范围清单。索引型 PRD 只有功能名和引用文件名，不要据此编造参数。
 2. **映射**：明细逐条映射 capability（参数、enum、min/max、required，话术示例进 `utterances`）；错误码表进 `toolContract.response.errorCodes`；契约头（版本/超时/client 包名）进 `toolContract.version/timeoutMs/clientPackage`；PRD 出处写 `sourceRef`。索引型 PRD（只有范围清单）同样产出**协议表草案**：可提取的技能/页面名逐条登记为 capability（`status:"broken"`、空 params、`description` 注明索引依据与引用文件），已确认的通道契约（工具名/extras/错误码）照常填写，未知项留空并进待补清单——骨架表让上游提前对齐工具面，不是编造 wire。
-3. **交付**：PRD-only 没有执行链，不写 transport/mechanism，能力保持 `broken`；校验通过后用 `schema --format mcp --include-broken` 导出协议表草案。交付口径 = 协议表草案（能力标注待验证、参数待补）+ 待补明细清单（引用文件与待确认契约字段）；registry 与部署等执行链接入后再补。可提取技能为零的 app 才降级为纯清单。
+3. **交付**：PRD-only 没有执行链，不写 transport/mechanism，能力保持 `broken`；校验通过后用 `schema --format mcp --include-broken` 导出协议表草案。交付口径 = 协议表草案（能力标注待验证、参数待补）+ 待补明细清单（引用文件与待确认契约字段）；registry 与部署等执行链接入后再补——延后的只是 `registry.json` 产物本身，可视化照常默认交付（gen.mjs 的 registry 为可选参数，缺席如实展示）。可提取技能为零的 app 才降级为纯清单。
 
 E2E 用例可直接取各能力 `utterances` 作首批话术。
 
@@ -64,12 +64,14 @@ node "<套件根>/e2e/analysis-to-registry.mjs" "<产物>/analysis.json" "<产�
 
 ## 可视化与端到端
 
-默认提供与本项目对应的可视化。复制 `<套件根>/viz/` 到产物目录；使用绝对路径生成数据并启动：
+默认提供与本项目对应的可视化，PRD-only 草案同样适用。复制 `<套件根>/viz/` 到产物目录；使用绝对路径生成数据并启动：
 
 ```bash
-node "<产物>/viz/gen.mjs" "<产物>/analysis.json" "<产物>/registry.json"
+node "<产物>/viz/gen.mjs" "<产物>/analysis.json" ["<产物>/registry.json"] ["<产物>/function-schema.json"]
 node "<产物>/viz/run.mjs" --suite-root "<套件根>" --project-root "<项目>" --analysis "<产物>/analysis.json" --src "<项目>" --open
 ```
+
+registry 为可选参数，缺失时页面如实展示 registry 缺席，不阻断生成。数据面板只读 bridge 格式的 `function-schema.json`（生成与验证节的默认产物，自动在 analysis 同目录发现，第三参数可显式指定）；MCP/OpenAI 等其他格式导出不进可视化。
 
 端口默认 8650；冲突时选择其他端口。检查 `/api/health` 中项目身份与本次输入一致。无法打开浏览器时提供可访问地址。通过 `/api/session/start` 与 `/api/session/event` 上报真实进度：n1 输入、n2 能力、n3 校验、n4a schema、n4b registry、n5 部署、n6 运行。JSON 使用 UTF-8；观察服务失败不阻断产物生成。
 
