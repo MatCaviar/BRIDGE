@@ -18,8 +18,8 @@ description: '分析应用源码、PRD、APK 或运行行为，产出上游智�
 只有 PRD（PDF/xlsx/CSV/文档）也能产出 MCP 协议表：
 
 1. **抽取**：xlsx 逐 sheet 转成表格逐行核对；PDF 先抽取文本与表格再判断成色——拿到的是明细（功能名/参数/类型/必填/取值范围/话术示例/错误码）还是仅范围清单。索引型 PRD 只有功能名和引用文件名，不要据此编造参数。
-2. **映射**：明细逐条映射 capability（参数、enum、min/max、required，话术示例进 `utterances`）；错误码表进 `toolContract.response.errorCodes`；契约头（版本/超时/client 包名）进 `toolContract.version/timeoutMs/clientPackage`；PRD 出处写 `sourceRef`。索引型 PRD 登记能力骨架（`status:"broken"`、空 params、`description` 注明依据），同时产出待补明细清单请用户补齐引用文件。
-3. **交付**：PRD-only 没有执行链，不写 transport/mechanism，能力保持 `broken`；校验通过后用 `schema --format mcp --include-broken` 导出协议表。交付口径 = 协议表（全部能力标注待验证）+ 待实现/待补明细清单；registry 与部署等执行链接入后再补。
+2. **映射**：明细逐条映射 capability（参数、enum、min/max、required，话术示例进 `utterances`）；错误码表进 `toolContract.response.errorCodes`；契约头（版本/超时/client 包名）进 `toolContract.version/timeoutMs/clientPackage`；PRD 出处写 `sourceRef`。索引型 PRD（只有范围清单）同样产出**协议表草案**：可提取的技能/页面名逐条登记为 capability（`status:"broken"`、空 params、`description` 注明索引依据与引用文件），已确认的通道契约（工具名/extras/错误码）照常填写，未知项留空并进待补清单——骨架表让上游提前对齐工具面，不是编造 wire。
+3. **交付**：PRD-only 没有执行链，不写 transport/mechanism，能力保持 `broken`；校验通过后用 `schema --format mcp --include-broken` 导出协议表草案。交付口径 = 协议表草案（能力标注待验证、参数待补）+ 待补明细清单（引用文件与待确认契约字段）；registry 与部署等执行链接入后再补。可提取技能为零的 app 才降级为纯清单。
 
 E2E 用例可直接取各能力 `utterances` 作首批话术。
 
