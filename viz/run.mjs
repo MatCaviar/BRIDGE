@@ -890,6 +890,9 @@ const handler = async (req, res) => {
     if (url.pathname === "/api/session/event" && req.method === "POST") {
       let body = await readBody(req);
       const { stage, status, cls, msg } = JSON.parse(body || "{}");
+      // hooks 自动上报不经过 session/start：未初始化会话在此自动建立，页面即开始跟随
+      if (!session.startedAt) sessReset(`skill 会话 ${new Date().toLocaleTimeString()}`);
+      if (stage && session.stages[stage] === undefined) for (const s of SESSION_STAGES) if (session.stages[s] === undefined) session.stages[s] = "pending";
       if (status) sessStage(stage, status);
       if (msg) sessLog(stage, cls || "", msg);
       res.writeHead(200, { "content-type": "application/json" });

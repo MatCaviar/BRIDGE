@@ -2,6 +2,12 @@
   "hooks": {
     "SessionStart": [
       { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-init.mjs\"" } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash|Write|Edit|MultiEdit", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/progress-report.mjs\" pre" } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Bash|Write|Edit|MultiEdit", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/progress-report.mjs\" post" } ] }
     ]
   }
 }

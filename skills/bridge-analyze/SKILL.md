@@ -23,6 +23,16 @@ description: '分析应用源码、PRD、APK 或运行行为，产出上游智�
 
 E2E 用例可直接取各能力 `utterances` 作首批话术。
 
+## 代码 + PRD 混合输入
+
+用户常同时给出部分源码与 PRD：**代码里有的功能，依据代码对照 PRD 写；代码里没有的，依据 PRD 写（可预填）**。
+
+1. **找执行入口**：先在源码定位语音/通道入口的 action 分派（如 `ChannelActions` 注册表、命令枚举、binder 方法路由），列出代码已实现的 capability 清单。
+2. **代码侧（以代码为准）**：参数名/类型/取值域/错误码从实现事实提取（含 clamp、枚举匹配等防御逻辑），并对照 PRD 校正口径；`status:"probe"`，`sourceRef` 写代码文件。代码与 PRD 冲突时以代码为准，并在交付说明点名差异（如 PRD 写枚举名而代码收数字串）。
+3. **PRD 侧（可预填）**：PRD 有而代码无的能力登记 `status:"broken"`、`sourceRef` 写 PRD；参数拿不准时照样预填并标 `presumed:true`（能力级或参数级）——契约表导出自动带"预填·待确认"标注，确认后移除。
+4. **连线对照**：产出 `analysis.json` 同目录的 `prd-coverage.json`（`{"source":PRD出处,"items":[{"id","title","status":"matched|partial|prd-only","capIds":[...],"note"}]}`）——PRD 功能 ↔ MCP capability 逐条对应，可视化矩阵渲染三列（已对应 / PRD有代码无 / 代码有PRD未提及）；PRD 明确不做的功能（如"8797无此功能"）同样登记并用 note 说明。
+5. **契约表交付**：`schema --format contract --include-broken` 导出集成文档同构的 CSV 契约表（契约头 + 功能总览 + 功能详情（功能名/参数名/类型/是否必填/取值/范围/说明）+ 错误码表），presumed 项自动标"预填·待确认"。
+
 ## 契约设计
 
 先阅读 [工具契约](../../docs/tool-contract.md)。选择与目标接口匹配的模式：
@@ -73,7 +83,7 @@ node "<产物>/viz/run.mjs" --suite-root "<套件根>" --project-root "<项目>"
 
 registry 为可选参数，缺失时页面如实展示 registry 缺席，不阻断生成。数据面板只读 bridge 格式的 `function-schema.json`（生成与验证节的默认产物，自动在 analysis 同目录发现，第三参数可显式指定）；MCP/OpenAI 等其他格式导出不进可视化。
 
-端口默认 8650；冲突时选择其他端口。检查 `/api/health` 中项目身份与本次输入一致。无法打开浏览器时提供可访问地址。通过 `/api/session/start` 与 `/api/session/event` 上报真实进度：n1 输入、n2 能力、n3 校验、n4a schema、n4b registry、n5 部署、n6 运行。JSON 使用 UTF-8；观察服务失败不阻断产物生成。
+端口默认 8650；冲突时选择其他端口。检查 `/api/health` 中项目身份与本次输入一致。无法打开浏览器时提供可访问地址。**进度自动上报**：插件 hooks 在工具调用层推断阶段并驱动页面（写 analysis.json→②、validate→③、schema→③、registry→④乙、serve→④甲、call/invoke→⑥），无需手动 POST；仅在非插件环境 hooks 缺席时，才手动 `POST /api/session/event`（n1 输入、n2 能力、n3 校验、n4a schema、n4b registry、n5 部署、n6 运行）。JSON 使用 UTF-8；观察服务失败不阻断产物生成。
 
 页面 E2E 入口可拉起模型网关。按实际能力构造测试：典型操作、枚举边界、多意图、近义指令、范围外请求；每批至多 12 条。channel 测试除了工具名，还检查 action 和业务参数。工具选择与执行结果分开判断；设备失败不能通过改写 description 消除。只重测受修改影响的用例。
 

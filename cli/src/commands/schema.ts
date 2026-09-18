@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { AnalysisData, CapabilityDef, FieldShape, ParamDef } from "../types.js";
 import { assertAnalysis } from "../../../contract/analysis.mjs";
 
-export type SchemaFormat = "bridge" | "mcp" | "openai" | "anthropic" | "all";
+export type SchemaFormat = "bridge" | "mcp" | "openai" | "anthropic" | "contract" | "all";
 export type JsonSchema = Record<string, unknown>;
 
 export const MEDIA_BUILTINS = [
@@ -309,6 +309,92 @@ export function schemaArtifact(analysis: AnalysisData, format: SchemaFormat, inc
   };
 }
 
+/** Human-facing contract table columns, mirroring the integration contract sheet (功能名/参数名/类型/是否必填/取值/范围/说明). */
+const csvTypeName = (field: FieldShape): string => {
+  const t = normalizedJsonType(field.type);
+  if (t === "array") {
+    const item = arrayItemShape(field);
+    return `List[${item ? csvTypeName(item) : "Any"}]`;
+  }
+  return { integer: "Int", number: "Float", string: "String", boolean: "Bool", object: "Object" }[t] ?? "String";
+};
+
+const csvRange = (field: FieldShape): string => {
+  const parts: string[] = [];
+  const enumValues = normalizedEnum(field);
+  if (enumValues?.length) parts.push(enumValues.join("|"));
+  const t = normalizedJsonType(field.type);
+  if (t === "integer" || t === "number") {
+    if (field.minimum !== undefined && field.maximum !== undefined) parts.push(`${field.minimum}~${field.maximum}`);
+    else if (field.minimum !== undefined) parts.push(`≥${field.minimum}`);
+    else if (field.maximum !== undefined) parts.push(`≤${field.maximum}`);
+  }
+  for (const [lo, hi] of [["minLength", "maxLength"], ["minItems", "maxItems"]] as const) {
+    if (field[lo] !== undefined || field[hi] !== undefined) parts.push(`${lo === "minLength" ? "长度" : "项数"} ${field[lo] ?? 0}~${field[hi] ?? "∞"}`);
+  }
+  if (field.pattern) parts.push(`pattern:${field.pattern}`);
+  return parts.join("；");
+};
+
+const csvCell = (value: unknown): string => {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const csvRow = (cells: readonly unknown[]): string => cells.map(csvCell).join(",");
+
+/**
+ * Exports the human-facing contract sheet (integration-doc style): header info, function
+ * overview, per-parameter detail table, and the error-code table. `presumed` entries
+ * (pre-filled from PRD without code confirmation) are flagged 待确认 in 备注.
+ */
+export function contractTableCsv(analysis: AnalysisData, includeBroken = false): string {
+  const rows: string[] = [];
+  const contract = analysis.toolContract;
+  const caps = activeCapabilities(analysis, includeBroken);
+  const statusNote = (c: CapabilityDef) => {
+    const base = c.status === "broken" ? "PRD-only 待实现" : c.status === "probe" ? "待运行验证" : "已验证";
+    const presumed = c.presumed ? "；预填·待确认" : "";
+    return `${base}${c.deliverNote ? `；${c.deliverNote}` : ""}${presumed}`;
+  };
+
+  rows.push("契约头信息");
+  rows.push(csvRow(["channel", "契约版本", "超时声明", "client 应用包名"]));
+  rows.push(csvRow([contract?.name ?? "", contract?.version ?? "", contract?.timeoutMs ? `${contract.timeoutMs}ms` : "", contract?.clientPackage ?? ""]));
+  rows.push("");
+  rows.push("功能总览");
+  rows.push(csvRow(["功能名", "功能说明", "用户话术示例", "备注"]));
+  for (const c of caps) rows.push(csvRow([c.publicAction ?? c.id, c.description, (c.utterances ?? []).join("；"), statusNote(c)]));
+  rows.push("");
+  rows.push("功能详情");
+  rows.push(csvRow(["功能名", "参数名", "类型", "是否必填", "取值/范围", "说明", "示例", "备注"]));
+  for (const c of caps) {
+    const presumedNote = c.presumed ? "预填·待确认" : "";
+    if (!c.params?.length) {
+      rows.push(csvRow([c.publicAction ?? c.id, "", "", "", "", "", "", presumedNote]));
+      continue;
+    }
+    for (const p of c.params) {
+      rows.push(csvRow([
+        c.publicAction ?? c.id,
+        p.name,
+        csvTypeName(p),
+        !p.optional && p.defaultValue === undefined ? "是" : "否",
+        csvRange(p),
+        p.description ?? "",
+        (p.examples ?? []).map((e) => JSON.stringify(e)).join("；"),
+        p.presumed ? presumedNote || "预填·待确认" : presumedNote,
+      ]));
+    }
+  }
+  rows.push("");
+  rows.push("错误码表");
+  rows.push(csvRow(["code", "说明"]));
+  for (const code of contract?.response?.successCodes ?? [0]) rows.push(csvRow([code, "成功"]));
+  for (const e of contract?.response?.errorCodes ?? []) rows.push(csvRow([e.code, e.description ? `${e.message}（${e.description}）` : e.message]));
+  return "\uFEFF" + rows.join("\r\n") + "\r\n";
+}
+
 interface SchemaOptions {
   readonly analysisPath: string;
   readonly outputPath?: string;
@@ -334,7 +420,7 @@ function parseSchemaArgs(argv: string[]): SchemaOptions {
     else throw new Error(`Unknown schema option: ${arg}`);
   }
   if (!analysisPath) throw new Error("schema requires --analysis <analysis.json>");
-  if (!["bridge", "mcp", "openai", "anthropic", "all"].includes(format)) {
+  if (!["bridge", "mcp", "openai", "anthropic", "contract", "all"].includes(format)) {
     throw new Error(`Unsupported schema format: ${format}`);
   }
   return { analysisPath, outputPath, format, includeBroken, compact };
@@ -343,6 +429,17 @@ function parseSchemaArgs(argv: string[]): SchemaOptions {
 export async function schemaCommand(argv: string[]): Promise<void> {
   const opts = parseSchemaArgs(argv);
   const analysis = JSON.parse(readFileSync(opts.analysisPath, "utf-8")) as AnalysisData;
+  if (opts.format === "contract") {
+    const csv = contractTableCsv(analysis, opts.includeBroken);
+    if (!opts.outputPath) {
+      process.stdout.write(csv);
+      return;
+    }
+    mkdirSync(dirname(opts.outputPath), { recursive: true });
+    writeFileSync(opts.outputPath, csv, "utf-8");
+    process.stdout.write(`contract table written: ${activeCapabilities(analysis, opts.includeBroken).length} capabilities -> ${opts.outputPath}\n`);
+    return;
+  }
   const artifact = schemaArtifact(analysis, opts.format, opts.includeBroken);
   const json = JSON.stringify(artifact, null, opts.compact ? undefined : 2) + "\n";
   if (!opts.outputPath) {

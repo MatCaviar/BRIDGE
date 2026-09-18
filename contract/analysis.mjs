@@ -21,6 +21,7 @@ export function validateAnalysis(a) {
       seen.add(p.name);
       field(p, loc);
       if (p.optional !== undefined && typeof p.optional !== 'boolean') fail(loc, 'optional must be boolean');
+    if (p.presumed !== undefined && typeof p.presumed !== 'boolean') fail(loc, 'presumed must be boolean');
     }
   };
   const field = (p, at) => {
@@ -96,6 +97,7 @@ export function validateAnalysis(a) {
     if (c.scope !== undefined && !scopes.includes(c.scope)) fail(at,'invalid scope');
     if (c.utterances !== undefined && (!Array.isArray(c.utterances) || !c.utterances.length || c.utterances.some(u => typeof u !== 'string' || !u.trim()))) fail(at, 'utterances must be a nonempty array of nonempty strings');
     else if (c.utterances?.length && new Set(c.utterances).size !== c.utterances.length) fail(at, 'duplicate utterance');
+    if (c.presumed !== undefined && typeof c.presumed !== 'boolean') fail(at, 'presumed must be boolean');
     fields(c.params ?? [], `${at}.params`);
     const action = c.publicAction ?? c.id;
     if (typeof action !== 'string' || !action) fail(at, 'publicAction must be nonempty string');

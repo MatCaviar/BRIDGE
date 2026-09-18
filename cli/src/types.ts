@@ -21,6 +21,8 @@ export interface ParamDef extends FieldShape {
   readonly optional?: boolean;
   readonly examples?: readonly unknown[];
   readonly defaultValue?: unknown;
+  /** Value pre-filled from PRD/doc rather than confirmed from code or runtime; rendered as 待确认 in contract tables. */
+  readonly presumed?: boolean;
 }
 
 export type CapabilityStatus = "verified" | "probe" | "broken";
@@ -83,6 +85,10 @@ export interface CapabilityDef {
   readonly publicAction?: string;
   /** PRD-sourced example utterances, rendered into exported descriptions for action selection. */
   readonly utterances?: readonly string[];
+  /** Whole capability pre-filled from PRD/doc without code confirmation; surfaced in contract tables. */
+  readonly presumed?: boolean;
+  /** One-line delivery note (PRD mapping / coverage / pending items), rendered in the visualization matrix. */
+  readonly deliverNote?: string;
   readonly dispatch?: {
     readonly operation?: string;
     readonly parameterMap?: Readonly<Record<string, string>>;

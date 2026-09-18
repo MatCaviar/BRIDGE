@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AnalysisData, CapabilityDef } from "../src/types.js";
 import {
   bridgeFunctionArtifact,
+  contractTableCsv,
   jsonSchemaFor,
   mcpToolArtifact,
   openAIToolArtifact,
@@ -66,5 +67,36 @@ describe("upstream Agent function schema projection", () => {
     const numeric = { ...readingLight, params: [{ name: "mode", type: "int", enum: ["0", "1", "2"] }] };
     const schema = jsonSchemaFor(numeric) as any;
     expect(schema.properties.mode).toEqual(expect.objectContaining({ type: "integer", enum: [0, 1, 2] }));
+  });
+
+  it("exports the integration-doc contract table with ranges, required flags and presumed flags", () => {
+    const a: AnalysisData = {
+      app: { name: "t" },
+      toolContract: {
+        mode: "channel", name: "x_channelCall", version: "1.0", timeoutMs: 5000, clientPackage: "com.x",
+        response: { successCodes: [0], errorCodes: [{ code: 1400, message: "越界" }] },
+      },
+      capabilities: [
+        {
+          id: "act", domain: "d", object: "o", action: "set", description: "做某事", status: "probe", sourceRef: "code",
+          utterances: ["话术一"],
+          params: [{ name: "volume", type: "integer", minimum: 0, maximum: 10, description: "音量", examples: [5] }],
+        },
+        {
+          id: "draft", domain: "d", object: "o", action: "set", description: "预填能力", status: "broken", sourceRef: "PRD p1",
+          presumed: true,
+          params: [{ name: "style", type: "string", enum: ["0", "1"], presumed: true }],
+        },
+      ],
+    };
+    const csv = contractTableCsv(a, true);
+    expect(csv).toContain("功能名,参数名,类型,是否必填,取值/范围,说明,示例,备注");
+    expect(csv).toContain("x_channelCall,1.0,5000ms,com.x");
+    expect(csv).toContain("act,volume,Int,是,0~10,音量,5,");
+    expect(csv).toContain("draft,style,String,是,0|1,,,预填·待确认");
+    expect(csv).toContain("1400,越界");
+    expect(csv.charCodeAt(0)).toBe(0xfeff); // UTF-8 BOM，Excel 直开
+    const broken = contractTableCsv(a);
+    expect(broken).not.toContain("draft,style");
   });
 });
