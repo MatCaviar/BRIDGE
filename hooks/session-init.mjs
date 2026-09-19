@@ -38,7 +38,9 @@ async function startViz() {
 
   const entry = join(ROOT, "viz", "run.mjs");
   if (!existsSync(entry)) return;
-  const child = spawn(process.execPath, [entry, "--port", String(port)], {
+  // --no-open：hook 拉起的是后台进度服务，不该弹浏览器页面（开机静默）。
+  // 用户要看时打开 hook 输出里的地址，或手动 `node viz/run.mjs --open`。
+  const child = spawn(process.execPath, [entry, "--port", String(port), "--no-open"], {
     cwd: ROOT,
     detached: true,
     stdio: "ignore",
