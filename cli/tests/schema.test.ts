@@ -95,6 +95,12 @@ describe("upstream Agent function schema projection", () => {
     expect(csv).toContain("act,volume,Int,是,0~10,音量,5,");
     expect(csv).toContain("draft,style,String,是,0|1,,,预填·待确认");
     expect(csv).toContain("1400,越界");
+    expect(csv).toContain("mcp协议");
+    expect(csv).toContain('""name"": ""x_channelCall""');   // CSV 引号转义后形态（与集成文档一致）
+    expect(csv).toContain('""action"": ""act""');
+    expect(csv).toContain('""volume"": 5');
+    expect(csv).toContain("成功：");
+    expect(csv).toContain('""code"": 1400');
     expect(csv.charCodeAt(0)).toBe(0xfeff); // UTF-8 BOM，Excel 直开
     const broken = contractTableCsv(a);
     expect(broken).not.toContain("draft,style");

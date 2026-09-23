@@ -343,6 +343,52 @@ const csvCell = (value: unknown): string => {
 
 const csvRow = (cells: readonly unknown[]): string => cells.map(csvCell).join(",");
 
+/** Picks a concrete example value for JSON call examples: examples → enum → bounds → type default. */
+function exampleValue(p: ParamDef): unknown {
+  if (p.examples?.length) return p.examples[0];
+  const enumValues = normalizedEnum(p);
+  if (enumValues?.length) return enumValues[0];
+  const t = normalizedJsonType(p.type);
+  if (t === "integer" || t === "number") return p.minimum ?? 0;
+  if (t === "boolean") return true;
+  if (t === "array") {
+    const item = arrayItemShape(p);
+    return item ? [exampleValue({ ...item, name: p.name })] : [];
+  }
+  if (t === "object") {
+    const obj: Record<string, unknown> = {};
+    for (const prop of p.properties ?? []) obj[prop.name] = exampleValue(prop);
+    return obj;
+  }
+  return "xxx";
+}
+
+/** Renders the integration-doc "mcp协议" section: one row per capability with call/result JSON examples. */
+export function mcpProtocolRows(analysis: AnalysisData, caps: readonly CapabilityDef[]): string[][] {
+  const contract = analysis.toolContract;
+  const channel = contract?.mode === "channel";
+  const actionField = contract?.actionField ?? "action";
+  const contextField = contract?.contextField ?? "extras";
+  const context = contract?.context ?? [];
+  const extras: Record<string, unknown> = {};
+  for (const f of context) extras[f.name] = exampleValue(f);
+  const successCode = contract?.response?.successCodes?.[0] ?? 0;
+  const firstError = contract?.response?.errorCodes?.[0];
+
+  return caps.map((c) => {
+    const args: Record<string, unknown> = {};
+    if (channel) args[actionField] = c.publicAction ?? c.id;
+    for (const p of c.params ?? []) args[p.name] = exampleValue(p);
+    if (context.length) args[contextField] = extras;
+    const call = JSON.stringify({ name: channel ? contract?.name ?? "" : c.id, arguments: args }, null, 2);
+    const ok = JSON.stringify({ code: successCode, message: "success", data: {}, extras: {} }, null, 2);
+    const result = firstError
+      ? `成功：\n${ok}\n失败：\n${JSON.stringify({ code: firstError.code, message: firstError.message, data: {}, extras: {} }, null, 2)}`
+      : `成功：\n${ok}`;
+    return [c.publicAction ?? c.id, call, result, ""];
+  });
+}
+
 /**
  * Exports the human-facing contract sheet (integration-doc style): header info, function
  * overview, per-parameter detail table, and the error-code table. `presumed` entries
@@ -387,6 +433,10 @@ export function contractTableCsv(analysis: AnalysisData, includeBroken = false):
       ]));
     }
   }
+  rows.push("");
+  rows.push("mcp协议");
+  rows.push(csvRow(["功能名", "mcp入参", "mcp返回结果", "0=成功，非0见错误码表"]));
+  for (const cells of mcpProtocolRows(analysis, caps)) rows.push(csvRow(cells));
   rows.push("");
   rows.push("错误码表");
   rows.push(csvRow(["code", "说明"]));
