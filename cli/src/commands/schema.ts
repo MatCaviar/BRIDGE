@@ -416,11 +416,7 @@ export function contractTableCsv(analysis: AnalysisData, includeBroken = false):
   rows.push(csvRow(["功能名", "参数名", "类型", "是否必填", "取值/范围", "说明", "示例", "备注"]));
   for (const c of caps) {
     const presumedNote = c.presumed ? "预填·待确认" : "";
-    if (!c.params?.length) {
-      // 预填优先于留白：无业务参数本身是按功能语义的合理预判，显式写出待确认，而不是空行
-      rows.push(csvRow([c.publicAction ?? c.id, "（无业务参数）", "", "", "", "按功能语义预判无业务参数，待明细材料确认", "", presumedNote || "预填·待确认"]));
-      continue;
-    }
+    if (!c.params?.length) continue; // 团队契约表口径：无参功能不进功能详情（功能总览已有其行）
     for (const p of c.params) {
       rows.push(csvRow([
         c.publicAction ?? c.id,
