@@ -417,7 +417,8 @@ export function contractTableCsv(analysis: AnalysisData, includeBroken = false):
   for (const c of caps) {
     const presumedNote = c.presumed ? "预填·待确认" : "";
     if (!c.params?.length) {
-      rows.push(csvRow([c.publicAction ?? c.id, "", "", "", "", "", "", presumedNote]));
+      // 预填优先于留白：无业务参数本身是按功能语义的合理预判，显式写出待确认，而不是空行
+      rows.push(csvRow([c.publicAction ?? c.id, "（无业务参数）", "", "", "", "按功能语义预判无业务参数，待明细材料确认", "", presumedNote || "预填·待确认"]));
       continue;
     }
     for (const p of c.params) {
