@@ -55,8 +55,9 @@ HTTP 与 Android 示例分别见 [channel-analysis](../../examples/channel-analy
 
 1. **逆向契约**：应用接口常在 AAR/jar 里（如 `libs/*.aar`）。解包取 `classes.jar`，用 `javap -p`（或解析 class 常量池）提取接口方法签名与 descriptor；AIDL 单方法接口事务码 = `FIRST_CALL_TRANSACTION + 方法声明序`。
 2. **线格式判断**：与执行器四种机制（`aidl` 单 JSON 串方法 / `execmd` (String JSON, Binder) 双参与单 string 回调 / `intent` / `media`）逐 parcel 段对照。匹配 → 生成 registry（必要时 `BRIDGE_ADAPTER_DIR` 提供接口源码）；不匹配（回调式多参、多字段回调、自定义 parcelable）→ 项目自持 HTTP 适配器，`transport` 指向它，不部署执行器 APK。
-3. **适配器形态**：只做协议转换——校验工具名后把 `arguments` 原样透传给应用入口，应用应答组装 `{code,message,data,extras}` 信封；对业务 action 透明，应用新增 action 无需改适配器。仅监听 `127.0.0.1`，宿主经 `adb forward` 访问。参考结构见套件外项目（逆向 AIDL + HTTP 桥 + 离线构建脚本）。
-4. **验证**：`call --analysis ... --name ... --args ...` 走与 MCP 完全相同的校验与响应路径，附非法参数与越界值用例；无设备时交付构建与部署手册，能力保持 `probe`/`broken`，并注明执行链出处（`sourceRef`）。
+3. **适配器形态**：只做协议转换——校验工具名后把 `arguments` 原样透传给应用入口，应用应答组装 `{code,message,data,extras}` 信封；对业务 action 透明，应用新增 action 无需改适配器。仅监听 `127.0.0.1`，宿主经 `adb forward` 访问。channelCall 平台类应用直接用套件 `channel-bridge/` 通用桥模板（targets.json 参数化多目标，离线构建）。
+4. **无源码应用（感知→行动→决策）**：车机已装但无源码的应用——`discover-device.mjs` adb 扫包+dumpsys 提取各 app 的 PROVIDE 通道服务（发现清单+自动生成 targets.json）→ 多目标桥按包名路由（channel 类 bind 统一契约服务，页面技能 `am start` 直达）→ `calibrate.mjs --analysis <产物>/analysis.json` 错误码驱动校准（1402 动作名/1403 参数名/1401 值域/1400 边界/1406 待端侧/0 转正），无歧义修正自动回写、命名类建议交人确认，复测收敛。
+5. **验证**：`call --analysis ... --name ... --args ...` 走与 MCP 完全相同的校验与响应路径，附非法参数与越界值用例；无设备时交付构建与部署手册，能力保持 `probe`/`broken`，并注明执行链出处（`sourceRef`）。
 
 ## 生成与验证
 

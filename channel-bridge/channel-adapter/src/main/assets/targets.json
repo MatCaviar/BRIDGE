@@ -1,0 +1,7 @@
+{
+  "imaudio_channelCall": {
+    "package": "com.immotors.imaudio",
+    "service": "com.immotors.imaudio_service.channel.IMAudioChannelProviderService",
+    "channel": true
+  }
+}
